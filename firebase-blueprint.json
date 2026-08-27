@@ -1,0 +1,158 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Information about the store owner or analyst profile",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Store owner name"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar URL"
+        },
+        "storeName": {
+          "type": "string",
+          "description": "Default store name"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["email"]
+    },
+    "DatasetReport": {
+      "title": "DatasetReport",
+      "description": "Uploaded e-commerce analytics reports and parsed summary data",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ID of the user who owns this dataset"
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Uploaded Excel/CSV file name"
+        },
+        "platform": {
+          "type": "string",
+          "description": "E-commerce platform (shopee, tiktok, lazada, tiki)"
+        },
+        "kpis": {
+          "type": "object",
+          "description": "Calculated KPI summary metrics"
+        },
+        "executiveSummary": {
+          "type": "string",
+          "description": "Generated AI executive summary"
+        },
+        "actionCards": {
+          "type": "array",
+          "description": "Priority action cards"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of creation"
+        }
+      },
+      "required": ["userId", "fileName"]
+    },
+    "RoadmapTask": {
+      "title": "RoadmapTask",
+      "description": "Action roadmap tasks stored persistently",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Task name"
+        },
+        "timeframe": {
+          "type": "string",
+          "description": "Immediate (0-2w), Short-term (2-6w), Medium-term (1-3m)"
+        },
+        "category": {
+          "type": "string",
+          "description": "Task category (Cashflow, Marketing, Operations, Product)"
+        },
+        "priority": {
+          "type": "string",
+          "description": "P0 (Critical), P1 (High), P2 (Medium)"
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Assignee name"
+        },
+        "deadline": {
+          "type": "string",
+          "description": "Due date"
+        },
+        "status": {
+          "type": "string",
+          "description": "pending, in_progress, completed"
+        },
+        "expectedImpact": {
+          "type": "string",
+          "description": "Expected financial or operational impact"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp"
+        }
+      },
+      "required": ["userId", "title", "status"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Saved Dolphin AI chat history",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User ID"
+        },
+        "role": {
+          "type": "string",
+          "description": "user or assistant"
+        },
+        "content": {
+          "type": "string",
+          "description": "Message text"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO timestamp"
+        }
+      },
+      "required": ["userId", "role", "content"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document"
+    },
+    "/users/{userId}/datasets/{datasetId}": {
+      "schema": "DatasetReport",
+      "description": "Persistent e-commerce reports per user"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "RoadmapTask",
+      "description": "Action roadmap tasks per user"
+    },
+    "/users/{userId}/chatHistory/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Dolphin AI conversation logs per user"
+    }
+  }
+}

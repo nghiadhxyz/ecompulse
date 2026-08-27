@@ -1,0 +1,6 @@
+{
+  "name": "EcomPulse",
+  "description": "Zero-setup e-commerce analytics dashboard converting multi-sheet Excel exports into actionable insights, funnel leak detection, and AI-prioritized to-do lists for sellers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
