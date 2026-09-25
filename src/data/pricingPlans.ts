@@ -1,0 +1,682 @@
+import { PricingPlan } from '../types/pricing';
+
+export const PRICING_PLANS_VI: PricingPlan[] = [
+  {
+    id: 'experience',
+    name: 'GÓI EXPERIENCE',
+    subtitle: 'FREE TASTE',
+    targetAudience: 'Shop mới, cá nhân muốn trải nghiệm thử công cụ.',
+    price: 0,
+    originalPrice: 0,
+    billingText: 'Miễn phí trọn đời',
+    badge: 'Khởi Đầu Miễn Phí',
+    badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    accentColor: 'from-slate-800 to-slate-900 border-slate-700/60 hover:border-emerald-500/50',
+    ctaText: 'Đang Sử Dụng (Miễn Phí)',
+    features: [
+      {
+        text: 'Upload file Excel thủ công (tối đa 3 lần/tháng)',
+        isIncluded: true,
+        tag: 'Tối đa 3 lần',
+      },
+      {
+        text: 'Xem Dashboard Net Cash Flow & phễu rò rỉ cơ bản',
+        isIncluded: true,
+      },
+      {
+        text: 'Xuất báo cáo 3 Tab ra Google Sheets',
+        isIncluded: true,
+      },
+      {
+        text: 'Hỗ trợ qua tài liệu hướng dẫn và cộng đồng',
+        isIncluded: true,
+      },
+      {
+        text: 'Dolphin AI RAG Chatbot (Hỏi đáp dữ liệu shop)',
+        isIncluded: false,
+      },
+      {
+        text: 'AI Priority Action Cards & Simulator "What-If"',
+        isIncluded: false,
+      },
+      {
+        text: 'Gmail Critical Alert (Đơn hủy COD > 15%, Ads lỗ)',
+        isIncluded: false,
+      },
+      {
+        text: 'Partner Open API (Shopee, TikTok Shop)',
+        isIncluded: false,
+      },
+      {
+        text: 'Multimodal AI (Chụp ảnh/PDF hóa đơn COGS)',
+        isIncluded: false,
+      },
+      {
+        text: 'Báo cáo Benchmark trung bình ngành & SLA riêng',
+        isIncluded: false,
+      },
+    ],
+  },
+  {
+    id: 'pro_monthly',
+    name: 'GÓI PRO MONTHLY',
+    subtitle: 'THEO THÁNG',
+    targetAudience: 'Shop cá nhân, SMEs đang bán trên 1–3 sàn muốn linh hoạt chi phí.',
+    price: 299000,
+    originalPrice: 299000,
+    billingText: 'VNĐ / tháng',
+    discountNote: 'Ưu đãi tháng đầu tiên chỉ 119.000 VNĐ',
+    badge: '🔥 Phổ Biến Nhất',
+    badgeColor: 'bg-blue-500/25 text-blue-300 border-blue-400/50 shadow-blue-500/20',
+    accentColor: 'from-blue-950/80 via-slate-900 to-indigo-950/70 border-blue-500/50 hover:border-blue-400 shadow-xl shadow-blue-500/10',
+    isPopular: true,
+    ctaText: 'Đăng Ký Gói Tháng (119.000đ)',
+    features: [
+      {
+        text: 'Upload file Excel không giới hạn + Auto-fetch cào file qua Email',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Không giới hạn',
+      },
+      {
+        text: 'Mở khóa trọn bộ Dolphin AI RAG Chatbot (Hỏi đáp dữ liệu shop)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'AI RAG',
+      },
+      {
+        text: 'Trích xuất bộ AI Priority Action Cards & Simulator "What-If" dự báo lợi nhuận',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Simulator',
+      },
+      {
+        text: 'Gmail Critical Alert (Cảnh báo khi đơn hủy COD > 15% hoặc Ads âm lỗ)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Real-time',
+      },
+      {
+        text: 'Đồng bộ Google Calendar 1-Click',
+        isIncluded: true,
+      },
+      {
+        text: 'Xuất báo cáo 3 Tab ra Google Sheets',
+        isIncluded: true,
+      },
+      {
+        text: 'Partner Open API (Shopee, TikTok Shop)',
+        isIncluded: false,
+      },
+      {
+        text: 'Dự báo tồn kho thông minh (SKU Zombie)',
+        isIncluded: false,
+      },
+      {
+        text: 'Multimodal AI (Chụp ảnh/PDF hóa đơn COGS)',
+        isIncluded: false,
+      },
+      {
+        text: 'Báo cáo Benchmark trung bình ngành & SLA riêng',
+        isIncluded: false,
+      },
+    ],
+  },
+  {
+    id: 'pro_semi_annual',
+    name: 'GÓI PRO SEMI-ANNUAL',
+    subtitle: '6 THÁNG CHIẾN LƯỢC',
+    targetAudience: 'Nhà bán hàng chiến lược, gian hàng lớn muốn cam kết đồng hành dài hạn và tự động hóa.',
+    price: 599000,
+    originalPrice: 1794000,
+    billingText: 'VNĐ / 6 tháng (~99.800đ/tháng)',
+    discountNote: 'Tiết kiệm ~67% so với gia hạn từng tháng',
+    badge: '⭐ Khuyên Dùng (Tiết Kiệm 67%)',
+    badgeColor: 'bg-gradient-to-r from-amber-500/30 to-purple-500/30 text-amber-300 border-amber-400/50 shadow-amber-500/25',
+    accentColor: 'from-purple-950/80 via-slate-900 to-amber-950/60 border-amber-400/60 hover:border-amber-300 shadow-2xl shadow-purple-500/15 ring-1 ring-amber-400/30',
+    isBestValue: true,
+    ctaText: 'Nâng Cấp Gói 6 Tháng (599.000đ)',
+    features: [
+      {
+        text: 'Bao gồm toàn bộ tính năng của Gói Pro Monthly',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Full Pro',
+      },
+      {
+        text: 'Tự động đồng bộ dữ liệu qua Partner Open API (Shopee, TikTok Shop)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Auto API Sync',
+      },
+      {
+        text: 'Dự báo tồn kho thông minh (Predictive Inventory / Phát hiện SKU Zombie)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'AI Inventory',
+      },
+      {
+        text: 'Phân tích xu hướng tài chính đa tháng (Time-series RAG)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Time-series',
+      },
+      {
+        text: 'Ưu tiên hỗ trợ kỹ thuật 1-1 trực tiếp qua Zalo',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'VIP 1-1',
+      },
+      {
+        text: 'Upload file Excel không giới hạn + Auto-fetch Email',
+        isIncluded: true,
+      },
+      {
+        text: 'Trọn bộ Dolphin AI RAG Chatbot & Action Cards',
+        isIncluded: true,
+      },
+      {
+        text: 'Multimodal AI (Chụp ảnh/PDF hóa đơn COGS)',
+        isIncluded: false,
+      },
+      {
+        text: 'Báo cáo Benchmark trung bình ngành & SLA riêng',
+        isIncluded: false,
+      },
+    ],
+  },
+  {
+    id: 'enterprise',
+    name: 'GÓI ENTERPRISE',
+    subtitle: 'CUSTOM DOANH NGHIỆP',
+    targetAudience: 'Thương hiệu lớn (Brands), Agencies quản lý nhiều gian hàng.',
+    price: 0,
+    isCustomQuote: true,
+    billingText: 'Báo giá riêng (Quý / Năm)',
+    discountNote: 'Cam kết SLA & Bảo hành riêng',
+    badge: '👑 Doanh Nghiệp & Agency',
+    badgeColor: 'bg-gradient-to-r from-emerald-500/30 via-cyan-500/30 to-blue-500/30 text-cyan-300 border-cyan-400/50 shadow-cyan-500/25',
+    accentColor: 'from-cyan-950/80 via-slate-900 to-emerald-950/70 border-cyan-400/60 hover:border-cyan-300 shadow-2xl shadow-cyan-500/20 ring-1 ring-cyan-400/30',
+    isEnterprise: true,
+    ctaText: 'Liên Hệ Báo Giá Doanh Nghiệp',
+    features: [
+      {
+        text: 'Bao gồm toàn bộ tính năng của Gói Pro Semi-Annual',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Full Ultimate',
+      },
+      {
+        text: 'Tích hợp API riêng (Custom API Integration & Data Pipeline)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Custom API',
+      },
+      {
+        text: 'Multimodal AI: Chụp ảnh/PDF tự động bóc tách hóa đơn nhập thô COGS',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Multimodal AI',
+      },
+      {
+        text: 'Báo cáo Benchmark so sánh trung bình toàn ngành hàng',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Industry Benchmark',
+      },
+      {
+        text: 'Cảnh báo rủi ro tùy biến theo SLA riêng (Zalo Webhook / Telegram / Email)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Custom SLA',
+      },
+      {
+        text: 'Cam kết hạ tầng bảo mật On-Premise Local-First bảo vệ quyền riêng tư tuyệt đối',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Privacy Shield',
+      },
+      {
+        text: 'Kỹ sư giải pháp chuyên trách hỗ trợ kỹ thuật và bảo hành riêng 24/7',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Dedicated 24/7',
+      },
+      {
+        text: 'Quản lý đa gian hàng & phân quyền tài khoản thành viên nhóm',
+        isIncluded: true,
+      },
+      {
+        text: 'Ký hợp đồng dịch vụ doanh nghiệp & Xuất hóa đơn VAT đầy đủ',
+        isIncluded: true,
+      },
+    ],
+  },
+];
+
+export const PRICING_PLANS_EN: PricingPlan[] = [
+  {
+    id: 'experience',
+    name: 'EXPERIENCE PLAN',
+    subtitle: 'FREE TASTE',
+    targetAudience: 'New stores and individuals exploring the tool.',
+    price: 0,
+    originalPrice: 0,
+    billingText: 'Free Lifetime',
+    badge: 'Free Starter',
+    badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    accentColor: 'from-slate-800 to-slate-900 border-slate-700/60 hover:border-emerald-500/50',
+    ctaText: 'Current Plan (Free)',
+    features: [
+      {
+        text: 'Manual Excel file upload (Max 3 uploads / month)',
+        isIncluded: true,
+        tag: 'Max 3/mo',
+      },
+      {
+        text: 'Net Cash Flow dashboard & basic leakage funnel',
+        isIncluded: true,
+      },
+      {
+        text: 'Export 3-tab report to Google Sheets',
+        isIncluded: true,
+      },
+      {
+        text: 'Community and documentations support',
+        isIncluded: true,
+      },
+      {
+        text: 'Dolphin AI RAG Chatbot (Shop data Q&A)',
+        isIncluded: false,
+      },
+      {
+        text: 'Partner Open API (Shopee, TikTok Shop)',
+        isIncluded: false,
+      },
+      {
+        text: 'Multimodal AI (Raw COGS Invoice Extraction)',
+        isIncluded: false,
+      },
+      {
+        text: 'Industry Benchmark & Custom SLA Alerts',
+        isIncluded: false,
+      },
+    ],
+  },
+  {
+    id: 'pro_monthly',
+    name: 'PRO MONTHLY',
+    subtitle: 'MONTH-TO-MONTH',
+    targetAudience: 'Individual shops and SMEs selling on 1–3 platforms desiring cost flexibility.',
+    price: 299000,
+    originalPrice: 299000,
+    billingText: 'VND / month',
+    discountNote: 'First month special only 119,000 VND',
+    badge: '🔥 Most Popular',
+    badgeColor: 'bg-blue-500/25 text-blue-300 border-blue-400/50 shadow-blue-500/20',
+    accentColor: 'from-blue-950/80 via-slate-900 to-indigo-950/70 border-blue-500/50 hover:border-blue-400 shadow-xl shadow-blue-500/10',
+    isPopular: true,
+    ctaText: 'Get Pro Monthly (119,000 VND)',
+    features: [
+      {
+        text: 'Unlimited Excel file upload + Auto-fetch via Email crawler',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Unlimited',
+      },
+      {
+        text: 'Unlock full Dolphin AI RAG Chatbot (Shop data Q&A)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'AI RAG',
+      },
+      {
+        text: 'Extract AI Priority Action Cards & "What-If" profit simulator',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Simulator',
+      },
+      {
+        text: 'Gmail Critical Alert (Cancel rate > 15% or Ads losing money)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Real-time',
+      },
+      {
+        text: '1-Click Google Calendar Sync',
+        isIncluded: true,
+      },
+      {
+        text: 'Export 3-tab report to Google Sheets',
+        isIncluded: true,
+      },
+      {
+        text: 'Partner Open API (Shopee, TikTok Shop)',
+        isIncluded: false,
+      },
+      {
+        text: 'Multimodal AI (Raw COGS Invoice Extraction)',
+        isIncluded: false,
+      },
+      {
+        text: 'Industry Benchmark & Custom SLA Alerts',
+        isIncluded: false,
+      },
+    ],
+  },
+  {
+    id: 'pro_semi_annual',
+    name: 'PRO SEMI-ANNUAL',
+    subtitle: '6-MONTH STRATEGIC',
+    targetAudience: 'Strategic sellers and large brand stores aiming for long-term automation.',
+    price: 599000,
+    originalPrice: 1794000,
+    billingText: 'VND / 6 months (~99,800 VND/mo)',
+    discountNote: 'Save ~67% compared to monthly renewals',
+    badge: '⭐ Recommended (Save 67%)',
+    badgeColor: 'bg-gradient-to-r from-amber-500/30 to-purple-500/30 text-amber-300 border-amber-400/50 shadow-amber-500/25',
+    accentColor: 'from-purple-950/80 via-slate-900 to-amber-950/60 border-amber-400/60 hover:border-amber-300 shadow-2xl shadow-purple-500/15 ring-1 ring-amber-400/30',
+    isBestValue: true,
+    ctaText: 'Upgrade 6 Months (599,000 VND)',
+    features: [
+      {
+        text: 'Includes all features of Pro Monthly Plan',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Full Pro',
+      },
+      {
+        text: 'Auto-sync data via Partner Open API (Shopee, TikTok Shop)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Auto API Sync',
+      },
+      {
+        text: 'Smart Predictive Inventory (Predictive Stock & Zombie SKU)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'AI Inventory',
+      },
+      {
+        text: 'Multi-month financial trend analytics (Time-series RAG)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Time-series',
+      },
+      {
+        text: 'Priority 1-on-1 direct technical support via Zalo',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'VIP 1-1',
+      },
+      {
+        text: 'Multimodal AI (Raw COGS Invoice Extraction)',
+        isIncluded: false,
+      },
+      {
+        text: 'Industry Benchmark & Custom SLA Alerts',
+        isIncluded: false,
+      },
+    ],
+  },
+  {
+    id: 'enterprise',
+    name: 'ENTERPRISE PLAN',
+    subtitle: 'CUSTOM ENTERPRISE',
+    targetAudience: 'Large Brands & Multi-Store Agencies requiring customized SLAs and scale.',
+    price: 0,
+    isCustomQuote: true,
+    billingText: 'Custom Quote (Quarterly / Annual)',
+    discountNote: 'Dedicated SLA & Solution Engineer',
+    badge: '👑 Enterprise & Agency',
+    badgeColor: 'bg-gradient-to-r from-emerald-500/30 via-cyan-500/30 to-blue-500/30 text-cyan-300 border-cyan-400/50 shadow-cyan-500/25',
+    accentColor: 'from-cyan-950/80 via-slate-900 to-emerald-950/70 border-cyan-400/60 hover:border-cyan-300 shadow-2xl shadow-cyan-500/20 ring-1 ring-cyan-400/30',
+    isEnterprise: true,
+    ctaText: 'Contact for Enterprise Quote',
+    features: [
+      {
+        text: 'Includes all features of Pro Semi-Annual Plan',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Full Ultimate',
+      },
+      {
+        text: 'Custom API Integration & Internal ERP Data Pipeline',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Custom API',
+      },
+      {
+        text: 'Multimodal AI: Photo & PDF extraction for raw supplier COGS invoices',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Multimodal AI',
+      },
+      {
+        text: 'Industry Category Benchmark Comparison Report',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Industry Benchmark',
+      },
+      {
+        text: 'Custom SLA Critical Alerts (Zalo Webhook / Telegram / Custom Email)',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Custom SLA',
+      },
+      {
+        text: 'Local-First data security compliance with Enterprise Privacy Shield',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Privacy Shield',
+      },
+      {
+        text: 'Dedicated Solution Engineer & 24/7 Priority Custom SLA Support',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Dedicated 24/7',
+      },
+      {
+        text: 'Multi-store tenant management & team role-based permissions',
+        isIncluded: true,
+      },
+      {
+        text: 'Enterprise business contract & official electronic VAT invoice',
+        isIncluded: true,
+      },
+    ],
+  },
+];
+
+export const COMPARISON_FEATURES_MATRIX = [
+  {
+    category: 'Xử lý & Nhập Dữ Liệu',
+    categoryEn: 'Data Ingestion & Processing',
+    items: [
+      {
+        name: 'Giới hạn số lần Upload Excel',
+        nameEn: 'Excel Upload Frequency',
+        experience: '3 lần / tháng',
+        proMonthly: 'Không giới hạn',
+        proSemiAnnual: 'Không giới hạn',
+        enterprise: 'Không giới hạn (Bulk)',
+      },
+      {
+        name: 'Tự động cào file qua Email',
+        nameEn: 'Email Crawler & Auto-fetch',
+        experience: '❌',
+        proMonthly: '✅',
+        proSemiAnnual: '✅',
+        enterprise: '✅ (Đa Hộp Thư)',
+      },
+      {
+        name: 'Kết nối Partner Open API (Shopee, TikTok Shop)',
+        nameEn: 'Partner Open API Direct Sync',
+        experience: '❌',
+        proMonthly: '❌',
+        proSemiAnnual: '✅ (Tự động 24/7)',
+        enterprise: '✅ (Custom API & ERP)',
+      },
+      {
+        name: 'Multimodal AI (Bóc tách hóa đơn ảnh/PDF COGS)',
+        nameEn: 'Multimodal AI (Photo/PDF COGS Parsing)',
+        experience: '❌',
+        proMonthly: '❌',
+        proSemiAnnual: '❌',
+        enterprise: '✅ Multimodal OCR + AI',
+      },
+      {
+        name: 'Bảo mật Quyền Riêng Tư On-Premise',
+        nameEn: 'On-Premise Privacy & Security',
+        experience: '✅ 100% Cục bộ',
+        proMonthly: '✅ 100% Cục bộ',
+        proSemiAnnual: '✅ 100% Cục bộ',
+        enterprise: '✅ Cam kết pháp lý & SLA',
+      },
+    ],
+  },
+  {
+    category: 'Phân Tích & Báo Cáo',
+    categoryEn: 'Analytics & Reporting',
+    items: [
+      {
+        name: 'Dashboard Net Cash Flow & Phễu rò rỉ',
+        nameEn: 'Net Cash Flow Dashboard & Funnel',
+        experience: 'Cơ bản',
+        proMonthly: 'Chuyên sâu đa chiều',
+        proSemiAnnual: 'Chuyên sâu đa chiều',
+        enterprise: 'Tùy biến Dashboard theo yêu cầu',
+      },
+      {
+        name: 'Xuất 3 Tab sang Google Sheets',
+        nameEn: 'Google Sheets 3-Tab Export',
+        experience: '✅',
+        proMonthly: '✅',
+        proSemiAnnual: '✅ Không giới hạn',
+        enterprise: '✅ Không giới hạn + BigQuery',
+      },
+      {
+        name: 'Dự báo tồn kho & Phát hiện SKU Zombie',
+        nameEn: 'Smart Inventory & Zombie SKU Detection',
+        experience: '❌',
+        proMonthly: '❌',
+        proSemiAnnual: '✅ Thuật toán AI',
+        enterprise: '✅ AI Real-time Multi-Warehouse',
+      },
+      {
+        name: 'Phân tích xu hướng tài chính đa tháng (Time-series)',
+        nameEn: 'Multi-month Trend (Time-series RAG)',
+        experience: '❌',
+        proMonthly: '❌',
+        proSemiAnnual: '✅ Time-series RAG',
+        enterprise: '✅ Time-series RAG + Dự báo quý',
+      },
+      {
+        name: 'Báo cáo Benchmark so sánh trung bình ngành',
+        nameEn: 'Industry Benchmark Comparison Report',
+        experience: '❌',
+        proMonthly: '❌',
+        proSemiAnnual: '❌',
+        enterprise: '✅ Dữ liệu ngành TMĐT chuyên sâu',
+      },
+    ],
+  },
+  {
+    category: 'Trợ Lý AI & Tự Động Hóa',
+    categoryEn: 'AI Decision & Automation',
+    items: [
+      {
+        name: 'Dolphin AI RAG Chatbot (Hỏi đáp dữ liệu)',
+        nameEn: 'Dolphin AI RAG Shop Chatbot',
+        experience: '❌',
+        proMonthly: '✅ Không giới hạn',
+        proSemiAnnual: '✅ Không giới hạn',
+        enterprise: '✅ Custom Model Fine-tuning',
+      },
+      {
+        name: 'AI Action Cards & Simulator "What-If"',
+        nameEn: 'AI Action Cards & Simulator',
+        experience: '❌',
+        proMonthly: '✅',
+        proSemiAnnual: '✅',
+        enterprise: '✅ Kịch bản đa thương hiệu',
+      },
+      {
+        name: 'Cảnh báo rủi ro (Gmail, Zalo, Telegram, Webhook)',
+        nameEn: 'Custom Risk Alerts (Gmail, Zalo, Webhook)',
+        experience: '❌',
+        proMonthly: 'Gmail',
+        proSemiAnnual: 'Gmail',
+        enterprise: '✅ Custom Webhook & SLA',
+      },
+      {
+        name: 'Đồng bộ Google Calendar 1-Click',
+        nameEn: '1-Click Google Calendar Sync',
+        experience: '❌',
+        proMonthly: '✅',
+        proSemiAnnual: '✅',
+        enterprise: '✅ Đa thành viên / Team',
+      },
+    ],
+  },
+  {
+    category: 'Hỗ Trợ & Cam Kết Doanh Nghiệp',
+    categoryEn: 'Support & Enterprise SLA',
+    items: [
+      {
+        name: 'Kênh hỗ trợ kỹ thuật',
+        nameEn: 'Support Channel',
+        experience: 'Tài liệu & Cộng đồng',
+        proMonthly: 'Ưu tiên qua Ticket',
+        proSemiAnnual: '⭐ Kỹ thuật 1-1 qua Zalo',
+        enterprise: '👑 Kỹ sư giải pháp chuyên trách 24/7',
+      },
+      {
+        name: 'Hóa đơn VAT điện tử & Hợp đồng',
+        nameEn: 'VAT Invoice & Business Contract',
+        experience: 'Không áp dụng',
+        proMonthly: 'Hỗ trợ xuất VAT',
+        proSemiAnnual: 'Hỗ trợ xuất VAT & Hợp đồng',
+        enterprise: '✅ Hợp đồng SLA Doanh Nghiệp',
+      },
+    ],
+  },
+];
+
+export const PRICING_FAQS_VI = [
+  {
+    q: 'Gói Enterprise phù hợp với những đối tượng nào?',
+    a: 'Gói Enterprise được thiết kế chuyên biệt cho các Thương hiệu lớn (Brands), Tổng kho phân phối và các đơn vị Agency quản lý cùng lúc nhiều gian hàng Shopee, TikTok Shop cần tích hợp API ERP riêng, trích xuất hóa đơn nhập thô bằng Multimodal AI và cam kết bảo mật theo tiêu chuẩn doanh nghiệp.',
+  },
+  {
+    q: 'Tính năng Multimodal AI bóc tách hóa đơn COGS hoạt động như thế nào?',
+    a: 'Bạn chỉ cần chụp ảnh hoặc tải file PDF phiếu nhập kho / hóa đơn giá vốn (COGS) thô, mô hình Multimodal AI của EcomPulse sẽ tự động nhận diện SKU, số lượng, đơn giá và đối soát với doanh thu thực tế để tính toán chính xác biên lợi nhuận ròng.',
+  },
+  {
+    q: 'Dữ liệu doanh nghiệp được bảo vệ như thế nào?',
+    a: 'Tuyệt đối an toàn. EcomPulse cam kết mô hình Zero-Knowledge & Local-First: 100% dữ liệu nhạy cảm được xử lý trên máy trạm hoặc máy chủ nội bộ (On-Premise) của doanh nghiệp, có điều khoản bảo mật và cam kết pháp lý SLA rõ ràng trong hợp đồng.',
+  },
+  {
+    q: 'Tôi có thể dùng thử Gói Pro trước khi nâng cấp Enterprise không?',
+    a: 'Hoàn toàn có thể! Bạn có thể bắt đầu với Gói Experience miễn phí hoặc kích hoạt dùng thử Gói Pro để đánh giá hiệu quả trước khi liên hệ đội ngũ chuyên gia để tùy biến gói Enterprise.',
+  },
+];
+
+export const PRICING_FAQS_EN = [
+  {
+    q: 'Who is the Enterprise Plan tailored for?',
+    a: 'The Enterprise Plan is built specifically for large Brands, multi-store Agencies, and enterprise merchants managing multiple platform stores needing custom API integration, Multimodal AI COGS invoice OCR, and legal enterprise data privacy SLAs.',
+  },
+  {
+    q: 'How does Multimodal AI COGS extraction work?',
+    a: 'Simply upload photo or PDF scans of supplier import invoices. The Multimodal AI automatically parses SKUs, quantities, and cost of goods sold (COGS) to calculate net true profitability without manual data entry.',
+  },
+  {
+    q: 'How is enterprise data protected?',
+    a: 'Yes, 100%. EcomPulse adheres to Zero-Knowledge and Local-First architecture, processing sensitive sales records locally or inside your private corporate cloud with legal SLAs and enterprise NDAs.',
+  },
+  {
+    q: 'Can I test the Pro features before upgrading to Enterprise?',
+    a: 'Absolutely! You can start with the free Experience Plan or test the Pro suite before scheduling an architecture review with our enterprise team.',
+  },
+];

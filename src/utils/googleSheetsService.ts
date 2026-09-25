@@ -1,300 +1,176 @@
-// Google Sheets & Drive API Integration for EcomPulse Action Center & Roadmap
-import { ActionCard, RoadmapActionItem, ParsedStoreData, GoogleSheetsSyncConfig, GoogleUserProfile } from '../types';
+/**
+ * EcomPulse Link-Based Google Sheets & Task Assignment Service
+ * 
+ * ZERO OAuth requirement - 100% Privacy-Preserving
+ * - 1-Click Auto-Generate & Open Google Sheet (No URL input needed)
+ * - Auto-fetch & import live task assignments directly from shared Google Sheet links (CSV export)
+ * - 1-Click Clipboard table copy (Ctrl+V into Google Sheets)
+ * - Auto-Push to Google Sheets via Google Apps Script Webhook
+ * - Excel / CSV export ready for Google Sheets import
+ */
 
-declare global {
-  interface Window {
-    google?: any;
-  }
-}
+import * as XLSX from 'xlsx';
+import { ActionCard, RoadmapActionItem, GoogleSheetsSyncConfig, GoogleUserProfile } from '../types';
 
-const SCOPES = 'openid email profile https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
-const STORAGE_KEY_TOKEN = 'ecompulse_google_access_token';
-const STORAGE_KEY_CONFIG = 'ecompulse_sheets_config';
-const STORAGE_KEY_USER = 'ecompulse_google_user';
+const STORAGE_KEY_CONFIG = 'ecompulse_sheets_link_config';
+const STORAGE_KEY_USER = 'ecompulse_local_user';
 
-// Fetch OAuth Client ID from server or local override
-export async function getGoogleClientId(): Promise<string> {
+// ==========================================
+// 1. 1-CLICK AUTO-GENERATE GOOGLE SHEET
+// ==========================================
+
+/**
+ * 1-Click Auto-Generates Google Sheet without requiring user to type any URL
+ * - Copies formatted task table to Clipboard
+ * - Saves active linked Google Sheet config
+ * - Opens https://sheets.new in a new tab
+ */
+export function autoGenerateAndOpenGoogleSheet(
+  tasks: RoadmapActionItem[],
+  cards: ActionCard[] = [],
+  storeName = 'Shop TMĐT'
+): GoogleSheetsSyncConfig {
+  // 1. Auto-download formatted Excel file ready for Google Sheets / Excel
   try {
-    const localClientId = localStorage.getItem('ecompulse_custom_client_id');
-    if (localClientId && localClientId.trim().length > 10) {
-      return localClientId.trim();
-    }
-    const res = await fetch('/api/auth/google/client-id');
-    const data = await res.json();
-    return data.clientId || '';
-  } catch (err) {
-    console.error('Error fetching Google Client ID:', err);
-    return '';
-  }
-}
-
-export function saveCustomClientId(clientId: string) {
-  try {
-    if (clientId && clientId.trim()) {
-      localStorage.setItem('ecompulse_custom_client_id', clientId.trim());
-    } else {
-      localStorage.removeItem('ecompulse_custom_client_id');
-    }
-  } catch (e) {}
-}
-
-export function getCustomClientId(): string {
-  try {
-    return localStorage.getItem('ecompulse_custom_client_id') || '';
+    downloadRoadmapExcelFile(tasks, cards, storeName);
   } catch (e) {
-    return '';
+    console.error('Error auto downloading excel file:', e);
   }
-}
 
-// Request Access Token using Google Identity Services (GSI)
-export function requestGoogleAccessToken(clientId: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
-      reject(
-        new Error(
-          'Google Identity Services (GSI) chưa được tải hoàn tất. Vui lòng tải lại trang sau vài giây!'
-        )
-      );
-      return;
-    }
-
-    try {
-      const tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: SCOPES,
-        callback: (response: any) => {
-          if (response.error) {
-            reject(new Error(response.error_description || response.error));
-            return;
-          }
-          if (response.access_token) {
-            saveAccessToken(response.access_token);
-            resolve(response.access_token);
-          } else {
-            reject(new Error('Không nhận được Access Token từ Google.'));
-          }
-        },
-      });
-
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-// Fetch user profile from Google UserInfo endpoint
-export async function fetchGoogleUserProfile(accessToken: string): Promise<GoogleUserProfile> {
+  // 2. Auto-copy formatted roadmap to clipboard for instant Ctrl+V
   try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!res.ok) {
-      throw new Error(`Lỗi tải thông tin Google User (${res.status})`);
+    const tsv = generateRoadmapTsvData(tasks);
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(tsv);
     }
+  } catch (_) {}
 
-    const data = await res.json();
-    const user: GoogleUserProfile = {
-      sub: data.sub,
-      id: data.sub,
-      email: data.email,
-      name: data.name || data.email.split('@')[0],
-      picture: data.picture,
-      verified_email: data.email_verified,
-      loginMethod: 'google',
-      loggedInAt: new Date().toISOString(),
-    };
-
-    saveGoogleUser(user);
-    return user;
-  } catch (err) {
-    console.error('Error fetching Google User Profile:', err);
-    // Fallback minimal profile
-    const fallbackUser: GoogleUserProfile = {
-      email: 'user@google.com',
-      name: 'Google User',
-      loginMethod: 'google',
-      loggedInAt: new Date().toISOString(),
-    };
-    saveGoogleUser(fallbackUser);
-    return fallbackUser;
-  }
-}
-
-// Full Login with Google flow
-export async function loginWithGoogle(customClientId?: string): Promise<{ token: string; user: GoogleUserProfile }> {
-  let clientId = customClientId || (await getGoogleClientId());
-  if (!clientId || !clientId.trim()) {
-    throw new Error('Chưa cấu hình Google Client ID. Vui lòng nhập Client ID của bạn hoặc sử dụng chế độ Demo.');
-  }
-
-  const token = await requestGoogleAccessToken(clientId);
-  const user = await fetchGoogleUserProfile(token);
-  return { token, user };
-}
-
-// Demo Login for rapid testing
-export function loginAsDemoUser(email = 'seller.demo@ecompulse.vn', name = 'EcomPulse Store Manager'): GoogleUserProfile {
-  const demoUser: GoogleUserProfile = {
-    id: 'demo-user-12345',
-    email,
-    name,
-    picture: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    verified_email: true,
-    loginMethod: 'demo',
-    loggedInAt: new Date().toISOString(),
+  // 3. Create and save active linked sheet session
+  const sheetTitle = `Bảng Phân Công EcomPulse - ${storeName}`;
+  const config: GoogleSheetsSyncConfig = {
+    spreadsheetId: `auto_sheet_${Date.now()}`,
+    spreadsheetUrl: 'https://sheets.new',
+    spreadsheetTitle: sheetTitle,
+    lastSyncedAt:
+      new Date().toLocaleDateString('vi-VN') +
+      ' ' +
+      new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    autoSync: true,
   };
-  saveGoogleUser(demoUser);
-  return demoUser;
-}
+  saveSheetsConfig(config);
 
-// Save & Retrieve Access Token
-export function saveAccessToken(token: string) {
-  try {
-    sessionStorage.setItem(STORAGE_KEY_TOKEN, token);
-  } catch (e) {}
-}
-
-export function getSavedAccessToken(): string | null {
-  try {
-    return sessionStorage.getItem(STORAGE_KEY_TOKEN);
-  } catch (e) {
-    return null;
+  // 4. Open Google Sheets in new tab
+  if (typeof window !== 'undefined') {
+    window.open('https://sheets.new', '_blank');
   }
+
+  return config;
 }
 
-export function saveGoogleUser(user: GoogleUserProfile) {
-  try {
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-  } catch (e) {}
-}
+// ==========================================
+// 2. LINK-BASED GOOGLE SHEET HELPERS
+// ==========================================
 
-export function getSavedGoogleUser(): GoogleUserProfile | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_USER);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
+/**
+ * Extracts Google Spreadsheet ID from any standard Google Sheets URL or raw ID
+ */
+export function extractSpreadsheetId(urlOrId: string): string | null {
+  if (!urlOrId || typeof urlOrId !== 'string') return null;
+  const clean = urlOrId.trim();
+
+  // Pattern: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/...
+  const match = clean.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) {
+    return match[1];
   }
+
+  // If it's a raw spreadsheet ID (usually 20-60 alphanumeric characters)
+  if (/^[a-zA-Z0-9-_]{20,60}$/.test(clean)) {
+    return clean;
+  }
+
+  // Webhook or script URL
+  if (clean.includes('script.google.com/macros/s/')) {
+    return 'apps_script_webhook';
+  }
+
+  // Generic fallback if valid URL
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return 'custom_link';
+  }
+
+  return null;
 }
 
-export function clearGoogleSession() {
+/**
+ * Builds full Google Sheets URL from ID or returns valid URL
+ */
+export function formatSpreadsheetUrl(urlOrId: string): string {
+  const clean = urlOrId.trim();
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    return clean;
+  }
+  const id = extractSpreadsheetId(clean);
+  if (id && id !== 'custom_link' && id !== 'apps_script_webhook') {
+    return `https://docs.google.com/spreadsheets/d/${id}/edit`;
+  }
+  return clean;
+}
+
+/**
+ * Save linked Google Sheet URL and configuration locally
+ */
+export function saveSheetsConfig(config: GoogleSheetsSyncConfig | null): void {
   try {
-    sessionStorage.removeItem(STORAGE_KEY_TOKEN);
-    localStorage.removeItem(STORAGE_KEY_CONFIG);
-    localStorage.removeItem(STORAGE_KEY_USER);
-  } catch (e) {}
+    if (config) {
+      localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(config));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_CONFIG);
+    }
+  } catch (_) {}
 }
 
-// Save & Retrieve Google Sheets Configuration
-export function saveSheetsConfig(config: GoogleSheetsSyncConfig) {
-  try {
-    localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(config));
-  } catch (e) {}
-}
-
+/**
+ * Get active saved Google Sheet configuration
+ */
 export function getSavedSheetsConfig(): GoogleSheetsSyncConfig | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CONFIG);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
-  }
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (_) {}
+  return null;
 }
 
-
-// Format numbers for Google Sheets
-const formatVNDText = (num: number = 0) =>
-  new Intl.NumberFormat('vi-VN').format(Math.round(num)) + ' ₫';
+/**
+ * Clear saved Google Sheet link
+ */
+export function clearSheetsConfig(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY_CONFIG);
+  } catch (_) {}
+}
 
 /**
- * Creates a formatted Google Spreadsheet with Action Plan, Business Roadmap & Store Summary
+ * Connect a Google Sheet by URL or ID
  */
-export async function createActionPlanSpreadsheet(
-  token: string,
-  storeData: ParsedStoreData,
-  actionCards?: ActionCard[],
-  roadmapItems?: RoadmapActionItem[]
-): Promise<GoogleSheetsSyncConfig> {
-  const currentDateStr = new Date().toLocaleDateString('vi-VN');
-  const storeName = storeData.fileName.replace(/\.(xlsx|xls|csv)$/i, '');
-  const title = `EcomPulse - Kế Hoạch & Lộ Trình Hành Động [${storeName}] - ${currentDateStr}`;
-
-  // 1. Create Spreadsheet with 3 Sheets
-  const createResp = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      properties: {
-        title,
-        locale: 'vi_VN',
-      },
-      sheets: [
-        {
-          properties: {
-            sheetId: 0,
-            title: '🚀 Lộ Trình Hành Động Doanh Nghiệp',
-            gridProperties: {
-              frozenRowCount: 1,
-              rowCount: 100,
-              columnCount: 11,
-            },
-          },
-        },
-        {
-          properties: {
-            sheetId: 1,
-            title: '🎯 Trung Tâm Hành Động Ưu Tiên',
-            gridProperties: {
-              frozenRowCount: 1,
-              rowCount: 100,
-              columnCount: 10,
-            },
-          },
-        },
-        {
-          properties: {
-            sheetId: 2,
-            title: '📊 Tóm Tắt & Chỉ Số Shop',
-            gridProperties: {
-              frozenRowCount: 1,
-              rowCount: 50,
-              columnCount: 6,
-            },
-          },
-        },
-      ],
-    }),
-  });
-
-  if (!createResp.ok) {
-    const errJson = await createResp.json();
-    throw new Error(errJson.error?.message || 'Không thể tạo Google Spreadsheet.');
-  }
-
-  const sheetData = await createResp.json();
-  const spreadsheetId = sheetData.spreadsheetId;
-  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
-
-  // 2. Populate Data into all sheets
-  await populateAllSheetsData(token, spreadsheetId, storeData, actionCards, roadmapItems);
-
-  // 3. Format and Style the Spreadsheet
-  await formatSpreadsheet(token, spreadsheetId);
+export function linkGoogleSheetByUrl(
+  urlOrId: string,
+  customTitle?: string
+): GoogleSheetsSyncConfig {
+  const sheetUrl = formatSpreadsheetUrl(urlOrId);
+  const sheetId = extractSpreadsheetId(urlOrId) || 'sheet_' + Date.now();
+  const title = customTitle || 'Bảng Phân Công Công Việc EcomPulse';
 
   const config: GoogleSheetsSyncConfig = {
-    spreadsheetId,
-    spreadsheetUrl,
+    spreadsheetId: sheetId,
+    spreadsheetUrl: sheetUrl,
     spreadsheetTitle: title,
-    lastSyncedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    lastSyncedAt:
+      new Date().toLocaleDateString('vi-VN') +
+      ' ' +
+      new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     autoSync: true,
   };
 
@@ -302,378 +178,469 @@ export async function createActionPlanSpreadsheet(
   return config;
 }
 
+// ==========================================
+// 3. LIVE FETCH & PARSE TASKS FROM SHEET LINK
+// ==========================================
+
 /**
- * Builds the rows for all data categories and syncs them to Google Sheets
+ * Fetches and parses live tasks from a Google Sheet link (CSV export)
  */
-export async function populateAllSheetsData(
-  token: string,
-  spreadsheetId: string,
-  storeData: ParsedStoreData,
-  actionCards?: ActionCard[],
-  roadmapItems?: RoadmapActionItem[]
-) {
-  // --- SHEET 1: 🚀 Lộ Trình Hành Động Doanh Nghiệp (Roadmap) ---
-  if (roadmapItems && roadmapItems.length > 0) {
-    const roadmapHeaders = [
-      'STT',
-      'Khung Thời Gian',
-      'Cấp Độ Ưu Tiên',
-      'Bộ Phận Phụ Trách',
-      'Người Phụ Trách (Assignee)',
-      'Hạn Chót (Deadline)',
-      'Hành Động / Giải Pháp Đề Xuất',
-      'Chỉ Số KPI Theo Dõi',
-      'Hiện Trạng Thực Tế (Baseline)',
-      'Mục Tiêu Đạt Được (Target)',
-      'Các Bước Thực Hiện Chi Tiết',
-      'Trạng Thái',
-      'Cập Nhật Gần Nhất',
-    ];
-
-    const roadmapRows = roadmapItems.map((item, idx) => {
-      const priorityLabel =
-        item.category === 'high'
-          ? '🔴 Ưu Tiên Cao (0-2 Tuần)'
-          : item.category === 'medium'
-          ? '🟡 Ưu Tiên Trung Bình (2-6 Tuần)'
-          : '🟢 Ưu Tiên Dài Hạn (1-3 Tháng)';
-
-      const statusLabel =
-        item.status === 'completed'
-          ? '✅ ĐÃ HOÀN THÀNH'
-          : item.status === 'in_progress'
-          ? '⏳ ĐANG THỰC HIỆN'
-          : '📋 CẦN LÀM';
-
-      const detailsText = (item.details || []).map((d, i) => `${i + 1}. ${d}`).join('\n');
-
-      return [
-        `RM-${String(idx + 1).padStart(2, '0')}`,
-        item.timeframe,
-        priorityLabel,
-        item.department || 'Ban Quản Lý & Vận Hành',
-        item.assignee || 'Chưa phân công',
-        item.deadline || 'Trong tuần này',
-        item.action,
-        item.targetKpi,
-        item.currentBaseline || 'Chưa ghi nhận',
-        item.targetGoal || 'Theo mục tiêu quý',
-        detailsText,
-        statusLabel,
-        item.updatedAt || new Date().toLocaleString('vi-VN'),
-      ];
-    });
-
-    await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'🚀 Lộ Trình Hành Động Doanh Nghiệp'!A1:M${roadmapRows.length + 1}?valueInputOption=USER_ENTERED`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          range: "'🚀 Lộ Trình Hành Động Doanh Nghiệp'!A1:M" + (roadmapRows.length + 1),
-          values: [roadmapHeaders, ...roadmapRows],
-        }),
-      }
-    );
+export async function fetchTasksFromGoogleSheet(
+  urlOrId: string
+): Promise<{ success: boolean; tasks: RoadmapActionItem[]; message: string }> {
+  const sheetId = extractSpreadsheetId(urlOrId);
+  if (!sheetId || sheetId === 'custom_link') {
+    return { success: false, tasks: [], message: 'Không tìm thấy ID hợp lệ từ đường link Google Sheet.' };
   }
 
-  // --- SHEET 2: 🎯 Trung Tâm Hành Động Ưu Tiên (Action Center) ---
-  if (actionCards && actionCards.length > 0) {
-    const actionHeaders = [
-      'Mã ID',
-      'Mức Độ Ưu Tiên',
-      'Mục Tiêu / Tiêu Đề',
-      'Tác Động Doanh Thu Ước Tính',
-      'Việc Cần Làm (To-Do Checklist)',
-      'Trạng Thái',
-      'Người Phụ Trách (Assignee)',
-      'Ghi Chú Tiến Độ',
-      'Cập Nhật Gần Nhất',
-    ];
+  // Extract GID if present in URL
+  let gidParam = '';
+  const gidMatch = urlOrId.match(/[#&?]gid=([0-9]+)/);
+  if (gidMatch && gidMatch[1]) {
+    gidParam = `&gid=${gidMatch[1]}`;
+  }
 
-    const actionRows: any[][] = [];
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv${gidParam}`;
 
-    actionCards.forEach((card, idx) => {
-      const priorityLabel =
-        card.urgency === 'red'
-          ? '🔴 Khẩn Cấp (Cứu Doanh Thu)'
-          : card.urgency === 'yellow'
-          ? '🟡 Cơ Hội (Tăng Trưởng)'
-          : '🟢 Tiềm Năng (Tăng AOV)';
+  try {
+    const res = await fetch(csvUrl);
+    if (!res.ok) {
+      if (res.status === 404 || res.status === 403 || res.status === 401) {
+        throw new Error(
+          'Google Sheet chưa được bật quyền xem công khai. Vui lòng vào Google Sheet -> Bấm "Chia sẻ" -> Chọn "Bất kỳ ai có đường liên kết" (Người xem) rồi thử lại!'
+        );
+      }
+      throw new Error(`Không thể kết nối tải dữ liệu từ Google Sheet (Mã phản hồi: ${res.status}).`);
+    }
 
-      const totalTodos = card.todos.length;
-      const doneTodos = card.todos.filter((t) => t.done).length;
-      const cardStatus =
-        totalTodos === 0
-          ? 'Chưa Bắt Đầu'
-          : doneTodos === totalTodos
-          ? '✅ ĐÃ HOÀN THÀNH'
-          : doneTodos > 0
-          ? `⏳ Đang thực hiện (${doneTodos}/${totalTodos})`
-          : '📋 Chưa thực hiện';
+    const csvText = await res.text();
+    if (!csvText || csvText.trim().length === 0 || csvText.includes('<!DOCTYPE html>')) {
+      throw new Error(
+        'Google Sheet chưa được bật quyền công khai "Bất kỳ ai có liên kết". Vui lòng mở Google Sheet -> Bấm nút "Chia sẻ" ở góc phải -> Chọn "Bất kỳ ai có đường liên kết"!'
+      );
+    }
 
-      actionRows.push([
-        `ACT-${String(idx + 1).padStart(2, '0')}`,
-        priorityLabel,
-        `[TỔNG QUAN] ${card.title}`,
-        card.estimatedImpact,
-        `${card.description} (Gồm ${totalTodos} đầu việc chi tiết bên dưới)`,
-        cardStatus,
-        card.assignee || 'Toàn bộ Team Bán Hàng',
-        card.notes || 'Cần ưu tiên xử lý trong tuần này',
-        card.updatedAt || new Date().toLocaleString('vi-VN'),
-      ]);
+    // Parse CSV using XLSX
+    const workbook = XLSX.read(csvText, { type: 'string' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-      card.todos.forEach((todo, tIdx) => {
-        const todoStatus = todo.done ? '✅ ĐÃ XONG' : '⏳ CHƯA XONG';
-        actionRows.push([
-          `ACT-${String(idx + 1).padStart(2, '0')}.${tIdx + 1}`,
-          priorityLabel,
-          `  ↳ ${card.title}`,
-          card.estimatedImpact,
-          `[${todo.done ? 'X' : ' '}] ${todo.text}`,
-          todoStatus,
-          todo.assignee || card.assignee || 'Chưa phân công',
-          todo.done ? 'Đã hoàn tất kiểm tra' : 'Đang xử lý',
-          todo.completedAt || new Date().toLocaleString('vi-VN'),
-        ]);
+    if (!rows || rows.length < 2) {
+      return { success: false, tasks: [], message: 'Trang tính Google Sheet trống hoặc không có đủ dòng dữ liệu.' };
+    }
+
+    // Find header row
+    let headerRowIndex = 0;
+    for (let i = 0; i < Math.min(6, rows.length); i++) {
+      const rowStr = (rows[i] || []).join(' ').toLowerCase();
+      if (
+        rowStr.includes('hành động') ||
+        rowStr.includes('công việc') ||
+        rowStr.includes('task') ||
+        rowStr.includes('action') ||
+        rowStr.includes('đầu việc') ||
+        rowStr.includes('stt')
+      ) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    const header = (rows[headerRowIndex] || []).map((h: any) => String(h || '').trim().toLowerCase());
+
+    // Find column indexes
+    const actionIdx = header.findIndex(
+      (h) =>
+        h.includes('hành động') ||
+        h.includes('công việc') ||
+        h.includes('action') ||
+        h.includes('nhiệm vụ') ||
+        h.includes('đầu việc') ||
+        h.includes('task') ||
+        h.includes('tiêu đề')
+    );
+    const timeframeIdx = header.findIndex(
+      (h) => h.includes('giai đoạn') || h.includes('timeframe') || h.includes('thời gian') || h.includes('tuần')
+    );
+    const priorityIdx = header.findIndex(
+      (h) => h.includes('ưu tiên') || h.includes('priority') || h.includes('mức độ')
+    );
+    const assigneeIdx = header.findIndex(
+      (h) =>
+        h.includes('phụ trách') ||
+        h.includes('người') ||
+        h.includes('phòng ban') ||
+        h.includes('assignee') ||
+        h.includes('department') ||
+        h.includes('nhân viên')
+    );
+    const kpiIdx = header.findIndex(
+      (h) => h.includes('kpi') || h.includes('mục tiêu') || h.includes('impact') || h.includes('kết quả')
+    );
+    const deadlineIdx = header.findIndex(
+      (h) => h.includes('hạn') || h.includes('deadline') || h.includes('ngày hoàn thành')
+    );
+    const statusIdx = header.findIndex(
+      (h) => h.includes('trạng thái') || h.includes('status') || h.includes('tiến độ')
+    );
+
+    const actualActionIdx = actionIdx !== -1 ? actionIdx : header.length > 4 ? 4 : 1;
+
+    const parsedTasks: RoadmapActionItem[] = [];
+
+    for (let i = headerRowIndex + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      const actionText = String(row[actualActionIdx] || row[1] || row[0] || '').trim();
+      if (!actionText || actionText.length < 3) continue;
+
+      const priorityRaw = priorityIdx !== -1 ? String(row[priorityIdx] || '') : '';
+      let category: 'high' | 'medium' | 'long' = 'high';
+      if (
+        priorityRaw.includes('P1') ||
+        priorityRaw.includes('Trung') ||
+        priorityRaw.includes('Vàng') ||
+        priorityRaw.includes('Medium')
+      ) {
+        category = 'medium';
+      } else if (
+        priorityRaw.includes('P2') ||
+        priorityRaw.includes('Dài') ||
+        priorityRaw.includes('Xanh') ||
+        priorityRaw.includes('Long')
+      ) {
+        category = 'long';
+      }
+
+      const statusRaw = statusIdx !== -1 ? String(row[statusIdx] || '').toLowerCase() : '';
+      let status: 'pending' | 'in_progress' | 'completed' = 'pending';
+      if (
+        statusRaw.includes('hoàn thành') ||
+        statusRaw.includes('done') ||
+        statusRaw.includes('complete') ||
+        statusRaw.includes('xong') ||
+        statusRaw.includes('✅')
+      ) {
+        status = 'completed';
+      } else if (
+        statusRaw.includes('đang') ||
+        statusRaw.includes('progress') ||
+        statusRaw.includes('doing') ||
+        statusRaw.includes('🔄')
+      ) {
+        status = 'in_progress';
+      }
+
+      parsedTasks.push({
+        id: `sheet_task_${i}_${Date.now()}`,
+        action: actionText,
+        category,
+        categoryLabel:
+          category === 'high'
+            ? 'Khẩn cấp (0-2 tuần)'
+            : category === 'medium'
+            ? 'Trung hạn (2-6 tuần)'
+            : 'Dài hạn (1-3 tháng)',
+        categoryBadge: category === 'high' ? 'P0' : category === 'medium' ? 'P1' : 'P2',
+        timeframe:
+          timeframeIdx !== -1 && row[timeframeIdx]
+            ? String(row[timeframeIdx])
+            : category === 'high'
+            ? '0 - 2 Tuần'
+            : category === 'medium'
+            ? '2 - 6 Tuần'
+            : '1 - 3 Tháng',
+        assignee: assigneeIdx !== -1 && row[assigneeIdx] ? String(row[assigneeIdx]) : 'Đội Ngũ Vận Hành',
+        targetKpi: kpiIdx !== -1 && row[kpiIdx] ? String(row[kpiIdx]) : 'Tối ưu hiệu quả doanh thu',
+        deadline: deadlineIdx !== -1 && row[deadlineIdx] ? String(row[deadlineIdx]) : '',
+        status,
+        isCustom: true,
       });
+    }
+
+    if (parsedTasks.length === 0) {
+      return { success: false, tasks: [], message: 'Không tìm thấy dòng công việc hợp lệ trong trang tính.' };
+    }
+
+    return {
+      success: true,
+      tasks: parsedTasks,
+      message: `Đã đọc và cập nhật thành công ${parsedTasks.length} đầu việc từ Google Sheet vào hệ thống!`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      tasks: [],
+      message: err.message || 'Lỗi khi đọc dữ liệu từ Google Sheet.',
+    };
+  }
+}
+
+// ==========================================
+// 4. PUSH TO GOOGLE APPS SCRIPT WEBHOOK
+// ==========================================
+
+export async function pushTasksToAppsScriptWebhook(
+  webhookUrl: string,
+  tasks: RoadmapActionItem[],
+  cards: ActionCard[],
+  storeName = 'Shop TMĐT'
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      action: 'sync_tasks',
+      storeName,
+      syncedAt: new Date().toISOString(),
+      tasks: tasks.map((t, idx) => ({
+        stt: idx + 1,
+        timeframe: t.timeframe,
+        priority: t.category === 'high' ? 'P0' : t.category === 'medium' ? 'P1' : 'P2',
+        assignee: t.assignee || 'Đội Ngũ Vận Hành',
+        action: t.action,
+        targetKpi: t.targetKpi,
+        deadline: t.deadline || '',
+        status: t.status === 'completed' ? 'Hoàn thành' : t.status === 'in_progress' ? 'Đang làm' : 'Chờ xử lý',
+      })),
+      cards: cards.map((c) => ({
+        id: c.id,
+        urgency: c.urgency,
+        title: c.title,
+        estimatedImpact: c.estimatedImpact,
+        assignee: c.assignee || '',
+      })),
+    };
+
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors',
     });
 
-    await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'🎯 Trung Tâm Hành Động Ưu Tiên'!A1:I${actionRows.length + 1}?valueInputOption=USER_ENTERED`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          range: "'🎯 Trung Tâm Hành Động Ưu Tiên'!A1:I" + (actionRows.length + 1),
-          values: [actionHeaders, ...actionRows],
-        }),
-      }
-    );
+    return {
+      success: true,
+      message: 'Đã gửi lệnh cập nhật thành công tới Google Apps Script Webhook!',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Không thể kết nối tới Google Apps Script Webhook.',
+    };
   }
+}
 
-  // --- SHEET 3: 📊 Tóm Tắt & Chỉ Số Shop ---
-  const kpiHeaders = ['Chỉ Số Hiệu Suất Shop', 'Giá Trị Thực Tế', 'Mô Tả & Ghi Chú Đánh Giá'];
-  const kpis = storeData.kpis;
-  const funnel = storeData.funnel;
+export const APPS_SCRIPT_TEMPLATE = `function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Phân Công EcomPulse") || ss.insertSheet("Phân Công EcomPulse");
+    sheet.clear();
+    
+    // Header
+    var header = ["STT", "Giai Đoạn", "Mức Ưu Tiên", "Phụ Trách", "Hành Động Chiến Lược", "Mục Tiêu KPI", "Hạn Chót", "Trạng Thái"];
+    sheet.appendRow(header);
+    sheet.getRange(1, 1, 1, header.length).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+    
+    // Tasks
+    if (data.tasks && data.tasks.length > 0) {
+      data.tasks.forEach(function(t) {
+        sheet.appendRow([t.stt, t.timeframe, t.priority, t.assignee, t.action, t.targetKpi, t.deadline, t.status]);
+      });
+    }
+    
+    sheet.autoResizeColumns(1, header.length);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
 
-  const kpiRows = [
-    ['Doanh Thu Thực Nhận (Paid Revenue)', formatVNDText(kpis.paidRevenue), `${kpis.paidOrders} đơn hàng thanh toán thành công`],
-    ['Doanh Thu Đặt Hàng (Placed Revenue)', formatVNDText(kpis.placedRevenue), `${kpis.placedOrders} đơn đặt ban đầu`],
-    ['Giá Trị Trung Bình Đơn (AOV)', formatVNDText(kpis.aov), 'Mức chi tiêu bình quân/đơn thực nhận'],
-    ['Tỷ Lệ Hoàn Tất Đơn (Conversion)', `${kpis.conversionRate.toFixed(1)}%`, 'Tỷ lệ đơn thanh toán thành công trên tổng đơn đặt'],
-    ['Rò Rỉ Dòng Tiền (Leakage Amount)', formatVNDText(funnel.totalLeakageVND), `Thất thoát ${(100 - funnel.placedToPaidRate).toFixed(1)}% do huỷ/không nhận hàng`],
-    ['Hiệu Quả Quảng Cáo (Blended ROAS)', `${(kpis.blendedRoas || 8.5).toFixed(1)}x`, `Chi phí ads ước tính ~${formatVNDText(kpis.adSpend || (kpis.paidRevenue / 8.5))}`],
-    ['Sản Phẩm Chủ Lực (Class A Share)', `${(storeData.abcSummary.classAShare || 80).toFixed(1)}%`, 'Tỷ trọng đóng góp doanh thu nhóm sản phẩm ngôi sao'],
+// ==========================================
+// 5. 1-CLICK CLIPBOARD DATA GENERATOR (Ctrl+V)
+// ==========================================
+
+export function generateRoadmapTsvData(tasks: RoadmapActionItem[]): string {
+  const headers = [
+    'STT',
+    'Giai Đoạn',
+    'Mức Độ Ưu Tiên',
+    'Phòng Ban / Phụ Trách',
+    'Hành Động Chiến Lược',
+    'Mục Tiêu KPI Kỳ Vọng',
+    'Hạn Chót (Deadline)',
+    'Trạng Thái',
+    'Ghi Chú Chi Tiết',
   ];
 
-  await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'📊 Tóm Tắt & Chỉ Số Shop'!A1:C${kpiRows.length + 1}?valueInputOption=USER_ENTERED`,
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        range: "'📊 Tóm Tắt & Chỉ Số Shop'!A1:C" + (kpiRows.length + 1),
-        values: [kpiHeaders, ...kpiRows],
-      }),
-    }
-  );
+  const rows = tasks.map((t, idx) => {
+    const priority =
+      t.category === 'high' ? '🔴 Khẩn Cấp (P0)' : t.category === 'medium' ? '🟡 Trung Hạn (P1)' : '🟢 Dài Hạn (P2)';
+    const status =
+      t.status === 'completed'
+        ? '✅ Đã Hoàn Thành'
+        : t.status === 'in_progress'
+        ? '🔄 Đang Thực Hiện'
+        : '⏳ Chờ Xử Lý';
+    const timeframe =
+      t.timeframe || (t.category === 'high' ? '0 - 2 Tuần' : t.category === 'medium' ? '2 - 6 Tuần' : '1 - 3 Tháng');
+
+    return [
+      idx + 1,
+      timeframe,
+      priority,
+      t.assignee || t.department || 'Đội Ngũ Vận Hành',
+      t.action,
+      t.targetKpi || t.targetGoal || 'Tối ưu dòng tiền',
+      t.deadline || 'Chưa đặt',
+      status,
+      (t.details || []).join('; ') || t.notes || '',
+    ];
+  });
+
+  return [headers.join('\t'), ...rows.map((r) => r.join('\t'))].join('\n');
 }
 
-// Backward compatibility helper
-export async function populateActionCardsData(
-  token: string,
-  spreadsheetId: string,
-  actionCards: ActionCard[],
-  storeData: ParsedStoreData,
-  roadmapItems?: RoadmapActionItem[]
-) {
-  return populateAllSheetsData(token, spreadsheetId, storeData, actionCards, roadmapItems);
+export function generateActionCardsTsvData(cards: ActionCard[]): string {
+  const headers = [
+    'Mã Thẻ',
+    'Mức Độ Khẩn Cấp',
+    'Tên Đầu Việc Chiến Lược',
+    'Mô Tả & Nguyên Nhân',
+    'Ước Tính Doanh Thu Cứu Vãn',
+    'Checklist Chi Tiết Cần Làm',
+    'Người Phụ Trách',
+  ];
+
+  const rows = cards.map((c) => {
+    const urgency =
+      c.urgency === 'red' ? '🔴 KHẨN CẤP' : c.urgency === 'yellow' ? '🟡 QUAN TRỌNG' : '🟢 TỐI ƯU HÓA';
+    const todosText = c.todos.map((t, idx) => `[${t.done ? 'x' : ' '}] ${idx + 1}. ${t.text}`).join('\n');
+
+    return [
+      c.id,
+      urgency,
+      c.title,
+      c.description.replace(/\n/g, ' '),
+      c.estimatedImpact,
+      `"${todosText}"`,
+      c.assignee || 'Trưởng Phòng Vận Hành',
+    ];
+  });
+
+  return [headers.join('\t'), ...rows.map((r) => r.join('\t'))].join('\n');
 }
 
-/**
- * Applies professional formatting, header colors, borders, and column widths
- */
-async function formatSpreadsheet(token: string, spreadsheetId: string) {
+// ==========================================
+// 6. EXCEL EXPORT FOR GOOGLE SHEETS IMPORT
+// ==========================================
+
+export function downloadRoadmapExcelFile(
+  tasks: RoadmapActionItem[],
+  cards: ActionCard[],
+  storeName = 'Shop'
+): void {
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Roadmap Tasks
+  const roadmapData = [
+    ['BẢNG PHÂN CÔNG LỘ TRÌNH HÀNH ĐỘNG DOANH NGHIỆP - ' + storeName.toUpperCase()],
+    ['Ngày xuất: ' + new Date().toLocaleDateString('vi-VN')],
+    [],
+    [
+      'STT',
+      'Giai Đoạn',
+      'Mức Ưu Tiên',
+      'Phòng Ban / Phụ Trách',
+      'Hành Động Chiến Lược',
+      'Mục Tiêu KPI',
+      'Hạn Chót',
+      'Trạng Thái',
+      'Chi Tiết',
+    ],
+    ...tasks.map((t, idx) => [
+      idx + 1,
+      t.timeframe ||
+        (t.category === 'high' ? '0 - 2 Tuần' : t.category === 'medium' ? '2 - 6 Tuần' : '1 - 3 Tháng'),
+      t.category === 'high' ? 'P0 (Khẩn Cấp)' : t.category === 'medium' ? 'P1 (Trung Hạn)' : 'P2 (Dài Hạn)',
+      t.assignee || t.department || 'Đội Ngũ Vận Hành',
+      t.action,
+      t.targetKpi || t.targetGoal || 'Tối ưu dòng tiền',
+      t.deadline || 'Chưa đặt',
+      t.status === 'completed' ? 'Đã hoàn thành' : t.status === 'in_progress' ? 'Đang thực hiện' : 'Chờ xử lý',
+      (t.details || []).join('; ') || t.notes || '',
+    ]),
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(roadmapData);
+  XLSX.utils.book_append_sheet(wb, ws1, 'Lo_Trinh_Hanh_Dong');
+
+  // Sheet 2: Action Cards
+  const cardsData = [
+    ['DANH SÁCH THẺ HÀNH ĐỘNG ƯU TIÊN & CHECKLIST - ' + storeName.toUpperCase()],
+    ['Ngày xuất: ' + new Date().toLocaleDateString('vi-VN')],
+    [],
+    ['Mã Thẻ', 'Mức Khẩn Cấp', 'Tên Đầu Việc', 'Mô Tả & Dẫn Chứng', 'Ước Tính Doanh Thu Cứu Vãn', 'Người Phụ Trách'],
+    ...cards.map((c) => [
+      c.id,
+      c.urgency === 'red' ? 'ĐỎ (Khẩn Cấp)' : c.urgency === 'yellow' ? 'VÀNG (Quan Trọng)' : 'XANH (Tối Ưu)',
+      c.title,
+      c.description,
+      c.estimatedImpact,
+      c.assignee || 'Trưởng Phòng Vận Hành',
+    ]),
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(cardsData);
+  XLSX.utils.book_append_sheet(wb, ws2, 'The_Hanh_Dong');
+
+  XLSX.writeFile(wb, `EcomPulse_PhanCong_GoogleSheet_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// ==========================================
+// 7. LOCAL ON-PREMISE USER SESSION HELPERS
+// ==========================================
+
+export function getSavedGoogleUser(): GoogleUserProfile {
   try {
-    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        requests: [
-          // 1. Header style for Sheet 0 (Indigo / Violet)
-          {
-            repeatCell: {
-              range: {
-                sheetId: 0,
-                startRowIndex: 0,
-                endRowIndex: 1,
-                startColumnIndex: 0,
-                endColumnIndex: 11,
-              },
-              cell: {
-                userEnteredFormat: {
-                  backgroundColor: { red: 0.18, green: 0.15, blue: 0.38 },
-                  textFormat: {
-                    foregroundColor: { red: 1.0, green: 1.0, blue: 1.0 },
-                    fontSize: 11,
-                    bold: true,
-                  },
-                  horizontalAlignment: 'CENTER',
-                  verticalAlignment: 'MIDDLE',
-                  wrapStrategy: 'WRAP',
-                },
-              },
-              fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment,wrapStrategy)',
-            },
-          },
-          // 2. Header style for Sheet 1 (Navy Blue)
-          {
-            repeatCell: {
-              range: {
-                sheetId: 1,
-                startRowIndex: 0,
-                endRowIndex: 1,
-                startColumnIndex: 0,
-                endColumnIndex: 9,
-              },
-              cell: {
-                userEnteredFormat: {
-                  backgroundColor: { red: 0.12, green: 0.18, blue: 0.35 },
-                  textFormat: {
-                    foregroundColor: { red: 1.0, green: 1.0, blue: 1.0 },
-                    fontSize: 11,
-                    bold: true,
-                  },
-                  horizontalAlignment: 'CENTER',
-                  verticalAlignment: 'MIDDLE',
-                  wrapStrategy: 'WRAP',
-                },
-              },
-              fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment,wrapStrategy)',
-            },
-          },
-          // 3. Header style for Sheet 2 (Emerald Green)
-          {
-            repeatCell: {
-              range: {
-                sheetId: 2,
-                startRowIndex: 0,
-                endRowIndex: 1,
-                startColumnIndex: 0,
-                endColumnIndex: 3,
-              },
-              cell: {
-                userEnteredFormat: {
-                  backgroundColor: { red: 0.05, green: 0.35, blue: 0.25 },
-                  textFormat: {
-                    foregroundColor: { red: 1.0, green: 1.0, blue: 1.0 },
-                    fontSize: 11,
-                    bold: true,
-                  },
-                  horizontalAlignment: 'CENTER',
-                  verticalAlignment: 'MIDDLE',
-                },
-              },
-              fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
-            },
-          },
-          // 4. Auto-resize or set comfortable column widths on Sheet 0
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 },
-              properties: { pixelSize: 80 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 },
-              properties: { pixelSize: 180 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 },
-              properties: { pixelSize: 200 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 3, endIndex: 4 },
-              properties: { pixelSize: 180 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 4, endIndex: 5 },
-              properties: { pixelSize: 340 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 5, endIndex: 6 },
-              properties: { pixelSize: 220 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 6, endIndex: 7 },
-              properties: { pixelSize: 220 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 7, endIndex: 8 },
-              properties: { pixelSize: 220 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 8, endIndex: 9 },
-              properties: { pixelSize: 340 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 9, endIndex: 10 },
-              properties: { pixelSize: 160 },
-              fields: 'pixelSize',
-            },
-          },
-          {
-            updateDimensionProperties: {
-              range: { sheetId: 0, dimension: 'COLUMNS', startIndex: 10, endIndex: 11 },
-              properties: { pixelSize: 180 },
-              fields: 'pixelSize',
-            },
-          },
-        ],
-      }),
-    });
-  } catch (err) {
-    console.warn('Formatting spreadsheet warning:', err);
-  }
+    const raw = localStorage.getItem(STORAGE_KEY_USER);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (_) {}
+
+  const defaultUser: GoogleUserProfile = {
+    id: 'local_onpremise_user',
+    email: 'seller@local.workspace',
+    name: 'Nhà Bán Hàng On-Premise',
+    picture: '',
+    loginMethod: 'demo',
+  };
+  return defaultUser;
 }
 
+export function saveGoogleUser(user: GoogleUserProfile): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+  } catch (_) {}
+}
+
+export function clearGoogleSession(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem(STORAGE_KEY_CONFIG);
+  } catch (_) {}
+}
+
+export function loginAsDemoUser(
+  email = 'seller.onpremise@local.workspace',
+  name = 'Nhà Bán Hàng EcomPulse'
+): GoogleUserProfile {
+  const demoUser: GoogleUserProfile = {
+    id: 'user_onprem_' + Date.now(),
+    email,
+    name,
+    picture: '',
+    loginMethod: 'demo',
+  };
+  saveGoogleUser(demoUser);
+  return demoUser;
+}

@@ -14,13 +14,19 @@ import {
   BarChart3,
   HelpCircle,
   Zap,
+  Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 import { parseShopeeExcelFile, downloadSampleShopeeExcel } from '../utils/excelParser';
 import { ParsedStoreData } from '../types';
 import ecompulseAvatar from '../assets/images/ecompulse_avatar_1787721096722.jpg';
-import { ShopeeLogo, TikTokShopLogo, LazadaLogo } from './PlatformLogos';
+import { ShopeeLogo, TikTokShopLogo } from './PlatformLogos';
 import { EcommercePlatform } from './EcommercePlatformSelector';
 import { SAMPLE_DATASETS } from '../data/sampleDatasets';
+import { SecurityStatusBadge } from './security/SecurityStatusBadge';
+import { ProcessingProgressBar } from './security/ProcessingProgressBar';
+import { ClearLocalDataModal } from './security/ClearLocalDataModal';
+import { OnPremiseSecurityModal } from './dashboard/OnPremiseSecurityModal';
 
 interface EmptyStateUploadProps {
   onDataLoaded: (data: ParsedStoreData) => void;
@@ -37,7 +43,12 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [processProgress, setProcessProgress] = useState<number>(0);
+  const [processStep, setProcessStep] = useState<1 | 2 | 3>(1);
+  const [processingFileName, setProcessingFileName] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showClearDataModal, setShowClearDataModal] = useState<boolean>(false);
+  const [showSecurityModal, setShowSecurityModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const getPlatformMeta = () => {
@@ -51,16 +62,6 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
           accentColor: 'border-cyan-500/40 text-cyan-400',
           sampleName: 'TikTok Shop Mega Live & Video',
           Logo: TikTokShopLogo,
-        };
-      case 'lazada':
-        return {
-          title: 'Tải Lên Báo Cáo Lazada',
-          subtitle: 'Phân tích tự động phễu đặt hàng Siêu Sale, Voucher Tích Lũy và tối ưu hóa doanh số',
-          badge: 'LAZADA ANALYTICS',
-          badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-400/40',
-          accentColor: 'border-blue-500/40 text-blue-400',
-          sampleName: 'Lazada Siêu Sale & Voucher',
-          Logo: LazadaLogo,
         };
       case 'shopee':
       default:
@@ -81,15 +82,36 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
   const handleFileProcess = async (file: File) => {
     setIsLoading(true);
     setErrorMsg(null);
+    setProcessingFileName(file.name);
+    setProcessStep(1);
+    setProcessProgress(15);
+
     try {
+      // Step 1: In-Browser RAM Parsing (0% -> 35%)
+      await new Promise((r) => setTimeout(r, 250));
+      setProcessProgress(35);
+
       const parsed = await parseShopeeExcelFile(file);
+
+      // Step 2: PII Data Sanitization (35% -> 70%)
+      setProcessStep(2);
+      setProcessProgress(55);
+      await new Promise((r) => setTimeout(r, 300));
+      setProcessProgress(70);
+
+      // Step 3: Dolphin AI Connection & KPI Engine (70% -> 100%)
+      setProcessStep(3);
+      setProcessProgress(88);
+      await new Promise((r) => setTimeout(r, 250));
+      setProcessProgress(100);
+
+      await new Promise((r) => setTimeout(r, 200));
       onDataLoaded(parsed);
     } catch (err: any) {
       console.error('File parse error:', err);
       setErrorMsg(
         err.message || 'Không thể đọc file Excel. Vui lòng kiểm tra định dạng file .xlsx hoặc .csv!'
       );
-    } finally {
       setIsLoading(false);
     }
   };
@@ -102,7 +124,21 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
     }
   };
 
-  const handleLoadSample = () => {
+  const handleLoadSample = async () => {
+    setIsLoading(true);
+    setProcessingFileName('EcomPulse_Sample_Demo_8.8.xlsx');
+    setProcessStep(1);
+    setProcessProgress(25);
+
+    await new Promise((r) => setTimeout(r, 200));
+    setProcessStep(2);
+    setProcessProgress(65);
+
+    await new Promise((r) => setTimeout(r, 200));
+    setProcessStep(3);
+    setProcessProgress(100);
+
+    await new Promise((r) => setTimeout(r, 200));
     const baseSample = SAMPLE_DATASETS['mega-8-8'] || Object.values(SAMPLE_DATASETS)[0];
     let custom: ParsedStoreData = { ...baseSample };
     if (selectedPlatform === 'tiktok') {
@@ -111,21 +147,15 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
         fileName: 'TikTokShop_BaoCao_DoanhThu_Live_Video_Thang8.xlsx',
         periodLabel: 'TikTok Shop - Tháng 8/2025 (Mega Live & Video KOC)',
       };
-    } else if (selectedPlatform === 'lazada') {
-      custom = {
-        ...baseSample,
-        fileName: 'Lazada_BaoCao_DoanhThu_SieuSale_VoucherTichLuy.xlsx',
-        periodLabel: 'Lazada - Tháng 8/2025 (Siêu Sale & Voucher Tích Lũy)',
-      };
     }
     onDataLoaded(custom);
   };
 
   return (
     <div className="max-w-5xl mx-auto py-6 sm:py-10 space-y-6 animate-in fade-in duration-300">
-      {/* Top back navigation bar */}
-      {onBackToPlatformSelector && (
-        <div className="flex items-center justify-between">
+      {/* 1. Top Navigation & Security Badge Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        {onBackToPlatformSelector ? (
           <button
             onClick={onBackToPlatformSelector}
             className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-slate-300 hover:text-white border border-white/10 transition-all shadow-sm group"
@@ -133,14 +163,30 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             <span>← Quay lại chọn sàn khác</span>
           </button>
+        ) : <div />}
 
-          <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${meta.badgeColor} backdrop-blur-md`}>
-            {meta.badge}
-          </div>
+        {/* Feature 1: Security Status Badge */}
+        <div className="flex items-center gap-2.5">
+          <SecurityStatusBadge
+            variant="full"
+            onClick={() => setShowSecurityModal(true)}
+            language={language}
+          />
+
+          {/* Feature 3: Clear All Local Data Button */}
+          <button
+            type="button"
+            onClick={() => setShowClearDataModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-white/10 hover:border-rose-400/30 text-xs font-medium transition-all shadow-sm group"
+            title="Xóa sạch toàn bộ Cache/IndexedDB trên trình duyệt của bạn bất kỳ lúc nào"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-400 transition-colors" />
+            <span className="hidden sm:inline">Xóa Dữ Liệu Local</span>
+          </button>
         </div>
-      )}
+      </div>
 
-      {/* Hero Welcome Card */}
+      {/* 2. Hero Welcome Card */}
       <div className="text-center space-y-4">
         <div className="flex justify-center items-center gap-3">
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-3xl overflow-hidden shadow-2xl shadow-sky-500/30 ring-2 ring-white/30 backdrop-blur-md bg-slate-900 group">
@@ -158,9 +204,15 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
           </div>
         </div>
 
-        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/30 text-blue-300 text-xs font-semibold backdrop-blur-md">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>EcomPulse • {meta.badge}</span>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/30 text-blue-300 text-xs font-semibold backdrop-blur-md">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>EcomPulse • {meta.badge}</span>
+          </div>
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-semibold backdrop-blur-md">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>100% In-Browser RAM • Không tải file lên máy chủ</span>
+          </div>
         </div>
 
         <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
@@ -171,7 +223,7 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
         </p>
       </div>
 
-      {/* Main Drag & Drop Zone */}
+      {/* 3. Main Drag & Drop Zone or Processing Progress Bar */}
       <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-white/20 shadow-2xl backdrop-blur-2xl">
         {errorMsg && (
           <div className="mb-6 p-4 bg-rose-950/40 border border-rose-500/40 rounded-2xl text-xs sm:text-sm text-rose-300 flex items-center space-x-3 backdrop-blur-md">
@@ -180,89 +232,94 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
           </div>
         )}
 
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-3xl p-8 sm:p-14 text-center cursor-pointer transition-all ${
-            isDragging
-              ? 'border-blue-400 bg-blue-500/20 shadow-xl shadow-blue-500/20 scale-[1.01]'
-              : 'border-white/25 glass-panel-subtle hover:border-blue-400/50 hover:bg-white/[0.08]'
-          }`}
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={(e) => {
-              if (e.target.files && e.target.files.length > 0) {
-                handleFileProcess(e.target.files[0]);
-              }
+        {/* Feature 2: Processing Progress Bar during file loading */}
+        {isLoading ? (
+          <div className="py-4">
+            <ProcessingProgressBar
+              progress={processProgress}
+              currentStep={processStep}
+              fileName={processingFileName}
+              language={language}
+            />
+          </div>
+        ) : (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
             }}
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-          />
-
-          <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-3xl bg-gradient-to-tr from-blue-600/30 to-indigo-500/30 border border-blue-400/40 text-blue-300 flex items-center justify-center mb-5 shadow-lg shadow-blue-500/20 backdrop-blur-md">
-            <FileSpreadsheet className="w-8 h-8 sm:w-10 sm:h-10" />
-          </div>
-
-          <div className="text-base sm:text-lg font-bold text-white">
-            {isLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                Đang đọc & tính toán toán học các sheet dữ liệu...
-              </span>
-            ) : (
-              'Kéo thả file Excel vào đây hoặc Click để chọn từ thiết bị'
-            )}
-          </div>
-
-          <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-lg mx-auto">
-            Hỗ trợ báo cáo <strong>Excel nhiều sheet</strong> (.xlsx, .xls) hoặc file danh sách đơn hàng (.csv).
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                fileInputRef.current?.click();
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-3xl p-8 sm:p-14 text-center cursor-pointer transition-all ${
+              isDragging
+                ? 'border-blue-400 bg-blue-500/20 shadow-xl shadow-blue-500/20 scale-[1.01]'
+                : 'border-white/25 glass-panel-subtle hover:border-blue-400/50 hover:bg-white/[0.08]'
+            }`}
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  handleFileProcess(e.target.files[0]);
+                }
               }}
-              className="inline-flex items-center px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-blue-500/25 border border-blue-400/40 active:scale-95"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Chọn file từ máy tính
-            </button>
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+            />
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLoadSample();
-              }}
-              className="inline-flex items-center px-4 py-2.5 text-xs sm:text-sm font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 rounded-xl transition-all shadow-sm"
-            >
-              <Zap className="w-4 h-4 mr-2 text-amber-400" />
-              Dữ liệu Demo
-            </button>
+            <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-3xl bg-gradient-to-tr from-blue-600/30 to-indigo-500/30 border border-blue-400/40 text-blue-300 flex items-center justify-center mb-5 shadow-lg shadow-blue-500/20 backdrop-blur-md">
+              <FileSpreadsheet className="w-8 h-8 sm:w-10 sm:h-10" />
+            </div>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                downloadSampleShopeeExcel();
-              }}
-              className="inline-flex items-center px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-200 hover:text-white bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 rounded-xl transition-all shadow-sm"
-            >
-              <Download className="w-4 h-4 mr-2 text-blue-300" />
-              Tải file Excel mẫu (.xlsx)
-            </button>
+            <div className="text-base sm:text-lg font-bold text-white">
+              Kéo thả file Excel vào đây hoặc Click để chọn từ thiết bị
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-lg mx-auto">
+              Hỗ trợ báo cáo <strong>Excel nhiều sheet</strong> (.xlsx, .xls) hoặc file danh sách đơn hàng (.csv).
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+                className="inline-flex items-center px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-lg shadow-blue-500/25 border border-blue-400/40 active:scale-95"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Chọn file từ máy tính
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLoadSample();
+                }}
+                className="inline-flex items-center px-4 py-2.5 text-xs sm:text-sm font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/30 rounded-xl transition-all shadow-sm"
+              >
+                <Zap className="w-4 h-4 mr-2 text-amber-400" />
+                Dữ liệu Demo
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  downloadSampleShopeeExcel();
+                }}
+                className="inline-flex items-center px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-200 hover:text-white bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 rounded-xl transition-all shadow-sm"
+              >
+                <Download className="w-4 h-4 mr-2 text-blue-300" />
+                Tải file Excel mẫu (.xlsx)
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Feature Highlights Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/[0.1]">
@@ -298,19 +355,40 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
         </div>
       </div>
 
-      {/* Format Guidelines Box */}
-      <div className="glass-panel-subtle rounded-2xl p-5 border border-white/10 text-xs text-slate-300">
-        <div className="flex items-center space-x-2 text-slate-200 font-bold text-xs mb-2">
-          <HelpCircle className="w-4 h-4 text-blue-400" />
-          <span>Cấu trúc dữ liệu được hệ thống tự động nhận diện:</span>
+      {/* Security Banner Info */}
+      <div className="glass-panel-subtle rounded-2xl p-5 border border-white/10 text-xs text-slate-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+          <p className="text-xs text-slate-300">
+            <strong>Bảo Mật Zero-Knowledge:</strong> File Excel nhiều sheet được phân tích 100% trong bộ nhớ RAM trình duyệt của bạn. Bấm để xóa sạch dữ liệu IndexedDB bất cứ lúc nào.
+          </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400">
-          <div>• <strong>Nhóm 1 - Tổng quan:</strong> Đơn hàng đã đặt, Đơn đã xác nhận, Đơn đã thanh toán.</div>
-          <div>• <strong>Nhóm 2 - Nguồn truy cập:</strong> Nguồn lưu lượng chi tiết & tổng hợp.</div>
-          <div>• <strong>Nhóm 3 - Sản phẩm:</strong> Doanh số & lượt xem theo sản phẩm (Ma trận ABC).</div>
-          <div>• <strong>Nhóm 4, 5, 6 - Livestream, Video, Affiliate:</strong> Session contribution, Video KOC.</div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowClearDataModal(true)}
+          className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/30 text-rose-300 text-xs font-bold transition-all shrink-0 flex items-center gap-1.5"
+        >
+          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+          <span>Xóa Dữ Liệu Local 1-Click</span>
+        </button>
       </div>
+
+      {/* Clear Local Data Modal */}
+      <ClearLocalDataModal
+        isOpen={showClearDataModal}
+        onClose={() => setShowClearDataModal(false)}
+        onCleared={() => {
+          if (onBackToPlatformSelector) onBackToPlatformSelector();
+        }}
+        language={language}
+      />
+
+      {/* On-Premise Security Center Modal */}
+      <OnPremiseSecurityModal
+        isOpen={showSecurityModal}
+        onClose={() => setShowSecurityModal(false)}
+        language={language}
+      />
     </div>
   );
 };

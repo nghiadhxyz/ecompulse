@@ -6,6 +6,8 @@ import {
 import { ParsedStoreData } from '../types';
 import { formatCompactVND, formatNumber } from '../utils/formatters';
 import { P0AnalyticsDashboard } from './dashboard/P0AnalyticsDashboard';
+import { StoreOperationsMetricStrip } from './dashboard/StoreOperationsMetricStrip';
+import { ShopeeGrowthAndContentHub } from './dashboard/ShopeeGrowthAndContentHub';
 
 interface KpiOverviewTabProps {
   data: ParsedStoreData;
@@ -52,20 +54,23 @@ export const KpiOverviewTab: React.FC<KpiOverviewTabProps> = ({
           {/* Box 3: ROAS quảng cáo */}
           <div className="py-6 px-3 text-center flex flex-col items-center justify-center space-y-1.5 hover:bg-white/[0.03] transition-colors">
             <div className="text-xl sm:text-2xl lg:text-2xl font-extrabold text-sky-400 tracking-tight">
-              ~{(() => {
+              {(() => {
                 const totalAdSpend = data.kpis.adSpend || (data.ads && data.ads.length > 0 ? data.ads.reduce((sum, a) => sum + (a.spend || 0), 0) : 0);
                 const totalAdRev = data.ads && data.ads.length > 0 ? data.ads.reduce((sum, a) => sum + (a.paidRevenue || 0), 0) : 0;
                 const roas = data.kpis.blendedRoas && data.kpis.blendedRoas > 0
                   ? data.kpis.blendedRoas
-                  : (totalAdSpend > 0 ? (totalAdRev > 0 ? totalAdRev / totalAdSpend : data.kpis.paidRevenue / totalAdSpend) : 8.5);
-                return roas.toFixed(1).replace('.', ',');
-              })()} lần
+                  : (totalAdSpend > 0 ? (totalAdRev > 0 ? totalAdRev / totalAdSpend : data.kpis.paidRevenue / totalAdSpend) : 0);
+                return roas > 0 ? `~${roas.toFixed(1).replace('.', ',')} lần` : '0,0 lần';
+              })()}
             </div>
             <div className="text-xs sm:text-sm font-bold text-white tracking-tight">
               ROAS quảng cáo
             </div>
             <div className="text-[11px] text-slate-400 font-medium">
-              Chi phí ads {formatCompactVND(data.kpis.adSpend || (data.ads && data.ads.length > 0 ? data.ads.reduce((sum, a) => sum + (a.spend || 0), 0) : (data.kpis.paidRevenue / 8.5)))}
+              {(() => {
+                const totalAdSpend = data.kpis.adSpend || (data.ads && data.ads.length > 0 ? data.ads.reduce((sum, a) => sum + (a.spend || 0), 0) : 0);
+                return `Chi phí ads ${formatCompactVND(totalAdSpend)}`;
+              })()}
             </div>
           </div>
 
@@ -86,9 +91,9 @@ export const KpiOverviewTab: React.FC<KpiOverviewTabProps> = ({
           <div className="py-6 px-3 text-center flex flex-col items-center justify-center space-y-1.5 hover:bg-white/[0.03] transition-colors">
             <div className="text-xl sm:text-2xl lg:text-2xl font-extrabold text-sky-400 tracking-tight">
               {(() => {
-                const totalBuyers = data.retention?.totalBuyers || Math.round(data.kpis.paidOrders * 0.85) || 453;
-                const newBuyers = data.retention?.newBuyers || Math.round(totalBuyers * 0.821) || 372;
-                return ((newBuyers / Math.max(1, totalBuyers)) * 100).toFixed(1).replace('.', ',') + '%';
+                const totalBuyers = data.retention?.totalBuyers ?? (data.kpis.paidOrders > 0 ? data.kpis.paidOrders : 0);
+                const newBuyers = data.retention?.newBuyers ?? totalBuyers;
+                return totalBuyers > 0 ? ((newBuyers / totalBuyers) * 100).toFixed(1).replace('.', ',') + '%' : '0,0%';
               })()}
             </div>
             <div className="text-xs sm:text-sm font-bold text-white tracking-tight">
@@ -96,8 +101,8 @@ export const KpiOverviewTab: React.FC<KpiOverviewTabProps> = ({
             </div>
             <div className="text-[11px] text-slate-400 font-medium">
               {(() => {
-                const totalBuyers = data.retention?.totalBuyers || Math.round(data.kpis.paidOrders * 0.85) || 453;
-                const newBuyers = data.retention?.newBuyers || Math.round(totalBuyers * 0.821) || 372;
+                const totalBuyers = data.retention?.totalBuyers ?? (data.kpis.paidOrders > 0 ? data.kpis.paidOrders : 0);
+                const newBuyers = data.retention?.newBuyers ?? totalBuyers;
                 return `${formatNumber(newBuyers)}/${formatNumber(totalBuyers)} người mua`;
               })()}
             </div>
@@ -107,31 +112,43 @@ export const KpiOverviewTab: React.FC<KpiOverviewTabProps> = ({
           <div className="py-6 px-3 text-center flex flex-col items-center justify-center space-y-1.5 hover:bg-white/[0.03] transition-colors">
             <div className="text-xl sm:text-2xl lg:text-2xl font-extrabold text-sky-400 tracking-tight">
               {(() => {
-                const repeatRate = data.retention?.repeatPurchaseRate;
-                if (repeatRate && repeatRate > 0) {
-                  return `${(repeatRate * 0.7).toFixed(1).replace('.', ',')}% – ${repeatRate.toFixed(1).replace('.', ',')}%`;
-                }
-                return '19,9% – 28,5%';
+                const repeatRate = data.retention?.repeatPurchaseRate ?? 0;
+                return repeatRate > 0 ? `${String(repeatRate).replace('.', ',')}%` : '0,0%';
               })()}
             </div>
             <div className="text-xs sm:text-sm font-bold text-white tracking-tight">
               Tỷ lệ khách quay lại
             </div>
             <div className="text-[11px] text-slate-400 font-medium">
-              Giảm dần qua phễu
+              {(() => {
+                const totalBuyers = data.retention?.totalBuyers ?? (data.kpis.paidOrders > 0 ? data.kpis.paidOrders : 0);
+                const newBuyers = data.retention?.newBuyers ?? totalBuyers;
+                const returningBuyers = data.retention?.returningBuyers ?? Math.max(0, totalBuyers - newBuyers);
+                return returningBuyers > 0 ? `${formatNumber(returningBuyers)} khách quay lại` : 'Khách mua lần đầu';
+              })()}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 2. Power BI Visual Analytics Dashboard (Row 1: 3-Col Horizontal Widgets, Revenue Leakage Pie Card, Row 2: Channel Retention Matrix Table) */}
+      {/* 2. Operational & Store Performance Metrics Strip (4 Essential Shopee Operational KPIs) */}
+      <StoreOperationsMetricStrip data={data} language={language} />
+
+      {/* 3. Power BI Visual Analytics Dashboard (Row 1: 3-Col Horizontal Widgets, Revenue Leakage Pie Card, Row 2: Channel Retention Matrix Table) */}
       <P0AnalyticsDashboard
         data={data}
         onNavigateToAiTab={() => onNavigateToTab('ai')}
         language={language}
       />
 
-      {/* 3. Rule-Based Alerts (Phase 0 Zero-Latency Warnings) */}
+      {/* 4. Shopee Growth & Content Hub (Flywheel Momentum, Creator Analytics, Reels Analytics, Livestream Analytics) */}
+      <ShopeeGrowthAndContentHub
+        data={data}
+        language={language}
+        onNavigateToAi={() => onNavigateToTab('ai')}
+      />
+
+      {/* 5. Rule-Based Alerts (Phase 0 Zero-Latency Warnings) */}
       {data.alerts.length > 0 && (
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">

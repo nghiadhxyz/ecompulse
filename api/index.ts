@@ -125,7 +125,7 @@ app.post('/api/ai/executive-summary', async (req, res) => {
       return res.json(fallbackResult);
     }
 
-    const prompt = `Bạn là Giám đốc Dữ liệu Thương mại điện tử (Senior E-commerce Data Architect & Chief Analyst) chuyên sâu về sàn Shopee, TikTok Shop, Lazada.
+    const prompt = `Bạn là Giám đốc Dữ liệu Thương mại điện tử (Senior E-commerce Data Architect & Chief Analyst) chuyên sâu về sàn Shopee, TikTok Shop.
 Hãy viết một bản Tóm tắt Điều hành (Executive Summary) ngắn gọn, cực kỳ sắc bén (3-4 câu) bằng ${language === 'vi' ? 'Tiếng Việt' : 'English'} dựa trên số liệu phân tích JSON thực tế sau đây:
 
 DỮ LIỆU CỬA HÀNG:

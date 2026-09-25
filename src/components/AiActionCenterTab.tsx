@@ -54,19 +54,16 @@ import { AiAssessment7Pillars } from './dashboard/AiAssessment7Pillars';
 import { BusinessActionRoadmap } from './dashboard/BusinessActionRoadmap';
 import { GoogleSheetsActionSyncModal } from './dashboard/GoogleSheetsActionSyncModal';
 import {
-  getGoogleClientId,
-  requestGoogleAccessToken,
-  createActionPlanSpreadsheet,
-  populateAllSheetsData,
   getSavedSheetsConfig,
   saveSheetsConfig,
-  getSavedAccessToken,
   getSavedGoogleUser,
+  autoGenerateAndOpenGoogleSheet,
 } from '../utils/googleSheetsService';
 import {
   saveDatasetToFirestore,
   saveChatMessageToFirestore,
 } from '../utils/firebaseService';
+import { anonymizeStoreDataForAI, getSavedAiPrivacyMode } from '../utils/dataAnonymizer';
 
 interface AiActionCenterTabProps {
   data: ParsedStoreData;
@@ -198,19 +195,12 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
   const fetchExecutiveSummary = async (customKey?: string) => {
     setIsSummaryLoading(true);
     try {
+      const anonymized = anonymizeStoreDataForAI(data);
       const res = await fetch('/api/ai/executive-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          analyticsData: {
-            fileName: data.fileName,
-            kpis: data.kpis,
-            funnel: data.funnel,
-            channels: data.channels.slice(0, 4),
-            abc: data.abcSummary,
-            ads: data.ads,
-            campaign: data.campaignStats,
-          },
+          analyticsData: anonymized,
           language,
           apiKey: customKey || apiKey,
         }),
@@ -227,18 +217,12 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
   const fetchActionCards = async (customKey?: string) => {
     setIsActionsLoading(true);
     try {
+      const anonymized = anonymizeStoreDataForAI(data);
       const res = await fetch('/api/ai/action-center', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          analyticsData: {
-            kpis: data.kpis,
-            funnel: data.funnel,
-            channels: data.channels,
-            alerts: data.alerts,
-            abc: data.abcSummary,
-            ads: data.ads,
-          },
+          analyticsData: anonymized,
           language,
           apiKey: customKey || apiKey,
         }),
@@ -247,17 +231,16 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
       if (resJson.actionCards && resJson.actionCards.length > 0) {
         setActionCards(resJson.actionCards);
         
-        // Auto-save snapshot report to Firebase Firestore
+        // Auto-save snapshot report to On-Premise Local Storage
         const user = getSavedGoogleUser();
-        if (user && user.id) {
-          saveDatasetToFirestore(user.id, {
-            fileName: data.fileName,
-            platform: data.fileName.toLowerCase().includes('tiktok') ? 'tiktok' : data.fileName.toLowerCase().includes('lazada') ? 'lazada' : 'shopee',
-            kpis: data.kpis,
-            executiveSummary,
-            actionCards: resJson.actionCards,
-          });
-        }
+        const userId = user?.id || user?.email || 'local-user';
+        saveDatasetToFirestore(userId, {
+          fileName: data.fileName,
+          platform: data.fileName.toLowerCase().includes('tiktok') ? 'tiktok' : 'shopee',
+          kpis: data.kpis,
+          executiveSummary,
+          actionCards: resJson.actionCards,
+        });
       }
     } catch (err) {
       console.error('Failed to fetch AI action cards', err);
@@ -302,85 +285,16 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
   };
 
   // Google Sheets Handlers
-  const handleSyncToSheets = async (customCards?: ActionCard[], customRoadmap?: RoadmapActionItem[]) => {
-    const cardsToSync = customCards || actionCards;
-    const roadmapToSync = customRoadmap || roadmapItems;
-    if (!sheetsConfig?.spreadsheetId) {
-      setIsSheetsModalOpen(true);
-      return;
-    }
-    setIsSyncing(true);
-    setSheetsError(null);
-    try {
-      let token = getSavedAccessToken();
-      if (!token) {
-        const clientId = await getGoogleClientId();
-        token = await requestGoogleAccessToken(clientId);
-      }
-      await populateAllSheetsData(token, sheetsConfig.spreadsheetId, data, cardsToSync, roadmapToSync);
-      const updatedConfig: GoogleSheetsSyncConfig = {
-        ...sheetsConfig,
-        lastSyncedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      };
-      setSheetsConfig(updatedConfig);
-      saveSheetsConfig(updatedConfig);
-      setLastSyncStatus('Đã đồng bộ lên Google Sheet');
-      setTimeout(() => setLastSyncStatus(null), 3000);
-    } catch (err: any) {
-      console.error('Sync failed:', err);
-      setSheetsError(err?.message || 'Lỗi đồng bộ Google Sheets. Vui lòng kết nối lại!');
-    } finally {
-      setIsSyncing(false);
-    }
+  const handleSyncToSheets = async () => {
+    setIsSheetsModalOpen(true);
   };
 
-  const handleConnectNewSheet = async () => {
-    setIsSheetsLoading(true);
-    setSheetsError(null);
+  const handleQuickAutoGenerateSheet = () => {
+    const newConfig = autoGenerateAndOpenGoogleSheet(roadmapItems, actionCards, data.fileName);
+    setSheetsConfig(newConfig);
     try {
-      const clientId = await getGoogleClientId();
-      if (!clientId) throw new Error('Chưa cấu hình Google OAuth Client ID.');
-      const token = await requestGoogleAccessToken(clientId);
-      const config = await createActionPlanSpreadsheet(token, data, actionCards, roadmapItems);
-      setSheetsConfig(config);
-      setIsSheetsModalOpen(false);
-      try {
-        confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
-      } catch (e) {}
-    } catch (err: any) {
-      console.error('Connect failed:', err);
-      setSheetsError(err.message || 'Lỗi kết nối Google Sheets.');
-    } finally {
-      setIsSheetsLoading(false);
-    }
-  };
-
-  const handleLinkExistingSheet = async (idOrUrl: string) => {
-    setIsSheetsLoading(true);
-    setSheetsError(null);
-    try {
-      let sheetId = idOrUrl.trim();
-      const match = sheetId.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-      if (match && match[1]) sheetId = match[1];
-      const clientId = await getGoogleClientId();
-      const token = await requestGoogleAccessToken(clientId);
-      await populateAllSheetsData(token, sheetId, data, actionCards, roadmapItems);
-      const newConfig: GoogleSheetsSyncConfig = {
-        spreadsheetId: sheetId,
-        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}/edit`,
-        spreadsheetTitle: `Google Sheet [${sheetId.slice(0, 8)}...]`,
-        lastSyncedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        autoSync: true,
-      };
-      setSheetsConfig(newConfig);
-      saveSheetsConfig(newConfig);
-      setIsSheetsModalOpen(false);
-    } catch (err: any) {
-      console.error('Link existing failed:', err);
-      setSheetsError(err.message || 'Không thể liên kết Google Sheet này.');
-    } finally {
-      setIsSheetsLoading(false);
-    }
+      confetti({ particleCount: 50, spread: 70, origin: { y: 0.7 } });
+    } catch (_) {}
   };
 
   // Toggle Todo checkbox
@@ -406,7 +320,7 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
     setActionCards(updated);
 
     if (sheetsConfig?.spreadsheetId && sheetsConfig.autoSync) {
-      handleSyncToSheets(updated);
+      handleSyncToSheets();
     }
   };
 
@@ -414,7 +328,7 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
     const updated = actionCards.map((c) => (c.id === cardId ? { ...c, assignee, updatedAt: new Date().toLocaleString('vi-VN') } : c));
     setActionCards(updated);
     if (sheetsConfig?.spreadsheetId && sheetsConfig.autoSync) {
-      handleSyncToSheets(updated);
+      handleSyncToSheets();
     }
   };
 
@@ -449,25 +363,14 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
     }, 1200);
 
     try {
+      const anonymized = anonymizeStoreDataForAI(data);
       const res = await fetch('/api/ai/chat-analyst', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           conversationHistory: chatMessages.slice(-6),
-          analyticsData: {
-            fileName: data.fileName,
-            periodLabel: data.periodLabel,
-            kpis: data.kpis,
-            funnel: data.funnel,
-            channels: data.channels,
-            abc: data.abcSummary,
-            abcTopProducts: data.abcProducts.slice(0, 10),
-            alerts: data.alerts,
-            campaign: data.campaignStats,
-            ads: data.ads,
-            retention: data.retention,
-          },
+          analyticsData: anonymized,
           language,
           model: currentModelObj.apiModel,
           apiKey,
@@ -490,12 +393,11 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
       };
       setChatMessages((prev) => [...prev, assistantMsg]);
 
-      // Save to Firebase Firestore if logged in
+      // Save to On-Premise Local Storage
       const user = getSavedGoogleUser();
-      if (user && user.id) {
-        saveChatMessageToFirestore(user.id, { role: 'user', content: text });
-        saveChatMessageToFirestore(user.id, { role: 'assistant', content: assistantMsg.content });
-      }
+      const userId = user?.id || user?.email || 'local-user';
+      saveChatMessageToFirestore(userId, { role: 'user', content: text });
+      saveChatMessageToFirestore(userId, { role: 'assistant', content: assistantMsg.content });
     } catch (err) {
       console.error('Chat error', err);
       const errorAssistantMsg: ChatMessage = {
@@ -589,7 +491,8 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
         language={language}
         sheetsConfig={sheetsConfig}
         onOpenSheetsModal={() => setIsSheetsModalOpen(true)}
-        onSyncSheets={(customRoadmap) => handleSyncToSheets(undefined, customRoadmap)}
+        onConfigChange={(newConfig) => setSheetsConfig(newConfig)}
+        onSyncSheets={() => handleSyncToSheets()}
         isSyncing={isSyncing}
         onRoadmapChange={(items) => setRoadmapItems(items)}
       />
@@ -601,7 +504,7 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
             <div className="flex items-center space-x-2">
               <ListTodo className="w-5 h-5 text-blue-400" />
               <h3 className="text-base font-bold text-white">
-                Trung Tâm Hành Động Ưu Tiên (Prioritized Action Center)
+                Trung Tâm Hành Động Ưu Tiên
               </h3>
             </div>
             <p className="text-xs text-slate-300/80 mt-0.5">
@@ -654,14 +557,26 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setIsSheetsModalOpen(true)}
-                className="text-xs font-bold px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/30 to-teal-500/30 hover:from-emerald-500/40 hover:to-teal-500/40 text-emerald-300 border border-emerald-400/40 flex items-center gap-1.5 transition-all shadow-sm"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span>Liên kết Google Sheets</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleQuickAutoGenerateSheet}
+                  className="text-xs font-black px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 hover:scale-[1.02] active:scale-95"
+                  title="1-Click Tự động xuất việc cần làm sang Google Sheet & tải file Excel (.xlsx)"
+                >
+                  <Zap className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
+                  <span>Xuất Google Sheet (1-Click)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSheetsModalOpen(true)}
+                  className="p-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 hover:text-white border border-white/[0.1] transition-all text-xs"
+                  title="Tùy chọn nâng cao / Nhập link Google Sheet"
+                >
+                  <Link className="w-3.5 h-3.5" />
+                </button>
+              </div>
             )}
 
             {/* Copy Button */}
@@ -1352,10 +1267,16 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
         isOpen={isSheetsModalOpen}
         onClose={() => setIsSheetsModalOpen(false)}
         config={sheetsConfig}
-        onConnectNew={handleConnectNewSheet}
-        onLinkExisting={handleLinkExistingSheet}
-        isLoading={isSheetsLoading}
-        error={sheetsError}
+        onConfigChange={(newConfig) => setSheetsConfig(newConfig)}
+        onImportTasks={(importedTasks) => {
+          setRoadmapItems(importedTasks);
+          const fileId = data?.fileName ? data.fileName.replace(/[^a-zA-Z0-9_-]/g, '_') : 'default';
+          localStorage.setItem(`ecompulse_custom_roadmap_${fileId}`, JSON.stringify(importedTasks));
+        }}
+        roadmapTasks={roadmapItems}
+        actionCards={actionCards}
+        storeName={data.fileName}
+        language={language}
       />
 
       {/* Gemini API Key Configuration Modal */}

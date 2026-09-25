@@ -39,13 +39,14 @@ import { ParsedStoreData, GoogleSheetsSyncConfig, RoadmapActionItem } from '../.
 import { formatVND, formatNumber } from '../../utils/formatters';
 import { AddRoadmapTaskModal } from './AddRoadmapTaskModal';
 import { saveRoadmapTasksToFirestore } from '../../utils/firebaseService';
-import { getSavedGoogleUser } from '../../utils/googleSheetsService';
+import { getSavedGoogleUser, autoGenerateAndOpenGoogleSheet } from '../../utils/googleSheetsService';
 
 interface BusinessActionRoadmapProps {
   data: ParsedStoreData;
   language: 'vi' | 'en';
   sheetsConfig?: GoogleSheetsSyncConfig | null;
   onOpenSheetsModal?: () => void;
+  onConfigChange?: (config: GoogleSheetsSyncConfig | null) => void;
   onSyncSheets?: (customRoadmap?: RoadmapItem[]) => Promise<void>;
   isSyncing?: boolean;
   onRoadmapChange?: (items: RoadmapItem[]) => void;
@@ -60,6 +61,7 @@ export const BusinessActionRoadmap: React.FC<BusinessActionRoadmapProps> = ({
   language,
   sheetsConfig,
   onOpenSheetsModal,
+  onConfigChange,
   onSyncSheets,
   isSyncing = false,
   onRoadmapChange,
@@ -69,6 +71,7 @@ export const BusinessActionRoadmap: React.FC<BusinessActionRoadmapProps> = ({
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingTask, setEditingTask] = useState<RoadmapActionItem | null>(null);
+  const [autoSheetSuccess, setAutoSheetSuccess] = useState<boolean>(false);
 
   // Storage key for custom tasks per file
   const storageKey = useMemo(() => {
@@ -135,37 +138,40 @@ export const BusinessActionRoadmap: React.FC<BusinessActionRoadmapProps> = ({
     const placedRev = kpis.placedRevenue || 0;
     const paidRev = kpis.paidRevenue || 0;
     const leakageVND = funnel.totalLeakageVND || Math.max(0, placedRev - paidRev);
-    const leakagePct = placedRev > 0 ? ((leakageVND / placedRev) * 100).toFixed(1) : '23.8';
+    const leakagePct = placedRev > 0 ? ((leakageVND / placedRev) * 100).toFixed(1) : '0.0';
 
     // Channel specific metrics
+    const sortedByLeak = [...channels].sort((a, b) => (b.leakageAmount || 0) - (a.leakageAmount || 0));
     const searchChannel = channels.find((c) => c.channelName.toLowerCase().includes('tìm kiếm')) ||
-      channels.find((c) => c.channelName.toLowerCase().includes('search')) || {
-        channelName: 'Tìm kiếm',
-        retentionRate: 53.4,
-        leakageAmount: leakageVND * 0.4,
+      channels.find((c) => c.channelName.toLowerCase().includes('search')) ||
+      sortedByLeak[0] || {
+        channelName: 'Kênh rò rỉ',
+        retentionRate: 0,
+        leakageAmount: 0,
       };
 
-    const chatChannel = channels.find((c) => c.channelName.toLowerCase().includes('chat')) || {
-      channelName: 'Chat',
-      retentionRate: 0,
-      leakageAmount: 0,
-    };
+    const chatChannel = channels.find((c) => c.channelName.toLowerCase().includes('chat')) ||
+      channels.find((c) => c.channelName.toLowerCase().includes('tin nhắn')) || {
+        channelName: 'Chat/Tin nhắn',
+        retentionRate: 0,
+        leakageAmount: 0,
+      };
 
-    const totalAdsSpend = ads.reduce((acc, a) => acc + a.spend, 0);
-    const totalAdsPaid = ads.reduce((acc, a) => acc + a.paidRevenue, 0);
-    const roas = totalAdsSpend > 0 ? (totalAdsPaid / totalAdsSpend).toFixed(1) : '12.3';
+    const totalAdsSpend = ads.reduce((acc, a) => acc + (a.spend || 0), 0) || (kpis.adSpend || 0);
+    const totalAdsPaid = ads.reduce((acc, a) => acc + (a.paidRevenue || 0), 0);
+    const roas = totalAdsSpend > 0 ? (totalAdsPaid / totalAdsSpend).toFixed(1) : (kpis.blendedRoas && kpis.blendedRoas > 0 ? kpis.blendedRoas.toFixed(1) : '0.0');
 
     const newBuyerPct = retention && retention.totalBuyers > 0
       ? ((retention.newBuyers / retention.totalBuyers) * 100).toFixed(1)
-      : '77.7';
+      : '0.0';
     const returningPct = retention && retention.totalBuyers > 0
       ? ((retention.returningBuyers / retention.totalBuyers) * 100).toFixed(1)
-      : '22.3';
+      : '0.0';
 
     const normalDays = daily.filter((d) => !d.isDoubleDigitCampaign);
     const avgNormalRevenue = normalDays.length > 0
       ? Math.round(normalDays.reduce((acc, d) => acc + d.revenue, 0) / normalDays.length)
-      : Math.round(paidRev / 30);
+      : (daily.length > 0 ? Math.round(paidRev / daily.length) : 0);
 
     const items: RoadmapItem[] = [
       // === 1. Ưu tiên cao — thực hiện trong 0–2 tuần ===
@@ -527,6 +533,19 @@ export const BusinessActionRoadmap: React.FC<BusinessActionRoadmapProps> = ({
   const completedCount = roadmapItems.filter((i) => i.status === 'completed').length;
   const progressPercent = roadmapItems.length > 0 ? Math.round((completedCount / roadmapItems.length) * 100) : 0;
 
+  // 1-Click Auto Create & Open Google Sheet
+  const handleAutoCreateSheet = () => {
+    const newConfig = autoGenerateAndOpenGoogleSheet(roadmapItems, [], data.fileName);
+    if (onConfigChange) {
+      onConfigChange(newConfig);
+    }
+    setAutoSheetSuccess(true);
+    setTimeout(() => setAutoSheetSuccess(false), 5000);
+    try {
+      confetti({ particleCount: 50, spread: 70, origin: { y: 0.7 } });
+    } catch (_) {}
+  };
+
   // Copy full roadmap action table
   const handleCopyRoadmap = () => {
     let text = `=== ĐỀ XUẤT HÀNH ĐỘNG CHO DOANH NGHIỆP ===\nFile dữ liệu: ${data.fileName}\n\n`;
@@ -598,14 +617,14 @@ export const BusinessActionRoadmap: React.FC<BusinessActionRoadmapProps> = ({
           <div>
             <div className="flex flex-wrap items-center gap-2.5">
               <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
-                Đề Xuất Hành Động Cho Doanh Nghiệp (Action Roadmap)
+                Đề Xuất Hành Động Cho Doanh Nghiệp
               </h3>
               <span className="px-3 py-0.5 rounded-full text-xs font-black bg-rose-500/25 text-rose-300 border border-rose-400/40 uppercase tracking-wider backdrop-blur-md">
                 Lộ Trình Giải Quyết
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
-              Kế hoạch hành động từng bước gắn liền với mục tiêu & chỉ số KPI định lượng, tự động liên kết trực tiếp sang Google Sheets cho nhóm bán hàng
+              Kế hoạch hành động từng bước gắn liền với mục tiêu & chỉ số KPI định lượng, tự động tạo & mở Google Sheet cho nhóm bán hàng
             </p>
           </div>
         </div>
@@ -656,17 +675,37 @@ export const BusinessActionRoadmap: React.FC<BusinessActionRoadmapProps> = ({
                 <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
                 <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ'}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={onOpenSheetsModal}
+                className="p-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-slate-300 border border-white/[0.1] text-xs transition-all"
+                title="Cài đặt / Đổi link Google Sheet"
+              >
+                <Link className="w-3.5 h-3.5" />
+              </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={onOpenSheetsModal}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/25 animate-pulse hover:animate-none"
-              title="Tạo hoặc liên kết trang tính Google Sheets trực tuyến cho cả team cùng làm việc"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-slate-950" />
-              <span>Liên Kết Google Sheets</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleAutoCreateSheet}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/30 hover:scale-[1.02] active:scale-95"
+                title="1-Click Tự động xuất việc cần làm sang Google Sheet & tải file Excel (.xlsx)"
+              >
+                <Zap className="w-4 h-4 text-slate-950 fill-slate-950" />
+                <span>Xuất Google Sheet (1-Click)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenSheetsModal}
+                className="p-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-slate-300 border border-white/[0.1] text-xs transition-all"
+                title="Tùy chọn xuất / Cài đặt Google Sheet"
+              >
+                <Link className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
 
           {/* Export CSV Offline Button */}
@@ -698,6 +737,24 @@ export const BusinessActionRoadmap: React.FC<BusinessActionRoadmapProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Auto Sheet Created Toast Banner */}
+      {autoSheetSuccess && (
+        <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              🎉 <strong>Đã tự động tạo & mở Google Sheet!</strong> Toàn bộ bảng phân công đã được sao chép sẵn vào bộ nhớ tạm. Hãy nhấn <strong>Ctrl + V</strong> tại ô A1 trên trang tính vừa mở.
+            </span>
+          </div>
+          <button
+            onClick={() => setAutoSheetSuccess(false)}
+            className="text-slate-400 hover:text-white p-1"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* 2. Priority Filter Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
