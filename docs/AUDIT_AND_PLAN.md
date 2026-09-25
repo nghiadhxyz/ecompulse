@@ -143,14 +143,24 @@ Nguyên tắc:
 - Bảng trong KpiOverviewTab tràn ngang 587px trên màn 390px (có từ trước) — Seller Home thay thế ở Phase 2.
 - Privacy mode vẫn chưa được enforce ở mọi call AI → Phase 5 (đã vá rò rỉ payload thô của Dolphin chat).
 
-### Phase 2 — Seller Mode
-- Importer order-level Shopee/TikTok/Lazada (auto-detect) → CanonicalDataset; Web Worker + progress + cancel
-- Lưu CanonicalDataset vào IndexedDB (store mới, bump DB_VERSION)
-- Nhập COGS theo SKU (lưu local), cài đặt phí sàn
-- Sample data 3 tháng × 3 sàn, order-level, nhất quán nội bộ
-- 7 màn hình: Home · Lời/Lỗ · Sản phẩm · Đơn hàng · Ads & Live · Cảnh báo · Daily Brief
-- anomalyEngine v1 (ngưỡng + baseline 7 ngày + moving average)
-- Evidence object + nút [Xem dữ liệu]
+### Phase 2 — Seller Mode *(xong)*
+- [x] Importer file xuất đơn Shopee / TikTok Shop / Lazada / mẫu EcomPulse, tự nhận diện; file giá vốn; báo cáo tổng hợp Shopee đi qua parser cũ. **Cột theo định dạng công khai của sàn — cần đối chiếu lại khi có file thật** (`src/analytics/importers/orderExport.ts`, danh sách `SPECS`)
+- [x] Không lưu tên/SĐT/địa chỉ; mã người mua băm một chiều trên máy
+- [x] Web Worker + tiến độ + hủy nhập (`src/workers/importWorker.ts`)
+- [x] Workspace lưu IndexedDB riêng (`EcomPulse_Workspace_DB`), gộp file không đếm trùng đơn; "Xóa sạch dữ liệu" xóa luôn DB này
+- [x] Demo 3 tháng × 3 sàn cấp đơn, nhất quán nội bộ (test kiểm chứng), demo không ghi đè dữ liệu thật
+- [x] Nhập giá vốn theo SKU, tỷ lệ phí sàn/thanh toán, xác nhận "không chạy Ads" / "shop không chịu ship"
+- [x] 7 nhóm: Tổng quan (KPI + so sánh kỳ tương đương) · Lời/Lỗ thật (nguồn từng khoản) · Sản phẩm (lối tắt + "tốt nhất" theo từng tiêu chí) · Đơn hàng (vòng đời, hủy/hoàn theo SKU/sàn/lý do/ngày) · Ads & Live (ROAS + ROAS hòa vốn + lời sau Ads; live so với phiên trước) · Cảnh báo thông minh · Bản tin ngày
+- [x] Anomaly engine: ngưỡng + baseline (trung vị 7 ngày, 4 tuần, 14 ngày), so sánh ngày thường loại ngày sale, lọc nhiễu cỡ mẫu
+- [x] Evidence + [Xem dữ liệu] mở đúng danh sách đơn
+- [x] Mobile: điều hướng dưới, không tràn ngang; Seller Mode lazy-load (chunk riêng 136 KB)
+
+**Kết quả Phase 2 (2026-09-25):** `tsc` ✅ · `npm test` 149/149 ✅ · `npm run build` ✅ · chạy thử Edge headless: demo → 7 trang, [Xem dữ liệu], nhập giá vốn, nhập file xuất đơn Shopee + file giá vốn, IndexedDB không chứa PII, dữ liệu còn sau khi tải lại, mobile 390px không tràn, chế độ Analyst vẫn mở dashboard cũ, 0 lỗi console.
+
+**Còn tồn sau Phase 2:**
+- Chưa có importer báo cáo Ads / Live / Affiliate riêng của sàn → trang Ads & Live chỉ đầy đủ với demo hoặc khi có dữ liệu này (Phase 4).
+- Dolphin hỏi đáp theo bằng chứng (Phase 5); hiện Bản tin ngày là tất định, không gọi AI.
+- Header còn hiện badge "Shopee" cũ khi ở Seller Mode (thẩm mỹ).
 
 ### Phase 3 — Analyst Core
 Executive Overview · Category Intelligence (drill-down) · Product & Combo · Revenue & Profit waterfall theo chiều · Order Health · Traffic & Funnel

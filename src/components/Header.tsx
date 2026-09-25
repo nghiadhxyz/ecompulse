@@ -56,6 +56,8 @@ interface HeaderProps {
   setLanguage: (lang: 'vi' | 'en') => void;
   workspaceMode?: WorkspaceMode | null;
   onOpenWorkspaceMode?: () => void;
+  /** Seller Mode has its own Data page — hide the classic file/upload controls and tabs. */
+  hideDataControls?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -76,6 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
   setLanguage,
   workspaceMode,
   onOpenWorkspaceMode,
+  hideDataControls = false,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
   const [showSecurityModal, setShowSecurityModal] = useState<boolean>(false);
@@ -157,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               <div className="flex items-center space-x-2">
-                <span className="text-lg font-black tracking-tight text-white group-hover:text-blue-200 transition-colors whitespace-nowrap">
+                <span className="hidden sm:inline text-lg font-black tracking-tight text-white group-hover:text-blue-200 transition-colors whitespace-nowrap">
                   Ecom<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">Pulse AI</span>
                 </span>
                 {renderPlatformBadge()}
@@ -168,7 +171,7 @@ export const Header: React.FC<HeaderProps> = ({
                 CENTER: DUAL-TRACK SEGMENTED SWITCHER (Luồng 1 & Luồng 2)
             ========================================================= */}
             {onChangeTrack && (
-              <div className="flex items-center bg-slate-900/90 p-1 rounded-2xl border border-white/15 backdrop-blur-xl shadow-lg shadow-black/20 shrink-0">
+              <div className="hidden lg:flex items-center bg-slate-900/90 p-1 rounded-2xl border border-white/15 backdrop-blur-xl shadow-lg shadow-black/20 shrink-0">
                 <button
                   id="nav-track-marketplace"
                   onClick={() => onChangeTrack('marketplace')}
@@ -266,7 +269,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               {/* Data File Status / Reset */}
-              {currentData ? (
+              {hideDataControls ? null : currentData ? (
                 <div className="flex items-center gap-1.5 shrink-0">
                   <div className="hidden 2xl:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-medium backdrop-blur-md whitespace-nowrap">
                     <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -307,6 +310,7 @@ export const Header: React.FC<HeaderProps> = ({
               ) : null}
 
               {/* Download Sample Excel */}
+              {!hideDataControls && (<>
               <button
                 id="btn-download-sample"
                 onClick={downloadSampleShopeeExcel}
@@ -326,6 +330,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <Upload className="w-3.5 h-3.5 mr-1.5" />
                 <span>{currentData ? 'Tải file khác' : 'Nhập Excel'}</span>
               </button>
+              </>)}
 
               {/* Tour Guide Button */}
               <button
@@ -493,7 +498,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Navigation Sub-Header (Tabs) */}
-          {currentData && (
+          {currentData && !hideDataControls && (
             <div className="flex border-t border-white/[0.08] overflow-x-auto no-scrollbar py-2.5 gap-2 sm:gap-3">
               <button
                 id="nav-tab-overview"

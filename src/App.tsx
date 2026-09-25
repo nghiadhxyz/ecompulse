@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { Header } from './components/Header';
 import { DualTrackSelector, AnalysisTrack } from './components/DualTrackSelector';
 import { InternalFinanceModule } from './components/internal-finance/InternalFinanceModule';
@@ -15,6 +15,8 @@ import { ArrowLeft } from 'lucide-react';
 import { WorkspaceModeSelector } from './components/onboarding/WorkspaceModeSelector';
 import { getSavedWorkspaceMode, saveWorkspaceMode, WorkspaceMode } from './utils/workspacePreferences';
 import { canonicalFromParsedStoreData } from './analytics';
+// Seller Mode (engines + demo generator) loads on demand to keep the initial bundle small.
+const SellerWorkspace = lazy(() => import('./components/seller/SellerWorkspace').then((m) => ({ default: m.SellerWorkspace })));
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<GoogleUserProfile>(() => getSavedGoogleUser());
@@ -26,6 +28,9 @@ export default function App() {
   const [language, setLanguage] = useState<'vi' | 'en'>('vi');
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode | null>(() => getSavedWorkspaceMode());
   const [isModeSelectorOpen, setIsModeSelectorOpen] = useState<boolean>(false);
+  // "Xem demo" in Seller Mode opens the order-level 3-month demo instead of the classic one.
+  const [sellerDemoRequested, setSellerDemoRequested] = useState<boolean>(false);
+  const sellerMode = analysisTrack === 'marketplace' && workspaceMode === 'seller';
 
   // One canonical dataset per loaded file; every analytics view reads from it.
   const canonicalData = useMemo(
@@ -63,6 +68,7 @@ export default function App() {
 
   const handleLoadSampleData = (platform: EcommercePlatform, data: ParsedStoreData) => {
     setAnalysisTrack('marketplace');
+    setSellerDemoRequested(true);
     setSelectedPlatform(platform);
     setCurrentData(data);
     setActiveTab('overview');
@@ -100,6 +106,7 @@ export default function App() {
           setLanguage={setLanguage}
           workspaceMode={workspaceMode}
           onOpenWorkspaceMode={() => setIsModeSelectorOpen(true)}
+          hideDataControls={sellerMode}
         />
       )}
 
@@ -122,7 +129,22 @@ export default function App() {
         {/* =========================================================================
             TRACK 1: PHÂN TÍCH SÀN THƯƠNG MẠI ĐIỆN TỬ (3 SÀN TMĐT: SHOPEE, TIKTOK, LAZADA)
         ========================================================================= */}
-        {analysisTrack === 'marketplace' && (
+        {sellerMode && (
+          <Suspense fallback={<div className="text-sm text-slate-400 p-8 text-center">{language === 'vi' ? 'Đang tải…' : 'Loading…'}</div>}>
+          <SellerWorkspace
+            language={language}
+            setLanguage={setLanguage}
+            workspaceMode="seller"
+            onChangeMode={handleSelectWorkspaceMode}
+            legacyData={currentData}
+            legacyPlatform={selectedPlatform}
+            startWithDemo={sellerDemoRequested}
+            onDemoStarted={() => setSellerDemoRequested(false)}
+          />
+          </Suspense>
+        )}
+
+        {analysisTrack === 'marketplace' && !sellerMode && (
           <>
             {!currentData ? (
               !selectedPlatform ? (

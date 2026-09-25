@@ -471,6 +471,8 @@ export async function wipeAllLocalData(): Promise<boolean> {
     // Delete IndexedDB
     if (typeof window !== 'undefined' && window.indexedDB) {
       window.indexedDB.deleteDatabase(DB_NAME);
+      // Seller/Analyst workspace (order-level data and cost settings)
+      window.indexedDB.deleteDatabase('EcomPulse_Workspace_DB');
     }
   } catch (_) {}
 
