@@ -87,7 +87,12 @@ export interface PeriodComparison {
 }
 
 export function comparePeriods(dataset: CanonicalDataset, filter: DatasetFilter, mode: ComparisonMode): PeriodComparison {
-  const previousRange = comparableRange(filter.range, mode);
+  return { ...compareRanges(dataset, filter, comparableRange(filter.range, mode)), mode };
+}
+
+/** Compare against any explicit previous range (e.g. a user-chosen comparison period). */
+export function compareRanges(dataset: CanonicalDataset, filter: DatasetFilter, previousRange: DateRange): PeriodComparison {
+  const mode: ComparisonMode = 'previous';
   const current = computeKpis(dataset, filter);
   const previous = computeKpis(dataset, { ...filter, range: previousRange });
   const metrics = {} as Record<KpiKey, MetricComparison>;

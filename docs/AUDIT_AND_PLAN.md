@@ -162,8 +162,24 @@ Nguyên tắc:
 - Dolphin hỏi đáp theo bằng chứng (Phase 5); hiện Bản tin ngày là tất định, không gọi AI.
 - Header còn hiện badge "Shopee" cũ khi ở Seller Mode (thẩm mỹ).
 
-### Phase 3 — Analyst Core
-Executive Overview · Category Intelligence (drill-down) · Product & Combo · Revenue & Profit waterfall theo chiều · Order Health · Traffic & Funnel
+### Phase 3 — Analyst Core *(xong)*
+- [x] Breakdown engine dùng chung: cùng bộ KPI cho mọi thành viên của chiều (sàn, ngành, nhóm hàng, SKU, combo, chiến dịch, phiên live, kênh, ngày/tuần/tháng) + so sánh kỳ + đóng góp vào thay đổi GMV (`breakdownEngine.ts`)
+- [x] Bộ lọc mở rộng: nhóm hàng, combo, chiến dịch, phiên live; traffic/Ads thu hẹp đúng theo sản phẩm được chọn (sửa CVR toàn shop khi lọc ngành)
+- [x] Analyst Workspace: sidebar nhóm TODAY/PERFORMANCE/GROWTH/INTELLIGENCE/PLANNING/REPORTS/DATA; module của phase sau hiện nhãn "P4–P7", không bấm được; lối vào Dashboard cổ điển (What-If, roadmap cũ)
+- [x] Bộ lọc nâng cao: preset, kiểu so sánh Tự động/Kỳ liền trước/DoD/WoW/MoM/YoY/Tự chọn kỳ so sánh, nhiều sàn, nhiều ngành
+- [x] Executive Overview: 10 KPI; 1·Điều gì thay đổi → 2·Ở sàn nào → 3·Ngành nào đóng góp → 4·Nên điều tra gì; biểu đồ kỳ này vs kỳ so sánh
+- [x] Category Intelligence: Ngành → Nhóm → SKU → Product 360 → Đơn hàng, có breadcrumb
+- [x] Products & Combo: Scale/Maintain/Investigate/Reconsider kèm lý do, ABC, Hero, Zombie (chỉ khi có traffic), momentum ngày thường; Product 360; combo vs bán lẻ (giỏ hàng, margin, hủy)
+- [x] Revenue & Profit: thác nước có nguồn từng khoản + thay đổi so với kỳ trước; lợi nhuận theo 10 chiều
+- [x] Order Health: tỷ lệ hủy/hoàn/hoàn tất có so sánh; drill theo 8 chiều; lý do hủy/hoàn theo nhóm + so với kỳ trước
+- [x] Traffic & Funnel: 7 tầng (tầng thiếu dữ liệu ghi rõ, không suy diễn), điểm rơi lớn nhất sau khi khách đã nhấp, so sánh kỳ (pp), theo sàn/ngành/SKU, phễu livestream
+- [x] Data Mapping: danh mục SKU với độ phủ ngành/nhóm/giá vốn
+
+**Kết quả Phase 3 (2026-09-25):** `tsc` ✅ · `npm test` 177/177 ✅ · `npm run build` ✅ (Analyst chunk riêng 86 KB) · chạy thử Edge headless: toàn bộ module Analyst, drill-down 4 cấp, đổi kiểu so sánh (YoY ngoài dữ liệu có cảnh báo), dashboard cổ điển và quay lại, Seller Mode không hồi quy, mobile 390px không tràn, 0 lỗi console.
+
+**Còn tồn sau Phase 3:**
+- File xuất đơn của sàn thường không có ngành hàng → Category Intelligence cần danh mục sản phẩm (có thể bổ sung trang nhập ngành hàng theo SKU ở phase sau, tương tự nhập giá vốn).
+- "Lượt xem" (Views) trong phễu chưa có nguồn dữ liệu (cần báo cáo traffic sản phẩm của sàn — Phase 4).
 
 ### Phase 4 — Growth
 Campaign & Calendar · Ads Intelligence (break-even ROAS) · Live Auditor · Video & Affiliate (thay momentum tổng hợp)

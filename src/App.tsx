@@ -17,6 +17,7 @@ import { getSavedWorkspaceMode, saveWorkspaceMode, WorkspaceMode } from './utils
 import { canonicalFromParsedStoreData } from './analytics';
 // Seller Mode (engines + demo generator) loads on demand to keep the initial bundle small.
 const SellerWorkspace = lazy(() => import('./components/seller/SellerWorkspace').then((m) => ({ default: m.SellerWorkspace })));
+const AnalystWorkspace = lazy(() => import('./components/analyst/AnalystWorkspace').then((m) => ({ default: m.AnalystWorkspace })));
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<GoogleUserProfile>(() => getSavedGoogleUser());
@@ -31,6 +32,9 @@ export default function App() {
   // "Xem demo" in Seller Mode opens the order-level 3-month demo instead of the classic one.
   const [sellerDemoRequested, setSellerDemoRequested] = useState<boolean>(false);
   const sellerMode = analysisTrack === 'marketplace' && workspaceMode === 'seller';
+  // Analyst Mode opens the new workspace; the classic dashboard stays one click away.
+  const [analystClassic, setAnalystClassic] = useState<boolean>(false);
+  const analystMode = analysisTrack === 'marketplace' && workspaceMode === 'analyst' && !analystClassic;
 
   // One canonical dataset per loaded file; every analytics view reads from it.
   const canonicalData = useMemo(
@@ -106,7 +110,7 @@ export default function App() {
           setLanguage={setLanguage}
           workspaceMode={workspaceMode}
           onOpenWorkspaceMode={() => setIsModeSelectorOpen(true)}
-          hideDataControls={sellerMode}
+          hideDataControls={sellerMode || analystMode}
         />
       )}
 
@@ -144,7 +148,31 @@ export default function App() {
           </Suspense>
         )}
 
-        {analysisTrack === 'marketplace' && !sellerMode && (
+        {analystMode && (
+          <Suspense fallback={<div className="text-sm text-slate-400 p-8 text-center">{language === 'vi' ? 'Đang tải…' : 'Loading…'}</div>}>
+            <AnalystWorkspace
+              language={language}
+              setLanguage={setLanguage}
+              onChangeMode={handleSelectWorkspaceMode}
+              legacyData={currentData}
+              legacyPlatform={selectedPlatform}
+              startWithDemo={sellerDemoRequested}
+              onDemoStarted={() => setSellerDemoRequested(false)}
+              onOpenClassic={() => setAnalystClassic(true)}
+            />
+          </Suspense>
+        )}
+
+        {analysisTrack === 'marketplace' && workspaceMode === 'analyst' && analystClassic && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <span>{language === 'vi' ? 'Bạn đang ở dashboard cổ điển (dữ liệu từ file tải lên ở màn hình này).' : 'You are in the classic dashboard.'}</span>
+            <button onClick={() => setAnalystClassic(false)} className="font-bold text-sky-300 underline underline-offset-2">
+              {language === 'vi' ? '← Quay lại Analyst Workspace' : '← Back to Analyst Workspace'}
+            </button>
+          </div>
+        )}
+
+        {analysisTrack === 'marketplace' && !sellerMode && !analystMode && (
           <>
             {!currentData ? (
               !selectedPlatform ? (

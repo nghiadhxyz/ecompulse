@@ -113,7 +113,7 @@ export const HomeView: React.FC = () => {
                       itemStyle={{ color: '#cbd5e1' }}
                       formatter={(v: number) => [fmtMoney(v, lang), vi ? 'Doanh thu' : 'Revenue']}
                     />
-                    <Bar dataKey="gmv" fill={BAR_COLOR} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar isAnimationActive={false} dataKey="gmv" fill={BAR_COLOR} radius={[4, 4, 0, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

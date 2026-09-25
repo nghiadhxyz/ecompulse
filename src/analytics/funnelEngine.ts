@@ -40,7 +40,10 @@ export interface FunnelStep {
 export interface Funnel {
   stages: Record<FunnelStageKey, number | null>;
   steps: FunnelStep[];
-  /** Step with the lowest conversion among steps with data. */
+  /**
+   * Lowest-converting step after the shopper reached the product (impression → click is
+   * always the lowest and says little on its own; it is only used when nothing else exists).
+   */
   biggestLeak: FunnelStep | null;
   missing: FunnelStageKey[];
   /** Order stages are complete only for orders old enough to be delivered. */
@@ -72,7 +75,9 @@ function build(stages: Record<FunnelStageKey, number | null>, notes: Bilingual[]
     steps.push({ from, to, rate, dropOff: rate === null ? null : 1 - rate, skipped: ORDER.slice(ORDER.indexOf(from) + 1, ORDER.indexOf(to)) });
   }
   const withRate = steps.filter((s) => s.rate !== null);
-  const biggestLeak = withRate.length ? withRate.reduce((m, s) => (s.rate! < m.rate! ? s : m)) : null;
+  const onSite = withRate.filter((s) => s.from !== 'impressions' && s.from !== 'views');
+  const pool = onSite.length ? onSite : withRate;
+  const biggestLeak = pool.length ? pool.reduce((m, s) => (s.rate! < m.rate! ? s : m)) : null;
   return { stages, steps, biggestLeak, missing: ORDER.filter((k) => stages[k] === null), notes };
 }
 

@@ -15,7 +15,7 @@ import type { DatasetFilter } from './filters';
 import { sliceDataset, getDatasetIndex } from './filters';
 import { breakdown, type BreakdownRow } from './breakdownEngine';
 import { computeKpis } from './kpiEngine';
-import { comparePeriods, type PeriodComparison } from './comparisonEngine';
+import { comparePeriods, compareRanges, type PeriodComparison } from './comparisonEngine';
 import { adsSummary, type AdCampaignRow } from './adsLiveEngine';
 import { dailySeries, type DailyPoint } from './timeseries';
 import { campaignDates, normalDayStats } from './normalDays';
@@ -143,9 +143,10 @@ export interface Product360 {
   insight?: ProductInsight;
 }
 
-export function product360(dataset: CanonicalDataset, filter: DatasetFilter, sku: string, mode: ComparisonMode, insight?: ProductInsight): Product360 {
+/** `compare` is a comparison mode or an explicit previous range (e.g. the workspace's custom period). */
+export function product360(dataset: CanonicalDataset, filter: DatasetFilter, sku: string, compare: ComparisonMode | DateRange, insight?: ProductInsight): Product360 {
   const f: DatasetFilter = { ...filter, skus: [sku] };
-  const comparison = comparePeriods(dataset, f, mode);
+  const comparison = typeof compare === 'string' ? comparePeriods(dataset, f, compare) : compareRanges(dataset, f, compare);
   const product = dataset.products.find((p) => p.sku === sku);
   const slice = sliceDataset(dataset, f);
   const statusOk = new Map(slice.orders.map((o) => [o.orderId, o]));

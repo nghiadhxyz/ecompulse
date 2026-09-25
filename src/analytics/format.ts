@@ -45,14 +45,15 @@ export function fmtRate(v: number | null | undefined, lang: Lang = 'vi', digits 
 /** Signed relative change → "↑ 11,2%" / "↓ 3%". */
 export function fmtChange(ratio: number | null | undefined, lang: Lang = 'vi'): string {
   if (ratio === null || ratio === undefined || !Number.isFinite(ratio)) return DASH;
-  const arrow = ratio > 0 ? '↑' : ratio < 0 ? '↓' : '→';
+  // Changes that round to 0,0% show as flat, not as a tiny arrow.
+  const arrow = Math.abs(ratio) < 0.0005 ? '→' : ratio > 0 ? '↑' : '↓';
   return `${arrow} ${fmtRate(Math.abs(ratio), lang)}`;
 }
 
 /** Percentage-point change → "+2,7pp". */
 export function fmtPp(pp: number | null | undefined, lang: Lang = 'vi'): string {
   if (pp === null || pp === undefined || !Number.isFinite(pp)) return DASH;
-  const sign = pp > 0 ? '+' : pp < 0 ? '−' : '±';
+  const sign = Math.abs(pp) < 0.05 ? '±' : pp > 0 ? '+' : '−';
   return `${sign}${Math.abs(pp).toFixed(1).replace('.', lang === 'vi' ? ',' : '.')}pp`;
 }
 

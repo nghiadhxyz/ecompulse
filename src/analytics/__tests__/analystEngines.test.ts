@@ -151,7 +151,8 @@ describe('funnel engine', () => {
     expect(first.to).toBe('clicks');
     expect(first.skipped).toEqual(['views']);
     expect(f.biggestLeak).not.toBeNull();
-    expect(f.biggestLeak!.rate).toBe(Math.min(...f.steps.map((s) => s.rate!)));
+    expect(f.biggestLeak!.from).not.toBe('impressions'); // top-of-funnel CTR is excluded
+    expect(f.biggestLeak!.rate).toBe(Math.min(...f.steps.filter((s) => s.from !== 'impressions').map((s) => s.rate!)));
   });
 
   it('computes step rates exactly on a small fixture', () => {
@@ -163,7 +164,7 @@ describe('funnel engine', () => {
     const f = funnel(ds, { range: { start: '2025-09-01', end: '2025-09-01' } });
     expect(f.stages).toEqual({ impressions: 1000, views: null, clicks: 50, addToCart: 10, orders: 2, paid: 1, completed: 1 });
     expect(f.steps.map((s) => s.rate)).toEqual([0.05, 0.2, 0.2, 0.5, 1]);
-    expect(f.biggestLeak?.from).toBe('impressions');
+    expect(f.biggestLeak?.from).toBe('clicks'); // first of the tied 20% steps after the click
   });
 
   it('compares funnels in percentage points and builds a live funnel', () => {

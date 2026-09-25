@@ -189,5 +189,7 @@ describe('formatting', () => {
     expect(fmtRate(0.092)).toBe('9,2%');
     expect(fmtChange(0.112)).toBe('↑ 11,2%');
     expect(fmtPp(2.7)).toBe('+2,7pp');
+    expect(fmtPp(-0.03)).toBe('±0,0pp');
+    expect(fmtChange(-0.0002)).toBe('→ 0,0%');
   });
 });

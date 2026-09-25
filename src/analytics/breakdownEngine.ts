@@ -109,6 +109,17 @@ export function dimensionMemberLabel(dataset: CanonicalDataset, dim: BreakdownDi
       const s = dataset.liveSessions.find((x) => x.sessionId === key);
       return s ? `${fmtDay(s.date)} · ${PLATFORM_LABELS[s.platform]}${s.title ? ` · ${s.title}` : ''}` : key;
     }
+    case 'channel': {
+      const channels: Record<string, { vi: string; en: string }> = {
+        search: { vi: 'Tìm kiếm', en: 'Search' },
+        recommend: { vi: 'Gợi ý / khám phá', en: 'Recommendation' },
+        affiliate: { vi: 'Affiliate', en: 'Affiliate' },
+        video: { vi: 'Video', en: 'Video' },
+        ads: { vi: 'Quảng cáo', en: 'Ads' },
+        live: { vi: 'Livestream', en: 'Live' },
+      };
+      return channels[key]?.[lang] ?? key;
+    }
     case 'day':
       return fmtDay(key);
     case 'week':
