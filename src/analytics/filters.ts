@@ -5,8 +5,26 @@ export interface DatasetFilter {
   range: DateRange;
   /** Empty / undefined = all platforms. */
   platforms?: Platform[];
+  // Line-level filters (product attributes)
   skus?: string[];
   categories?: string[];
+  subcategories?: string[];
+  comboIds?: string[];
+  // Order-level filters
+  campaignIds?: string[];
+  liveSessionIds?: string[];
+}
+
+const nonEmpty = (a?: unknown[]) => !!a && a.length > 0;
+
+/** Line-level filter present → only part of each order counts. */
+export function hasLineFilter(f: DatasetFilter): boolean {
+  return nonEmpty(f.skus) || nonEmpty(f.categories) || nonEmpty(f.subcategories) || nonEmpty(f.comboIds);
+}
+
+/** Any filter narrower than "whole shop on these platforms" — shop-level costs can't be attributed. */
+export function isScopedFilter(f: DatasetFilter): boolean {
+  return hasLineFilter(f) || nonEmpty(f.campaignIds) || nonEmpty(f.liveSessionIds);
 }
 
 /** The subset of a dataset that falls inside a filter. Engines compute on this. */
@@ -28,6 +46,7 @@ export interface DatasetSlice {
 interface DatasetIndex {
   linesByOrder: Map<string, OrderLine[]>;
   categoryBySku: Map<string, string>;
+  subcategoryBySku: Map<string, string>;
 }
 
 const indexCache = new WeakMap<CanonicalDataset, DatasetIndex>();
@@ -42,8 +61,12 @@ export function getDatasetIndex(dataset: CanonicalDataset): DatasetIndex {
     else linesByOrder.set(line.orderId, [line]);
   }
   const categoryBySku = new Map<string, string>();
-  for (const p of dataset.products) if (p.category) categoryBySku.set(p.sku, p.category);
-  const index = { linesByOrder, categoryBySku };
+  const subcategoryBySku = new Map<string, string>();
+  for (const p of dataset.products) {
+    if (p.category) categoryBySku.set(p.sku, p.category);
+    if (p.subcategory) subcategoryBySku.set(p.sku, p.subcategory);
+  }
+  const index = { linesByOrder, categoryBySku, subcategoryBySku };
   indexCache.set(dataset, index);
   return index;
 }
@@ -56,17 +79,28 @@ function platformMatch(filter: DatasetFilter, platform: Platform | undefined): b
 export function sliceDataset(dataset: CanonicalDataset, filter: DatasetFilter): DatasetSlice {
   const { range } = filter;
   const index = getDatasetIndex(dataset);
-  const skuSet = filter.skus && filter.skus.length > 0 ? new Set(filter.skus) : null;
-  const catSet = filter.categories && filter.categories.length > 0 ? new Set(filter.categories) : null;
-  const lineMatch = (l: OrderLine) =>
-    (!skuSet || skuSet.has(l.sku)) && (!catSet || catSet.has(index.categoryBySku.get(l.sku) || ''));
+  const toSet = (a?: string[]) => (a && a.length > 0 ? new Set(a) : null);
+  const skuSet = toSet(filter.skus);
+  const catSet = toSet(filter.categories);
+  const subSet = toSet(filter.subcategories);
+  const comboSet = toSet(filter.comboIds);
+  const campaignSet = toSet(filter.campaignIds);
+  const liveSet = toSet(filter.liveSessionIds);
+  const lineFiltered = !!(skuSet || catSet || subSet || comboSet);
+  const skuMatch = (sku: string) =>
+    (!skuSet || skuSet.has(sku)) &&
+    (!catSet || catSet.has(index.categoryBySku.get(sku) || '')) &&
+    (!subSet || subSet.has(index.subcategoryBySku.get(sku) || ''));
+  const lineMatch = (l: OrderLine) => skuMatch(l.sku) && (!comboSet || (!!l.comboId && comboSet.has(l.comboId)));
 
   const orders: Order[] = [];
   const lines: OrderLine[] = [];
   for (const o of dataset.orders) {
     if (!isInRange(o.orderDate, range) || !platformMatch(filter, o.platform)) continue;
+    if (campaignSet && !(o.campaignId && campaignSet.has(o.campaignId))) continue;
+    if (liveSet && !(o.liveSessionId && liveSet.has(o.liveSessionId))) continue;
     const orderLines = index.linesByOrder.get(o.orderId) || [];
-    if (skuSet || catSet) {
+    if (lineFiltered) {
       const matched = orderLines.filter(lineMatch);
       if (matched.length === 0) continue;
       orders.push(o);
@@ -79,22 +113,23 @@ export function sliceDataset(dataset: CanonicalDataset, filter: DatasetFilter): 
 
   const inRange = <T extends { date?: string; platform?: Platform }>(rows: T[]) =>
     rows.filter((r) => r.date !== undefined && isInRange(r.date, range) && platformMatch(filter, r.platform));
-  const skuScoped = <T extends { sku?: string }>(rows: T[]) => (skuSet ? rows.filter((r) => r.sku && skuSet.has(r.sku)) : rows);
+  // Product-scoped rows (traffic, ads) follow the product filters; shop-level rows drop out.
+  const productScoped = <T extends { sku?: string }>(rows: T[]) =>
+    lineFiltered && !comboSet ? rows.filter((r) => r.sku && skuMatch(r.sku)) : comboSet ? rows.filter((r) => r.sku && comboSet.has(r.sku)) : rows;
+  const orderScoped = !!(campaignSet || liveSet);
 
   return {
     dataset,
     filter,
     orders,
     lines,
-    dailyMetrics: skuSet || catSet ? [] : inRange(dataset.dailyMetrics),
-    traffic: skuScoped(inRange(dataset.traffic)),
-    ads: skuScoped(inRange(dataset.ads)),
-    liveSessions: inRange(dataset.liveSessions),
-    affiliates: inRange(dataset.affiliates),
-    costs: skuSet || catSet ? [] : inRange(dataset.costs),
-    settlements: dataset.settlements.filter(
-      (s) => isInRange(s.settledDate, range) && platformMatch(filter, s.platform),
-    ),
+    dailyMetrics: lineFiltered || orderScoped ? [] : inRange(dataset.dailyMetrics),
+    traffic: orderScoped ? [] : productScoped(inRange(dataset.traffic)),
+    ads: productScoped(inRange(dataset.ads)).filter((a) => !campaignSet || (!!a.campaignId && campaignSet.has(a.campaignId))),
+    liveSessions: inRange(dataset.liveSessions).filter((s) => !liveSet || liveSet.has(s.sessionId)),
+    affiliates: lineFiltered || orderScoped ? [] : inRange(dataset.affiliates),
+    costs: lineFiltered || orderScoped ? [] : inRange(dataset.costs),
+    settlements: orderScoped || lineFiltered ? [] : dataset.settlements.filter((s) => isInRange(s.settledDate, range) && platformMatch(filter, s.platform)),
   };
 }
 

@@ -295,6 +295,8 @@ let cached: CanonicalDataset | null = null;
 export function buildDemoCanonicalDataset(): CanonicalDataset {
   if (cached) return cached;
   const rng = makeRng(20250930);
+  // Separate stream for add-to-cart so the main stories stay identical.
+  const atcRng = makeRng(424242);
   const days = enumerateDays(DEMO_RANGE);
   const lives = planLiveSessions(rng, days);
   const liveByDayPlatform = new Map(lives.map((l) => [`${l.session.date}|${l.session.platform}`, l]));
@@ -319,7 +321,8 @@ export function buildDemoCanonicalDataset(): CanonicalDataset {
         if (baseLambda > 0 && !(spec.launch && date < spec.launch)) {
           const baseCvr = spec.price > 1_000_000 ? 0.012 : 0.045;
           const clicks = Math.round((baseLambda / baseCvr) * rng.between(0.9, 1.1));
-          traffic.push({ date, platform, sku: spec.sku, productClicks: clicks, impressions: Math.round(clicks / rng.between(0.025, 0.04)) });
+          const addToCart = Math.min(clicks, Math.max(n, Math.round(clicks * atcRng.between(0.08, 0.12))));
+          traffic.push({ date, platform, sku: spec.sku, productClicks: clicks, addToCart, impressions: Math.round(clicks / rng.between(0.025, 0.04)) });
         }
 
         for (let i = 0; i < n; i++) {

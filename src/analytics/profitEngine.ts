@@ -18,7 +18,7 @@
 import type { AdPerformance, CanonicalDataset, Order, OrderLine, Platform } from './model';
 import { PLATFORM_LABELS } from './model';
 import type { DatasetSlice } from './filters';
-import { getDatasetIndex } from './filters';
+import { getDatasetIndex, isScopedFilter } from './filters';
 import { isCancelled, isReturnOrRefund, consumesCogs } from './status';
 import { missing, ok, partial, safeDivide, type Bilingual, type MetricResult } from './metric';
 
@@ -517,7 +517,7 @@ function linesByOrderOf(slice: DatasetSlice): Map<string, OrderLine[]> {
 }
 
 function isScoped(slice: DatasetSlice): boolean {
-  return !!(slice.filter.skus?.length || slice.filter.categories?.length);
+  return isScopedFilter(slice.filter);
 }
 
 export function computeProfit(slice: DatasetSlice): ProfitResult {

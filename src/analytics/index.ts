@@ -26,3 +26,7 @@ export * from './anomalyEngine';
 export * from './dailyBrief';
 export * from './importers/orderExport';
 export * from './timeseries';
+export * from './breakdownEngine';
+export * from './productIntelligence';
+export * from './funnelEngine';
+export * from './normalDays';
