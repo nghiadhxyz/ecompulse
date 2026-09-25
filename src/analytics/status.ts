@@ -7,21 +7,23 @@ import type { OrderStatus } from './model';
  */
 export function normalizeOrderStatus(raw: unknown): OrderStatus {
   if (raw === null || raw === undefined) return 'unknown';
-  const s = String(raw)
+  const plain = String(raw)
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/[^a-z0-9]/g, '');
+    .replace(/đ/g, 'd');
+  const s = plain.replace(/[^a-z0-9]/g, '');
   if (!s) return 'unknown';
+  // Whole words — "vận chuyển" contains the letters "huy" but is not a cancellation.
+  const words = new Set(plain.split(/[^a-z0-9]+/).filter(Boolean));
 
   // Order matters: more specific phrases first ("giao không thành công" contains "thành công").
   if (s.includes('giaokhongthanhcong') || s.includes('giaothatbai') || s.includes('faileddelivery') || s.includes('deliveryfailed') || s.includes('thatbai')) {
     return 'failed_delivery';
   }
-  if (s.includes('trahang') || s.includes('return')) return 'returned';
+  if (s.includes('trahang') || s.includes('return') || s.includes('shippedback')) return 'returned';
   if (s.includes('hoantien') || s.includes('refund')) return 'refunded';
-  if (s.includes('huy') || s.includes('cancel')) return 'cancelled';
+  if (words.has('huy') || s.includes('cancel')) return 'cancelled';
   if (s.includes('hoanthanh') || s.includes('completed') || s.includes('complete')) return 'completed';
   if (s.includes('dagiao') || s.includes('thanhcong') || s.includes('delivered')|| s.includes('danhanhang') || s.includes('danhanduochang')) {
     return 'delivered';
@@ -32,6 +34,9 @@ export function normalizeOrderStatus(raw: unknown): OrderStatus {
   if (
     s.includes('cholayhang') ||
     s.includes('chogiao') ||
+    s.includes('chovanchuyen') ||
+    s.includes('packed') ||
+    s.includes('topack') ||
     s.includes('choguihang') ||
     s.includes('readytoship') ||
     s.includes('awaitingshipment') ||

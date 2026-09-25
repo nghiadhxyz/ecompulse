@@ -231,6 +231,8 @@ export interface CostSettings {
   paymentFeeRate?: Partial<Record<Platform, number>>;
   /** User confirmed they ran no paid ads in the period (so Ads = 0 is real, not missing). */
   noAdsDeclared?: boolean;
+  /** User confirmed the shop pays no shipping (buyer / platform pays), so shipping = 0 is real. */
+  noSellerShippingDeclared?: boolean;
   /** Per-SKU unit COGS entered by the user; overrides catalog values. */
   skuCogs?: Record<string, number>;
 }

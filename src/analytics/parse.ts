@@ -74,7 +74,35 @@ export function toIsoDate(value: unknown): string | undefined {
   m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?=$|[ T]\d)/.exec(s);
   if (m) return validIso(m[3], m[2], m[1]);
   if (/^\d{5}(\.\d+)?$/.test(s)) return toIsoDate(Number(s));
+  // Lazada: "29 Sep 2025 10:22" · "Sep 29, 2025"
+  m = /^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})(?=$|[ ,T]\d?)/.exec(s);
+  if (m && MONTHS[m[2].slice(0, 3).toLowerCase()]) return validIso(m[3], MONTHS[m[2].slice(0, 3).toLowerCase()], m[1]);
+  m = /^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})/.exec(s);
+  if (m && MONTHS[m[1].slice(0, 3).toLowerCase()]) return validIso(m[3], MONTHS[m[1].slice(0, 3).toLowerCase()], m[2]);
   return undefined;
+}
+
+const MONTHS: Record<string, string> = {
+  jan: '1', feb: '2', mar: '3', apr: '4', may: '5', jun: '6', jul: '7', aug: '8', sep: '9', oct: '10', nov: '11', dec: '12',
+};
+
+/**
+ * Stable pseudonymous ID (cyrb53 hash, hex). Buyer usernames, names or phone numbers
+ * are never stored — only this hash, which still links repeat purchases locally.
+ */
+export function pseudonymize(value: string, namespace = ''): string {
+  const input = `${namespace}:${value.trim().toLowerCase()}`;
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  const hash = 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  return `c_${hash.toString(16).padStart(14, '0')}`;
 }
 
 function validIso(y: string, m: string, d: string): string | undefined {
