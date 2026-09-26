@@ -18,7 +18,6 @@ import { WorkspaceProvider, type AnalystView, type EvidenceRequest, type Workspa
 import { EvidenceDrawer } from '../seller/EvidenceDrawer';
 import { GhostButton, PrimaryButton } from '../seller/ui';
 import { DolphinView } from '../seller/views/DolphinView';
-import { AdsLiveView } from '../seller/views/AdsLiveView';
 import { DataView } from '../seller/views/DataView';
 import { SettingsView } from '../seller/views/SettingsView';
 import { DataQualityPanel } from '../data/DataQualityPanel';
@@ -30,6 +29,10 @@ import { RevenueProfit } from './views/RevenueProfit';
 import { OrderHealthAnalyst } from './views/OrderHealthAnalyst';
 import { TrafficFunnel } from './views/TrafficFunnel';
 import { DataMapping } from './views/DataMapping';
+import { CampaignCalendar } from './views/CampaignCalendar';
+import { AdsIntelligenceView } from './views/AdsIntelligenceView';
+import { LiveAuditor } from './views/LiveAuditor';
+import { VideoAffiliateView } from './views/VideoAffiliateView';
 
 interface Props {
   language: Lang;
@@ -70,9 +73,10 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
     en: 'Growth',
     items: [
       { key: 'funnel', vi: 'Traffic & Funnel', en: 'Traffic & Funnel' },
-      { key: 'adsLiveBasic', vi: 'Ads & Live (cơ bản)', en: 'Ads & Live (basic)' },
-      { key: 'campaign', vi: 'Campaign & Calendar', en: 'Campaign & Calendar', phase: 4 },
-      { key: 'video', vi: 'Video & Affiliate', en: 'Video & Affiliate', phase: 4 },
+      { key: 'campaign', vi: 'Campaign & Calendar', en: 'Campaign & Calendar' },
+      { key: 'ads', vi: 'Ads Intelligence', en: 'Ads Intelligence' },
+      { key: 'live', vi: 'Livestream', en: 'Livestream' },
+      { key: 'video', vi: 'Video & Affiliate', en: 'Video & Affiliate' },
     ],
   },
   {
@@ -99,7 +103,7 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
   },
 ];
 
-const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'adsLiveBasic', 'mapping', 'dataQuality'];
+const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'live', 'video', 'mapping', 'dataQuality'];
 
 export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted, onOpenClassic }) => {
   const vi = lang === 'vi';
@@ -133,7 +137,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
     home: 'overview',
     products: 'productsCombo',
     orders: 'orderHealth',
-    adsLive: 'adsLiveBasic',
+    adsLive: 'ads',
     dolphin: 'alerts',
     data: 'dataHub',
   };
@@ -239,7 +243,10 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
             {view === 'revenueProfit' && <RevenueProfit />}
             {view === 'orderHealth' && <OrderHealthAnalyst />}
             {view === 'funnel' && <TrafficFunnel />}
-            {view === 'adsLiveBasic' && <AdsLiveView />}
+            {view === 'campaign' && <CampaignCalendar />}
+            {view === 'ads' && <AdsIntelligenceView />}
+            {view === 'live' && <LiveAuditor />}
+            {view === 'video' && <VideoAffiliateView />}
             {view === 'dataQuality' && <DataQualityPanel dataset={dataset} language={lang} />}
             {view === 'mapping' && <DataMapping />}
           </ViewErrorBoundary>

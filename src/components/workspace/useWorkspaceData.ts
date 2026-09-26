@@ -3,7 +3,7 @@
  * dataset, the switchable demo, cost settings and import handling. Both modes read
  * the same dataset object, so switching mode never changes a number.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   canonicalFromParsedStoreData,
   datasetDateBounds,
@@ -48,6 +48,9 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
   const [loading, setLoading] = useState(true);
   /** Imported data (persisted). Never overwritten by the demo. */
   const [imported, setImported] = useState<CanonicalDataset | null>(null);
+  // Latest imported data for sequential multi-file imports: each file must merge into the
+  // result of the previous one, not into the state captured when the import started.
+  const importedRef = useRef<CanonicalDataset | null>(null);
   /** Demo view is a separate, switchable state on top of the user's data. */
   const [demo, setDemo] = useState(false);
   const [persisted, setPersisted] = useState(true);
@@ -57,7 +60,10 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
     let alive = true;
     Promise.all([loadWorkspace(), loadCostSettings()]).then(([ws, settings]) => {
       if (!alive) return;
-      if (ws?.kind === 'imported') setImported(ws.dataset);
+      if (ws?.kind === 'imported') {
+        importedRef.current = ws.dataset;
+        setImported(ws.dataset);
+      }
       if (ws?.kind === 'demo') setDemo(true);
       setCostSettings(settings);
       setLoading(false);
@@ -100,6 +106,7 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
   }, []);
 
   const storeImported = async (next: CanonicalDataset) => {
+    importedRef.current = next;
     setImported(next);
     setDemo(false);
     setPersisted(await saveWorkspace({ kind: 'imported', dataset: next }));
@@ -107,18 +114,18 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
 
   const applyImport = async (file: File, outcome: ImportOutcome): Promise<ImportLogEntry['outcome']> => {
     if (outcome.type === 'orders') {
-      await storeImported(mergeIntoWorkspace(imported, outcome.result.dataset));
+      await storeImported(mergeIntoWorkspace(importedRef.current, outcome.result.dataset));
       return outcome;
     }
     if (outcome.type === 'report') {
-      await storeImported(mergeIntoWorkspace(imported, outcome.result.dataset));
+      await storeImported(mergeIntoWorkspace(importedRef.current, outcome.result.dataset));
       return outcome;
     }
     if (outcome.type === 'shopee_summary') {
       try {
         // The classic parser handles Shopee's 21-sheet summary layout.
         const parsed = await parseShopeeExcelFile(file);
-        await storeImported(mergeIntoWorkspace(imported, canonicalFromParsedStoreData(parsed, 'shopee')));
+        await storeImported(mergeIntoWorkspace(importedRef.current, canonicalFromParsedStoreData(parsed, 'shopee')));
         return { type: 'legacy_summary', ok: true };
       } catch (e) {
         return { type: 'legacy_summary', ok: false, message: e instanceof Error ? e.message : String(e) };
@@ -129,6 +136,7 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
 
   const clear = async () => {
     await clearWorkspace();
+    importedRef.current = null;
     setImported(null);
     setDemo(false);
   };

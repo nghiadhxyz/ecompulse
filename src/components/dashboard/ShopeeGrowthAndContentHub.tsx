@@ -128,6 +128,12 @@ export const ShopeeGrowthAndContentHub: React.FC<ShopeeGrowthAndContentHubProps>
 
   return (
     <div className="glass-panel rounded-3xl p-5 sm:p-6 border border-white/[0.15] shadow-2xl space-y-6">
+      {/* Momentum per SKU here is allocated from shop-level totals, not measured per SKU. */}
+      <div role="note" className="rounded-xl border border-[#fab219]/40 bg-[#fab219]/10 px-3 py-2 text-xs text-amber-100">
+        {language === 'vi'
+          ? 'Lưu ý: số video, KOC và tốc độ tăng trưởng theo từng SKU trong mục này là ƯỚC TÍNH phân bổ từ số tổng của shop, không phải dữ liệu đo theo SKU. Xem số thật theo nhà sáng tạo / video trong Analyst Workspace → Video & Affiliate.'
+          : 'Note: per-SKU video, KOC and growth figures here are ESTIMATES allocated from shop totals, not measured per SKU. See Analyst Workspace → Video & Affiliate for measured data.'}
+      </div>
       {/* ====================================================================
           HEADER & SUB-TABS NAVIGATION
       ==================================================================== */}

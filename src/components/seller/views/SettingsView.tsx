@@ -19,6 +19,9 @@ const FEE_PLATFORMS: Platform[] = ['shopee', 'tiktok', 'lazada'];
 export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, settings, onChange, workspaceMode, onChangeMode, onChangeLanguage }) => {
   const vi = lang === 'vi';
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Catalog drafts: category / niche per SKU (saved as user overrides).
+  const [catDrafts, setCatDrafts] = useState<Record<string, string>>({});
+  const [subDrafts, setSubDrafts] = useState<Record<string, string>>({});
   const [onlyMissing, setOnlyMissing] = useState(false);
 
   const rows = useMemo(() => {
@@ -31,7 +34,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
       .map((sku) => {
         const p = dataset.products.find((x) => x.sku === sku);
         const user = settings.skuCogs?.[sku];
-        return { sku, name: p?.name ?? sku, fileCogs: p?.unitCogs, userCogs: user, units: units.get(sku) || 0, missing: missing.has(sku) && user === undefined };
+        return {
+          sku,
+          name: p?.name ?? sku,
+          fileCogs: p?.unitCogs,
+          userCogs: user,
+          category: p?.category,
+          subcategory: p?.subcategory,
+          units: units.get(sku) || 0,
+          missing: missing.has(sku) && user === undefined,
+        };
       })
       .sort((a, b) => Number(b.missing) - Number(a.missing) || b.units - a.units);
   }, [dataset, settings.skuCogs]);
@@ -49,9 +61,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
       const v = toNumber(raw);
       if (v !== undefined && v >= 0) next[sku] = v;
     }
-    onChange({ ...settings, skuCogs: next });
+    const applyText = (base: Record<string, string> | undefined, d: Record<string, string>) => {
+      const out = { ...(base || {}) };
+      for (const [sku, raw] of Object.entries(d)) {
+        if (raw.trim() === '') delete out[sku];
+        else out[sku] = raw.trim();
+      }
+      return out;
+    };
+    onChange({ ...settings, skuCogs: next, skuCategory: applyText(settings.skuCategory, catDrafts), skuSubcategory: applyText(settings.skuSubcategory, subDrafts) });
     setDrafts({});
+    setCatDrafts({});
+    setSubDrafts({});
   };
+  const categoryOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.category).filter(Boolean) as string[])).sort(), [rows]);
+  const nicheOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.subcategory).filter(Boolean) as string[])).sort(), [rows]);
+  const dirty = Object.keys(drafts).length + Object.keys(catDrafts).length + Object.keys(subDrafts).length > 0;
 
   const setRate = (field: 'platformFeeRate' | 'paymentFeeRate', platform: Platform, raw: string) => {
     const rates = { ...(settings[field] || {}) };
@@ -66,7 +91,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
   return (
     <div className="space-y-4">
       <Section
-        title={vi ? 'Giá vốn theo SKU' : 'COGS per SKU'}
+        title={vi ? 'Giá vốn & ngành hàng theo SKU' : 'COGS & category per SKU'}
         subtitle={
           vi
             ? `Giá vốn mỗi sản phẩm (đ/sản phẩm). Không có giá vốn thì không tính được lợi nhuận — EcomPulse không tự giả định. ${missingCount > 0 ? `${missingCount} SKU đang thiếu.` : ''}`
@@ -83,7 +108,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
           <p className="text-sm text-slate-400">{vi ? 'Nhập dữ liệu trước để thấy danh sách SKU.' : 'Import data to see SKUs.'}</p>
         ) : (
           <>
-            <p className="text-[11px] text-slate-500 mb-2">{vi ? 'Mẹo: có thể nhập nhanh bằng file Excel 2 cột "SKU" và "Giá vốn" ở trang Dữ liệu.' : 'Tip: import an Excel file with "SKU" and "COGS" columns on the Data page.'}</p>
+            <p className="text-[11px] text-slate-500 mb-2">
+              {vi
+                ? 'Mẹo: nhập nhanh bằng file Excel có cột "SKU" cùng "Giá vốn", "Ngành hàng", "Nhóm hàng" ở trang Dữ liệu. Ngành hàng cần cho phân tích Category Intelligence.'
+                : 'Tip: import an Excel file with "SKU" plus "COGS", "Category", "Niche" columns on the Data page.'}
+            </p>
+            <datalist id="category-options">{categoryOptions.map((c) => <option key={c} value={c} />)}</datalist>
+            <datalist id="niche-options">{nicheOptions.map((c) => <option key={c} value={c} />)}</datalist>
             <div className="overflow-x-auto rounded-xl border border-white/10 max-h-[420px] overflow-y-auto">
               <table className="w-full text-xs">
                 <thead className="bg-[#0f1530] text-slate-400 sticky top-0">
@@ -92,6 +123,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
                     <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Đã bán' : 'Sold'}</th>
                     <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Giá vốn từ file' : 'From file'}</th>
                     <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Giá vốn bạn nhập' : 'Your COGS'}</th>
+                    <th className="text-left font-semibold px-2.5 py-2">{vi ? 'Ngành hàng' : 'Category'}</th>
+                    <th className="text-left font-semibold px-2.5 py-2">{vi ? 'Nhóm hàng' : 'Niche'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -113,14 +146,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
                           className="w-32 text-right bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
                         />
                       </td>
+                      <td className="px-2.5 py-1.5">
+                        <input
+                          list="category-options"
+                          value={catDrafts[r.sku] ?? r.category ?? ''}
+                          onChange={(e) => setCatDrafts((d) => ({ ...d, [r.sku]: e.target.value }))}
+                          placeholder={vi ? 'vd: Mẹ & Bé' : 'e.g. Beauty'}
+                          aria-label={`${vi ? 'Ngành hàng' : 'Category'} ${r.sku}`}
+                          className="w-36 bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
+                        />
+                      </td>
+                      <td className="px-2.5 py-1.5">
+                        <input
+                          list="niche-options"
+                          value={subDrafts[r.sku] ?? r.subcategory ?? ''}
+                          onChange={(e) => setSubDrafts((d) => ({ ...d, [r.sku]: e.target.value }))}
+                          placeholder={vi ? 'vd: Tã bỉm' : 'e.g. Diapers'}
+                          aria-label={`${vi ? 'Nhóm hàng' : 'Niche'} ${r.sku}`}
+                          className="w-36 bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="flex items-center gap-2 mt-3">
-              <PrimaryButton disabled={Object.keys(drafts).length === 0 || invalidDraft} onClick={saveCogs}>
-                <Save className="w-4 h-4" /> {vi ? 'Lưu giá vốn' : 'Save COGS'}
+              <PrimaryButton disabled={!dirty || invalidDraft} onClick={saveCogs}>
+                <Save className="w-4 h-4" /> {vi ? 'Lưu thay đổi' : 'Save changes'}
               </PrimaryButton>
               {invalidDraft && <span className="text-xs text-[#f08080]">{vi ? 'Có giá trị không hợp lệ.' : 'Invalid value.'}</span>}
             </div>

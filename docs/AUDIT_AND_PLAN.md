@@ -181,8 +181,18 @@ Nguyên tắc:
 - File xuất đơn của sàn thường không có ngành hàng → Category Intelligence cần danh mục sản phẩm (có thể bổ sung trang nhập ngành hàng theo SKU ở phase sau, tương tự nhập giá vốn).
 - "Lượt xem" (Views) trong phễu chưa có nguồn dữ liệu (cần báo cáo traffic sản phẩm của sàn — Phase 4).
 
-### Phase 4 — Growth
-Campaign & Calendar · Ads Intelligence (break-even ROAS) · Live Auditor · Video & Affiliate (thay momentum tổng hợp)
+### Phase 4 — Growth *(xong)*
+- [x] Bộ đọc báo cáo Ads · Livestream · Hiệu quả sản phẩm (traffic) · Affiliate/Video · Danh mục sản phẩm (SKU + ngành/nhóm/giá vốn) cho Shopee / TikTok Shop / Lazada / mẫu EcomPulse (`importers/reportImporters.ts`, danh sách `SPECS` — **cần đối chiếu khi có file thật**)
+- [x] Báo cáo không có cột ngày → lưu là **số tổng cả kỳ** (kỳ đọc từ dòng tiêu đề hoặc tên file), chỉ được tính khi chọn trọn kỳ; không chia đều theo ngày
+- [x] Nhập ngành hàng / nhóm hàng theo SKU trong Cài đặt (ghi đè danh mục)
+- [x] Campaign & Calendar: loại ngày (siêu sale / ngày đôi / ngày lương / cuối tuần / ngày thường) có cỡ mẫu, thứ trong tuần & ngày trong tháng (ngày thường), sale vs ngày thường, cảnh báo dữ liệu ngắn; so sánh chiến dịch A/B có mức tăng so với 14 ngày thường trước đó
+- [x] Ads Intelligence: trên/dưới hòa vốn, tỷ trọng ngân sách, ngân sách dưới hòa vốn, chi phí & ROAS theo ngày (2 biểu đồ riêng, không trục kép), theo sàn
+- [x] Live Auditor: xếp hạng GMV/giờ, lợi nhuận/giờ, theo khung giờ/thứ/thời lượng (có cỡ mẫu), so sánh 2 phiên, phễu live
+- [x] Video & Affiliate: theo nhà sáng tạo & video, CTR/CVR/tỷ lệ hoa hồng, lợi nhuận từ đơn gắn nguồn, so với kỳ trước
+- [x] Mục momentum ở dashboard cổ điển gắn nhãn "ước tính phân bổ"
+- [x] **Sửa lỗi**: nhập nhiều file cùng lúc bị ghi đè nhau (closure React cũ)
+
+**Kết quả Phase 4 (2026-09-26):** `tsc` ✅ · `npm test` 205/205 ✅ · build ✅ (Analyst chunk 132 KB) · chạy thử Edge headless: 4 module mới trên demo, nhập đồng thời file đơn + Ads (số tổng kỳ) + Live + danh mục, Ads chỉ tính khi chọn trọn kỳ, Category Intelligence từ danh mục nhập, nhập ngành hàng ở Cài đặt, Seller/Analyst không hồi quy, mobile không tràn, 0 lỗi console.
 
 ### Phase 5 — Intelligence
 Root cause tree · Anomaly & Opportunity · Dolphin Evidence Mode (INSIGHT/EVIDENCE/INTERPRETATION/NEXT CHECK) · Privacy mode enforcement (Local Only / Privacy AI / Cloud AI) + Local LLM client · gộp `server.ts`/`api/index.ts` dùng chung handler

@@ -21,7 +21,7 @@ import { Th } from '../ui';
 
 type Segment = 'platform' | 'category' | 'sku';
 
-const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map<string, number | null> }> = ({ f, lang, ppByStep }) => {
+export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map<string, number | null> }> = ({ f, lang, ppByStep }) => {
   const vi = lang === 'vi';
   const keys = Object.keys(f.stages) as FunnelStageKey[];
   return (
