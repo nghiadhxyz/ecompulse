@@ -132,8 +132,8 @@ export const HomeView: React.FC = () => {
               </button>
             }
           >
-            {dataset.orders.length === 0 ? (
-              <NotEnoughData lang={lang} reason={vi ? 'Cảnh báo theo SKU, Ads, Live cần file xuất đơn hàng.' : 'Alerts need an order export.'} />
+            {dataset.orders.length === 0 && dataset.dailyMetrics.length === 0 ? (
+              <NotEnoughData lang={lang} reason={vi ? 'Chưa có dữ liệu để tạo cảnh báo.' : 'No data for alerts yet.'} />
             ) : topAlerts.length === 0 ? (
               <p className="text-sm text-slate-400">{vi ? 'Không có điểm bất thường cần chú ý.' : 'Nothing unusual to flag.'}</p>
             ) : (

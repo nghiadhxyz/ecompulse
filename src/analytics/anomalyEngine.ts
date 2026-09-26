@@ -23,6 +23,7 @@ import { assessDataQuality } from './dataQuality';
 import { fmtChange, fmtDay, fmtMoneyCompact, fmtMultiple, fmtRate } from './format';
 import type { Bilingual } from './metric';
 import type { Evidence } from './evidence';
+import { MIN_RATE_ORDERS, REVENUE_BASELINE_CHANGE, summaryAlerts } from './summaryAlerts';
 
 export type AlertSeverity = 'critical' | 'warning' | 'opportunity' | 'info';
 
@@ -40,7 +41,13 @@ export type AlertType =
   | 'growth_opportunity'
   | 'live_drop'
   | 'live_viewers_up_orders_down'
-  | 'missing_cogs';
+  | 'missing_cogs'
+  // Summary reports (no order rows): see summaryAlerts.ts
+  | 'ads_day_change'
+  | 'source_change'
+  | 'data_negative_subsidy'
+  | 'data_period_mismatch'
+  | 'data_cvr_mismatch';
 
 export interface SmartAlert {
   id: string;
@@ -74,14 +81,14 @@ export interface AlertThresholds {
 }
 
 export const DEFAULT_THRESHOLDS: AlertThresholds = {
-  revenueDrop: 0.25,
+  revenueDrop: REVENUE_BASELINE_CHANGE,
   revenueDropCritical: 0.4,
-  revenueRise: 0.25,
+  revenueRise: REVENUE_BASELINE_CHANGE,
   profitDrop: 0.3,
   marginDropPp: 5,
   cancelSpikePp: 5,
   cancelSpikeCriticalPp: 10,
-  minOrdersDay: 20,
+  minOrdersDay: MIN_RATE_ORDERS,
   skuRateSpikePp: 5,
   skuMinOrders: 15,
   adsRoasDrop: 0.3,
@@ -119,8 +126,12 @@ function campaignDay(dataset: CanonicalDataset, day: string): string | undefined
 }
 
 export function detectAlerts(dataset: CanonicalDataset, options: AnomalyOptions): SmartAlert[] {
-  if (dataset.orders.length === 0) return [];
   const t = { ...DEFAULT_THRESHOLDS, ...options.thresholds };
+  if (dataset.orders.length === 0) {
+    // Summary reports: shop, Ads, channel and data-quality alerts; product alerts need orders.
+    if (dataset.dailyMetrics.length === 0) return [];
+    return summaryAlerts(dataset, options.day, options.platforms, t).sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+  }
   const { day, platforms } = options;
   const alerts: SmartAlert[] = [];
   const f = (r: DateRange) => ({ range: r, platforms });

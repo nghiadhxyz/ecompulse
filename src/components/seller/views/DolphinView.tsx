@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CheckCircle2, AlertTriangle, ClipboardCheck, ShieldCheck, ListPlus } from 'lucide-react';
 import { DolphinAsk } from '../DolphinAsk';
 import { usePlanning } from '../../workspace/usePlanning';
-import { addDays, buildDailyBrief, fmtDay, type AlertSeverity, type BriefItem } from '../../../analytics';
+import { addDays, buildDailyBrief, fmtDay, fmtMoneyCompact, type AlertSeverity, type BriefItem } from '../../../analytics';
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, KpiCard, NotEnoughData, Section, SeverityBadge, SEVERITY_STYLE, tr } from '../ui';
 import dolphinAvatar from '../../../assets/images/dolphin_ai_avatar_1787721342181.jpg';
@@ -45,6 +45,8 @@ export const DolphinView: React.FC = () => {
     );
 
   const h = brief.headline;
+  const basis = brief.stage ?? undefined;
+  const b = brief.revenueBaseline;
   return (
     <div className="space-y-4">
       <DolphinAsk />
@@ -81,10 +83,25 @@ export const DolphinView: React.FC = () => {
 
         <h3 className="text-xs font-black text-slate-300 uppercase tracking-wider mt-4 mb-2">{vi ? `Hôm qua (${fmtDay(day)})` : `Yesterday (${fmtDay(day)})`}</h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          <KpiCard lang={lang} label={vi ? 'Doanh thu' : 'Revenue'} metric={brief.headline.revenue.current === null ? { value: null, unit: 'vnd', status: 'missing' } : { value: h.revenue.current, unit: 'vnd', status: h.revenue.currentStatus }} cmp={h.revenue} compareLabel={vi ? `so với ${fmtDay(brief.compareDay)}` : `vs ${fmtDay(brief.compareDay)}`} />
+          <KpiCard
+            lang={lang}
+            label={vi ? 'Doanh thu' : 'Revenue'}
+            metric={h.revenue.current === null ? { value: null, unit: 'vnd', status: 'missing' } : { value: h.revenue.current, unit: 'vnd', status: h.revenue.currentStatus, basis }}
+            cmp={h.revenue}
+            compareLabel={vi ? `so với ${fmtDay(brief.compareDay)}` : `vs ${fmtDay(brief.compareDay)}`}
+            sub={
+              h.revenue.current !== null && (b.avg7 !== null || b.avgPeriod !== null) ? (
+                <span className="text-[11px] text-slate-400">
+                  {vi ? 'Mức nền' : 'Baseline'}: {b.avg7 !== null && `${vi ? 'TB 7 ngày' : '7-day avg'} ${fmtMoneyCompact(b.avg7, lang)}`}
+                  {b.avg7 !== null && b.avgPeriod !== null && ' · '}
+                  {b.avgPeriod !== null && `${vi ? 'TB cả kỳ' : 'period avg'} ${fmtMoneyCompact(b.avgPeriod, lang)}`}
+                </span>
+              ) : undefined
+            }
+          />
           <KpiCard lang={lang} label={vi ? 'Lợi nhuận ước tính' : 'Est. profit'} metric={{ value: h.profit.current, unit: 'vnd', status: h.profit.currentStatus }} cmp={h.profit} compareLabel={vi ? `so với ${fmtDay(brief.compareDay)}` : `vs ${fmtDay(brief.compareDay)}`} />
-          <KpiCard lang={lang} label={vi ? 'Đơn hàng' : 'Orders'} metric={{ value: h.orders.current, unit: 'count', status: h.orders.currentStatus }} cmp={h.orders} compareLabel={vi ? `so với ${fmtDay(brief.compareDay)}` : `vs ${fmtDay(brief.compareDay)}`} />
-          <KpiCard lang={lang} label={vi ? 'Tỷ lệ hủy' : 'Cancel rate'} metric={{ value: h.cancelRate.current, unit: 'ratio', status: h.cancelRate.currentStatus }} cmp={h.cancelRate} goodWhenUp={false} compareLabel={vi ? `so với ${fmtDay(brief.compareDay)}` : `vs ${fmtDay(brief.compareDay)}`} />
+          <KpiCard lang={lang} label={vi ? 'Đơn hàng' : 'Orders'} metric={{ value: h.orders.current, unit: 'count', status: h.orders.currentStatus, basis }} cmp={h.orders} compareLabel={vi ? `so với ${fmtDay(brief.compareDay)}` : `vs ${fmtDay(brief.compareDay)}`} />
+          <KpiCard lang={lang} label={vi ? 'Tỷ lệ hủy' : 'Cancel rate'} metric={{ value: h.cancelRate.current, unit: 'ratio', status: h.cancelRate.currentStatus, basis }} cmp={h.cancelRate} goodWhenUp={false} compareLabel={vi ? `so với ${fmtDay(brief.compareDay)}` : `vs ${fmtDay(brief.compareDay)}`} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-4">
@@ -124,8 +141,13 @@ export const DolphinView: React.FC = () => {
             );
           })}
         </div>
-        {dataset.orders.length === 0 ? (
-          <NotEnoughData lang={lang} reason={vi ? 'Cảnh báo theo sản phẩm, Ads và Live cần file xuất đơn hàng.' : 'Alerts need an order export.'} />
+        {dataset.orders.length === 0 && (
+          <p className="text-[11px] text-slate-500 mb-2">
+            {vi ? 'Đang dùng báo cáo tổng hợp: cảnh báo theo doanh thu, Ads, kênh và chất lượng dữ liệu. Cảnh báo theo sản phẩm cần file xuất đơn hàng.' : 'Summary report: shop, Ads, channel and data-quality alerts. Product alerts need an order export.'}
+          </p>
+        )}
+        {dataset.dailyMetrics.length === 0 && dataset.orders.length === 0 ? (
+          <NotEnoughData lang={lang} reason={vi ? 'Chưa có dữ liệu để tạo cảnh báo.' : 'No data for alerts yet.'} />
         ) : alerts.length === 0 ? (
           <p className="text-sm text-slate-400">{vi ? 'Không có cảnh báo.' : 'No alerts.'}</p>
         ) : (

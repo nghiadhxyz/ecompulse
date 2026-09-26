@@ -176,7 +176,42 @@ describe('smart alerts & daily brief on demo data', () => {
     const ds = dataset([], [], { dailyMetrics: [{ date: '2025-09-01', platform: 'shopee', paidGmv: 1 }, { date: '2025-09-02', platform: 'shopee', paidGmv: 2 }] });
     const brief = buildDailyBrief(ds, '2025-09-02');
     expect(brief.limitations.some((l) => l.vi.includes('file xuất đơn hàng'))).toBe(true);
-    expect(brief.alerts).toEqual([]);
+    expect(brief.alerts).toEqual([]); // two days: no baseline yet
+  });
+});
+
+describe('daily brief on summary reports', () => {
+  // 7 typical days (1.000đ placed sales, 10 orders) then the day under review.
+  const typical = Array.from({ length: 7 }, (_, i) => ({ date: `2025-09-0${i + 1}`, platform: 'shopee' as const, placedGmv: 1000, placedOrders: 10, cancelledOrders: 1, paidGmv: 800, paidOrders: 8 }));
+  const withDay = (day: Partial<(typeof typical)[number]>) =>
+    dataset([], [], { dailyMetrics: [...typical, { date: '2025-09-08', platform: 'shopee', placedGmv: 1000, placedOrders: 10, cancelledOrders: 1, paidGmv: 800, paidOrders: 8, ...day }] });
+
+  it('keeps revenue and orders on placed orders and labels paid figures', () => {
+    const brief = buildDailyBrief(withDay({ placedGmv: 950, paidGmv: 300, paidOrders: 3 }), '2025-09-08');
+    expect(brief.stage?.vi).toBe('Đơn đặt');
+    expect(brief.headline.revenue.current).toBe(950);
+    expect(brief.headline.orders.current).toBe(10);
+    expect(brief.paid?.revenue.current).toBe(300);
+    expect(brief.summary.vi).toContain('Theo đơn đã thanh toán');
+  });
+
+  it('puts revenue more than 30% off its baseline under "Cần chú ý", either way, with a check', () => {
+    for (const placedGmv of [600, 1400]) {
+      const brief = buildDailyBrief(withDay({ placedGmv }), '2025-09-08');
+      expect(brief.concerns[0].text.vi).toContain('trung bình 7 ngày trước');
+      expect(brief.checks.length).toBeGreaterThan(0);
+      expect(brief.positives.some((p) => p.text.vi.startsWith('Doanh thu'))).toBe(false);
+    }
+    // Within ±30%: no revenue concern.
+    expect(buildDailyBrief(withDay({ placedGmv: 800 }), '2025-09-08').concerns).toEqual([]);
+  });
+
+  it('does not judge a rate on fewer than 30 orders', () => {
+    const few = buildDailyBrief(withDay({ placedOrders: 16, cancelledOrders: 0 }), '2025-09-08');
+    expect(few.positives.some((p) => p.text.vi.includes('Tỷ lệ hủy'))).toBe(false);
+    expect(few.limitations.some((l) => l.vi.includes('dưới 30 đơn'))).toBe(true);
+    const many = buildDailyBrief(withDay({ placedOrders: 40, cancelledOrders: 0 }), '2025-09-08');
+    expect(many.positives.some((p) => p.text.vi.includes('Tỷ lệ hủy'))).toBe(true);
   });
 });
 
