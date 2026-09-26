@@ -33,3 +33,6 @@ export * from './normalDays';
 export * from './importers/reportImporters';
 export * from './campaignEngine';
 export * from './growthEngines';
+export * from './rootCauseEngine';
+export * from './anomalyScan';
+export * from './dolphinEvidence';
