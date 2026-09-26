@@ -16,7 +16,14 @@ import {
   AdPerformanceMetric,
   RuleAlert,
 } from '../types';
-import { calculateAnalyticsFromOrders } from './analyticsEngine';
+import { calculateAnalyticsFromOrders, deriveProductGrowthMomentumAndCreatorSummary } from './analyticsEngine';
+import {
+  convertStandardizedToStoreData,
+  StandardizedWorkbookData,
+  parseStandardDate,
+  localAgentCleanAndStandardize,
+  convertCleanedAgentDataToStoreData,
+} from './universalStandardizer';
 
 // ==========================================
 // NUMERIC & PERCENTAGE PARSING HELPERS
@@ -129,19 +136,22 @@ export interface SheetConfig {
 }
 
 export const SHOPEE_21_SHEET_CONFIGS: SheetConfig[] = [
-  // GROUP 1: EXECUTIVE OVERVIEW METRICS (Row 1 -> headerRowIndex 0)
+  // GROUP 1: EXECUTIVE OVERVIEW METRICS (3 Sheets - Row 1 -> headerRowIndex 0)
+  // 1. Sheet Đơn hàng đã đặt (17 cột)
   {
     group: 'Group 1: Executive Overview',
     namePatterns: ['đơn hàng đã đặt', 'placed orders overview', 'đơn đã đặt overview'],
     headerRowIndex: 0,
     expectedCols: ['Ngày', 'Tổng doanh số (VND)', 'Doanh số không bao gồm trợ giá bởi Shopee', 'Tổng số đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Lượt nhấp vào sản phẩm', 'Số lượt truy cập', 'Tỷ lệ chuyển đổi đơn hàng', 'Đơn đã hủy', 'Doanh số đơn hủy', 'Đơn đã hoàn trả / hoàn tiền', 'Doanh số các đơn Trả hàng/Hoàn tiền', 'số người mua', 'số người mua mới', 'số người mua hiện tại', 'số người mua tiềm năng', 'Tỉ lệ quay lại của người mua'],
   },
+  // 2. Sheet Đơn đã xác nhận (17 cột)
   {
     group: 'Group 1: Executive Overview',
     namePatterns: ['đơn đã xác nhận', 'confirmed orders overview'],
     headerRowIndex: 0,
     expectedCols: ['Ngày', 'Tổng doanh số (VND)', 'Doanh số không bao gồm trợ giá bởi Shopee', 'Tổng số đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Lượt nhấp vào sản phẩm', 'Số lượt truy cập', 'Tỷ lệ chuyển đổi đơn hàng', 'Đơn đã hủy', 'Doanh số đơn hủy', 'Đơn đã hoàn trả / hoàn tiền', 'Doanh số các đơn Trả hàng/Hoàn tiền', 'số người mua', 'số người mua mới', 'số người mua hiện tại', 'số người mua tiềm năng', 'Tỉ lệ quay lại của người mua'],
   },
+  // 3. Sheet Đơn Đã Thanh Toán (17 cột)
   {
     group: 'Group 1: Executive Overview',
     namePatterns: ['đơn đã thanh toán', 'paid orders overview'],
@@ -149,124 +159,139 @@ export const SHOPEE_21_SHEET_CONFIGS: SheetConfig[] = [
     expectedCols: ['Ngày', 'Tổng doanh số (VND)', 'Doanh số không bao gồm trợ giá bởi Shopee', 'Tổng số đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Lượt nhấp vào sản phẩm', 'Số lượt truy cập', 'Tỷ lệ chuyển đổi đơn hàng', 'Đơn đã hủy', 'Doanh số đơn hủy', 'Đơn đã hoàn trả / hoàn tiền', 'Doanh số các đơn Trả hàng/Hoàn tiền', 'số người mua', 'số người mua mới', 'số người mua hiện tại', 'số người mua tiềm năng', 'Tỉ lệ quay lại của người mua'],
   },
 
-  // GROUP 2: TRAFFIC SOURCE BREAKDOWN (6 Sheets)
-  // Summary Traffic Sheets (Header Row 1 -> headerRowIndex 0)
+  // GROUP 2: TRAFFIC SOURCE BREAKDOWN (6 Sheets - 13 columns each - Row 1 -> headerRowIndex 0)
+  // 4. Sheet Nguồn truy cập cho Đơn hàng...
   {
-    group: 'Group 2: Traffic Summary',
+    group: 'Group 2: Detailed Traffic',
     namePatterns: ['nguồn truy cập cho đơn hàng', 'nguồn truy cập cho đơn hàng đã đặt'],
     headerRowIndex: 0,
-    expectedCols: ['Ngày', 'Loại Đơn Hàng', 'Doanh số (VND)', 'Doanh thu từ thẻ sản phẩm', 'Doanh thu từ Livestream của người bán', 'Doanh thu từ Video của người bán', 'Doanh thu từ đối tác liên kết', 'Doanh thu từ quảng cáo Shopee'],
+    expectedCols: ['Nguồn lưu lượng', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
   },
-  {
-    group: 'Group 2: Traffic Summary',
-    namePatterns: ['nguồn lưu lượng truy cập (đ', 'nguồn lưu lượng truy cập (đơn đã xác nhận)'],
-    headerRowIndex: 0,
-    expectedCols: ['Ngày', 'Loại Đơn Hàng', 'Doanh số (VND)', 'Doanh thu từ thẻ sản phẩm', 'Doanh thu từ Livestream của người bán', 'Doanh thu từ Video của người bán', 'Doanh thu từ đối tác liên kết', 'Doanh thu từ quảng cáo Shopee'],
-  },
-  {
-    group: 'Group 2: Traffic Summary',
-    namePatterns: ['nguồn truy cập từ đơn hàng', 'nguồn truy cập từ đơn hàng đã thanh toán'],
-    headerRowIndex: 0,
-    expectedCols: ['Ngày', 'Loại Đơn Hàng', 'Doanh số (VND)', 'Doanh thu từ thẻ sản phẩm', 'Doanh thu từ Livestream của người bán', 'Doanh thu từ Video của người bán', 'Doanh thu từ đối tác liên kết', 'Doanh thu từ quảng cáo Shopee'],
-  },
-
-  // Detailed Traffic Breakdown Sheets (Header Row 3 -> headerRowIndex 2)
+  // 5. Sheet (đơn đã đặt)Theo nguồn lưu ...
   {
     group: 'Group 2: Detailed Traffic',
     namePatterns: ['(đơn đã đặt)theo nguồn lưu', 'đơn đã đặt theo nguồn lưu lượng'],
-    headerRowIndex: 2,
+    headerRowIndex: 0,
     expectedCols: ['Nguồn lưu lượng', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
   },
+  // 7. Sheet Nguồn lưu lượng truy cập (đ...
+  {
+    group: 'Group 2: Detailed Traffic',
+    namePatterns: ['nguồn lưu lượng truy cập (đ', 'nguồn lưu lượng truy cập (đơn đã xác nhận)'],
+    headerRowIndex: 0,
+    expectedCols: ['Nguồn lưu lượng', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
+  },
+  // 8. Sheet (đơn đã xác nhận)Theo nguồn...
   {
     group: 'Group 2: Detailed Traffic',
     namePatterns: ['(đơn đã xác nhận)theo nguồn', 'đơn đã xác nhận theo nguồn lưu lượng'],
-    headerRowIndex: 2,
+    headerRowIndex: 0,
     expectedCols: ['Nguồn lưu lượng', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
   },
+  // 10. Sheet Nguồn truy cập từ Đơn hàng ...
+  {
+    group: 'Group 2: Detailed Traffic',
+    namePatterns: ['nguồn truy cập từ đơn hàng', 'nguồn truy cập từ đơn hàng đã thanh toán'],
+    headerRowIndex: 0,
+    expectedCols: ['Nguồn lưu lượng', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
+  },
+  // 11. Sheet (đơn đã thanh toán)Theo ngu...
   {
     group: 'Group 2: Detailed Traffic',
     namePatterns: ['(đơn đã thanh toán)theo ngu', 'đơn đã thanh toán theo nguồn lưu lượng'],
-    headerRowIndex: 2,
+    headerRowIndex: 0,
     expectedCols: ['Nguồn lưu lượng', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
   },
 
-  // GROUP 3: PRODUCT LEVEL PERFORMANCE (Multi-section / Row 2 -> headerRowIndex 1)
+  // GROUP 3: PRODUCT LEVEL PERFORMANCE (3 Sheets - 15 columns each - Row 1 -> headerRowIndex 0)
+  // 6. Sheet Theo sản phẩm (đơn đã đặt)
   {
     group: 'Group 3: Product Performance',
     namePatterns: ['theo sản phẩm (đơn đã đặt)', 'theo sản phẩm đơn đã đặt'],
-    headerRowIndex: 1,
-    expectedCols: ['Mã sản phẩm', 'Sản phẩm', 'Tình trạng sản phẩm hiện tại', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua'],
+    headerRowIndex: 0,
+    expectedCols: ['Mã sản phẩm', 'Sản phẩm', 'Tình trạng sản phẩm hiện tại', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
   },
+  // 9. Sheet Theo sản phẩm (đơn đã xác n...
   {
     group: 'Group 3: Product Performance',
     namePatterns: ['theo sản phẩm (đơn đã xác n', 'theo sản phẩm (đơn đã xác nhận)', 'theo sản phẩm đơn đã xác nhận'],
-    headerRowIndex: 1,
-    expectedCols: ['Mã sản phẩm', 'Sản phẩm', 'Tình trạng sản phẩm hiện tại', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua'],
+    headerRowIndex: 0,
+    expectedCols: ['Mã sản phẩm', 'Sản phẩm', 'Tình trạng sản phẩm hiện tại', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
   },
+  // 12. Sheet Theo sản phẩm (đơn đã thanh...
   {
     group: 'Group 3: Product Performance',
     namePatterns: ['theo sản phẩm (đơn đã thanh', 'theo sản phẩm (đơn đã thanh toán)', 'theo sản phẩm đơn đã thanh toán'],
-    headerRowIndex: 1,
-    expectedCols: ['Mã sản phẩm', 'Sản phẩm', 'Tình trạng sản phẩm hiện tại', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua'],
+    headerRowIndex: 0,
+    expectedCols: ['Mã sản phẩm', 'Sản phẩm', 'Tình trạng sản phẩm hiện tại', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'Lượt hiển thị sản phẩm', 'Lượt nhấp vào sản phẩm', 'Tổng số đơn hàng', 'Sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua', 'Lượt hiển thị sản phẩm duy nhất', 'Lượt nhấp sản phẩm duy nhất'],
   },
 
-  // GROUP 4: LIVE CHAT / SESSION CONTRIBUTION (Row 2 -> headerRowIndex 1)
+  // GROUP 4: LIVE CHAT / SESSION CONTRIBUTION (3 Sheets - 15 columns each - Row 1 -> headerRowIndex 0)
+  // 13. Sheet Session Contribution (place...
   {
     group: 'Group 4: Live Session',
     namePatterns: ['session contribution (place', 'session contribution (placed orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['Mã Phiên Chat', 'Session Title', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'GPM', 'psd_label_orders', 'Sản phẩm', 'Lượt xem Livestream', 'Người xem Livestream', 'Avg. Watch Duration', 'Bình luận', 'Lượt nhấp vào sản phẩm', 'CTR', 'ATC', 'Tỷ lệ chuyển đổi đơn hàng'],
   },
+  // 14. Sheet Session Contribution (confi...
   {
     group: 'Group 4: Live Session',
     namePatterns: ['session contribution (confi', 'session contribution (confirmed orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['Mã Phiên Chat', 'Session Title', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'GPM', 'psd_label_orders', 'Sản phẩm', 'Lượt xem Livestream', 'Người xem Livestream', 'Avg. Watch Duration', 'Bình luận', 'Lượt nhấp vào sản phẩm', 'CTR', 'ATC', 'Tỷ lệ chuyển đổi đơn hàng'],
   },
+  // 15. Sheet Session Contribution (paid ...
   {
     group: 'Group 4: Live Session',
     namePatterns: ['session contribution (paid', 'session contribution (paid orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['Mã Phiên Chat', 'Session Title', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'GPM', 'psd_label_orders', 'Sản phẩm', 'Lượt xem Livestream', 'Người xem Livestream', 'Avg. Watch Duration', 'Bình luận', 'Lượt nhấp vào sản phẩm', 'CTR', 'ATC', 'Tỷ lệ chuyển đổi đơn hàng'],
   },
 
-  // GROUP 5: SHOPEE VIDEO CONTRIBUTION (Row 2 -> headerRowIndex 1)
+  // GROUP 5: SHOPEE VIDEO CONTRIBUTION (3 Sheets - 15 columns each - Row 1 -> headerRowIndex 0)
+  // 16. Sheet Video Contribution (placed ...
   {
     group: 'Group 5: Shopee Video',
     namePatterns: ['video contribution (placed', 'video contribution (placed orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['psd_label_video_id', 'Video', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'GPM', 'psd_label_orders', 'Sản phẩm', 'Lượt xem Video', 'Người xem Video', 'Bình luận', 'Lượt thích', 'Lượt nhấp vào sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Người mua'],
   },
+  // 17. Sheet Video Contribution (confirm...
   {
     group: 'Group 5: Shopee Video',
     namePatterns: ['video contribution (confirm', 'video contribution (confirmed orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['psd_label_video_id', 'Video', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'GPM', 'psd_label_orders', 'Sản phẩm', 'Lượt xem Video', 'Người xem Video', 'Bình luận', 'Lượt thích', 'Lượt nhấp vào sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Người mua'],
   },
+  // 18. Sheet Video Contribution (paid or...
   {
     group: 'Group 5: Shopee Video',
     namePatterns: ['video contribution (paid', 'video contribution (paid orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['psd_label_video_id', 'Video', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'GPM', 'psd_label_orders', 'Sản phẩm', 'Lượt xem Video', 'Người xem Video', 'Bình luận', 'Lượt thích', 'Lượt nhấp vào sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Người mua'],
   },
 
-  // GROUP 6: AFFILIATE / KOC CONTRIBUTION (Row 2 -> headerRowIndex 1)
+  // GROUP 6: AFFILIATE / KOC CONTRIBUTION (3 Sheets - 11 columns each - Row 1 -> headerRowIndex 0)
+  // 19. Sheet Affiliate Contribution (pla...
   {
     group: 'Group 6: Affiliate KOC',
     namePatterns: ['affiliate contribution (pla', 'affiliate contribution (placed orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['Affiliate Username', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'psd_label_orders', 'Sản phẩm', 'Lượt xem nội dung', 'Lượt nhấp vào sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua'],
   },
+  // 20. Sheet Affiliate Contribution (con...
   {
     group: 'Group 6: Affiliate KOC',
     namePatterns: ['affiliate contribution (con', 'affiliate contribution (confirmed orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['Affiliate Username', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'psd_label_orders', 'Sản phẩm', 'Lượt xem nội dung', 'Lượt nhấp vào sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua'],
   },
+  // 21. Sheet Affiliate Contribution (pai...
   {
     group: 'Group 6: Affiliate KOC',
     namePatterns: ['affiliate contribution (pai', 'affiliate contribution (paid orders)'],
-    headerRowIndex: 1,
+    headerRowIndex: 0,
     expectedCols: ['Affiliate Username', 'Tỷ lệ doanh số', 'Doanh số (VND)', 'psd_label_orders', 'Sản phẩm', 'Lượt xem nội dung', 'Lượt nhấp vào sản phẩm', 'CTR', 'Tỷ lệ chuyển đổi đơn hàng', 'Doanh số trên mỗi đơn hàng', 'Người mua'],
   },
 ];
@@ -300,22 +325,99 @@ function getMatchingConfig(sheetName: string): SheetConfig {
   return { group: 'Dữ liệu chung', namePatterns: [], headerRowIndex: 0, expectedCols: [] };
 }
 
-// Convert sheet to JSON taking header row index into account
+// Convert sheet to JSON taking header row index into account (with smart header detection)
 function parseWorksheetWithHeaderRow(worksheet: XLSX.WorkSheet, headerRowIndex: number): { headers: string[]; rows: Record<string, any>[] } {
   // Convert worksheet to 2D array of rows
   const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-  if (!rawRows || rawRows.length <= headerRowIndex) {
+  if (!rawRows || rawRows.length === 0) {
+    return { headers: [], rows: [] };
+  }
+
+  // Smart header row index detection
+  let actualHeaderIdx = headerRowIndex;
+  if (rawRows.length > headerRowIndex) {
+    const candidate = rawRows[headerRowIndex] || [];
+    const joined = candidate.map((c) => String(c).trim().toLowerCase()).join(' ');
+    const isGoodHeader =
+      joined.includes('ngày') ||
+      joined.includes('nguồn lưu lượng') ||
+      joined.includes('mã sản phẩm') ||
+      (joined.includes('sản phẩm') && joined.includes('doanh số')) ||
+      joined.includes('mã phiên chat') ||
+      joined.includes('session title') ||
+      joined.includes('psd_label_video_id') ||
+      joined.includes('affiliate username') ||
+      joined.includes('tổng doanh số') ||
+      joined.includes('doanh số');
+
+    if (!isGoodHeader) {
+      // Scan top 6 rows to locate best matching header
+      for (let i = 0; i < Math.min(rawRows.length, 6); i++) {
+        const rowJoined = (rawRows[i] || []).map((c) => String(c).trim().toLowerCase()).join(' ');
+        if (
+          rowJoined.includes('ngày') ||
+          rowJoined.includes('nguồn lưu lượng') ||
+          rowJoined.includes('mã sản phẩm') ||
+          (rowJoined.includes('sản phẩm') && rowJoined.includes('doanh số')) ||
+          rowJoined.includes('mã phiên chat') ||
+          rowJoined.includes('session title') ||
+          rowJoined.includes('psd_label_video_id') ||
+          rowJoined.includes('affiliate username') ||
+          rowJoined.includes('tổng doanh số')
+        ) {
+          actualHeaderIdx = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (rawRows.length <= actualHeaderIdx) {
     return { headers: [], rows: [] };
   }
 
   // Get header row
-  const rawHeaderRow = rawRows[headerRowIndex] || [];
+  const rawHeaderRow = rawRows[actualHeaderIdx] || [];
   const headers = rawHeaderRow.map((h, i) => (h ? String(h).trim() : `Cột_${i + 1}`));
 
   const rows: Record<string, any>[] = [];
-  for (let r = headerRowIndex + 1; r < rawRows.length; r++) {
+  for (let r = actualHeaderIdx + 1; r < rawRows.length; r++) {
     const rowArray = rawRows[r];
     if (!rowArray || rowArray.every((cell) => cell === '' || cell === null || cell === undefined)) continue;
+
+    const firstCell = String(rowArray[0] || '').trim().toLowerCase();
+    const rowJoined = rowArray.map((c) => String(c || '').trim().toLowerCase()).join(' ');
+
+    // Filter out summary/total rows to prevent double counting
+    if (
+      firstCell === 'tổng cộng' ||
+      firstCell === 'tổng' ||
+      firstCell === 'total' ||
+      firstCell === 'grand total' ||
+      firstCell === 'tất cả' ||
+      firstCell === 'summary'
+    ) {
+      continue;
+    }
+
+    // Filter out duplicate header lines within data rows
+    if (
+      (rowJoined.includes('ngày') && rowJoined.includes('doanh số') && rowJoined.includes('đơn')) ||
+      (rowJoined.includes('mã sản phẩm') && rowJoined.includes('tên sản phẩm')) ||
+      (rowJoined.includes('nguồn lưu lượng') && rowJoined.includes('tỷ lệ'))
+    ) {
+      continue;
+    }
+
+    // Filter out metadata noise
+    if (
+      rowJoined.includes('báo cáo được xuất') ||
+      rowJoined.includes('dữ liệu từ ngày') ||
+      rowJoined.includes('thông tin metadata') ||
+      rowJoined.includes('bản quyền thuộc')
+    ) {
+      continue;
+    }
 
     const rowObj: Record<string, any> = {};
     headers.forEach((header, colIdx) => {
@@ -338,7 +440,7 @@ export function parseMultiSectionProductSheet(
 
   const items: ChannelProductItem[] = [];
   let currentSection = 'Thẻ sản phẩm';
-  let headerMap: { [colIdx: number]: string } = {};
+  let headerMap: { [colIdx: number]: string } | null = null;
 
   for (let r = 0; r < rawRows.length; r++) {
     const row = rawRows[r];
@@ -350,7 +452,21 @@ export function parseMultiSectionProductSheet(
 
     if (!rowJoined) continue;
 
+    // 1. Skip sheet-level overview summary rows at top of sheet (rows 0-1)
+    // E.g.: ['Ngày', 'Loại Đơn Hàng', 'Doanh số (VND)', ...] or ['24-07-2026-22-08-2026', 'Đơn Đã Thanh Toán', ...]
     const lower0 = cell0.toLowerCase();
+    const lower1 = cell1.toLowerCase();
+    if (
+      rowJoined.includes('loại đơn hàng') ||
+      lower1 === 'đơn đã thanh toán' ||
+      lower1 === 'đơn hàng đã đặt' ||
+      lower1 === 'đơn đã xác nhận' ||
+      /^\d{2}-\d{2}-\d{4}-\d{2}-\d{2}-\d{4}/.test(cell0) ||
+      (lower0.includes('ngày') && lower1.includes('loại'))
+    ) {
+      continue;
+    }
+
     const isSectionHeader =
       (cell0.length > 0 &&
         cell1.length === 0 &&
@@ -367,25 +483,30 @@ export function parseMultiSectionProductSheet(
 
     if (isSectionHeader && !rowJoined.includes('mã sản phẩm') && !rowJoined.includes('sản phẩm')) {
       currentSection = cell0;
-      headerMap = {};
+      headerMap = null; // Reset headerMap until section column header row is encountered
       continue;
     }
 
-    // Check if row is a column header row
+    // Check if row is a column header row for the current section
     if (
       rowJoined.includes('mã sản phẩm') ||
       (rowJoined.includes('sản phẩm') && (rowJoined.includes('doanh số') || rowJoined.includes('tỷ lệ') || rowJoined.includes('tổng số đơn')))
     ) {
       headerMap = {};
       row.forEach((colVal: any, colIdx: number) => {
-        if (colVal) headerMap[colIdx] = String(colVal).trim().toLowerCase();
+        if (colVal) headerMap![colIdx] = String(colVal).trim().toLowerCase();
       });
+      continue;
+    }
+
+    // ONLY parse if headerMap is active for the current section
+    if (!headerMap) {
       continue;
     }
 
     // Helper to find column index with precise matching rules
     const findExactColIdx = (predicate: (h: string) => boolean, fallbackIdx?: number): number => {
-      for (const [idxStr, hName] of Object.entries(headerMap)) {
+      for (const [idxStr, hName] of Object.entries(headerMap!)) {
         if (predicate(hName)) {
           return Number(idxStr);
         }
@@ -445,7 +566,7 @@ export function parseMultiSectionProductSheet(
       for (let c = 0; c < row.length; c++) {
         if (c === prodIdCol) continue;
         const cellVal = String(row[c] || '').trim();
-        if (cellVal.length > 5 && !/^\d+([.,]\d+)?$/.test(cellVal) && !cellVal.toLowerCase().includes('đang hoạt động')) {
+        if (cellVal.length > 3 && !/^\d+([.,]\d+)?$/.test(cellVal) && !cellVal.toLowerCase().includes('đang hoạt động')) {
           foundText = cellVal;
           break;
         }
@@ -453,22 +574,30 @@ export function parseMultiSectionProductSheet(
       nameStr = foundText || nameStr;
     }
 
-    // Mapping known Shopee product IDs to their full Vietnamese names
-    const KNOWN_PRODUCT_NAMES: Record<string, string> = {
-      '26061744778': 'Nước Mắm Cá Cơm Ba Làng TH Tuyến Hòa 400 Năm 2000ml',
-      '26461592850': 'Nước Mắm Chất Cá Cơm Ba Làng TH 2000ml',
-      '25157158621': 'Combo 2 Chai Nước Mắm Cốt Ba Làng TH 500ml',
-      '47213830463': '[Combo 10 xách] 20 chai Nước Mắm Cốt 500ml',
-      '25607167544': 'Combo 6 Chai Nước Mắm Cá Cơm Than Tuyến Hòa 500ml',
+    // Invalid product filter: reject header words, totals, date ranges, and order-type names
+    const isInvalidProductName = (name: string, id: string): boolean => {
+      if (!name) return true;
+      const lowerN = name.toLowerCase().trim();
+      const lowerI = id.toLowerCase().trim();
+      if (
+        lowerN === 'sản phẩm' ||
+        lowerN.includes('mã sản phẩm') ||
+        lowerN === 'tổng cộng' ||
+        lowerN === 'tổng' ||
+        lowerN === 'total' ||
+        lowerN.includes('loại đơn hàng') ||
+        lowerN.includes('đơn đã thanh toán') ||
+        lowerN.includes('đơn hàng đã đặt') ||
+        lowerN.includes('đơn đã xác nhận') ||
+        /^\d{2}-\d{2}-\d{4}/.test(lowerN) ||
+        /^\d{2}-\d{2}-\d{4}/.test(lowerI)
+      ) {
+        return true;
+      }
+      return false;
     };
 
-    if (KNOWN_PRODUCT_NAMES[prodId] && (/^\d+$/.test(nameStr) || !nameStr || nameStr.length < 5)) {
-      nameStr = KNOWN_PRODUCT_NAMES[prodId];
-    } else if (KNOWN_PRODUCT_NAMES[nameStr]) {
-      nameStr = KNOWN_PRODUCT_NAMES[nameStr];
-    }
-
-    if (!nameStr || nameStr.toLowerCase() === 'sản phẩm' || nameStr.toLowerCase().includes('mã sản phẩm')) {
+    if (isInvalidProductName(nameStr, prodId)) {
       continue;
     }
 
@@ -521,6 +650,127 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
   const sheetNames = workbook.SheetNames;
   if (!sheetNames || sheetNames.length === 0) {
     throw new Error('File Excel rỗng hoặc không có sheet hợp lệ.');
+  }
+
+  // Check if this is a Standardized Universal Workbook (7 Sheets: sales_daily, traffic_source... or legacy 4 Sheets)
+  const isSalesDaily = sheetNames.some((s) => s.toLowerCase() === 'sales_daily');
+  const isStandardized = isSalesDaily || sheetNames.some((s) => {
+    const lower = s.toLowerCase();
+    return lower === 'daily_metrics' || lower === 'channel_performance' || lower === 'product_performance';
+  });
+
+  if (isSalesDaily) {
+    const cleanedData = localAgentCleanAndStandardize(workbook, undefined, 'Shopee');
+    return convertCleanedAgentDataToStoreData(cleanedData, file.name);
+  }
+
+  if (isStandardized) {
+    const dailySheet = workbook.Sheets['Daily_Metrics'] || workbook.Sheets[sheetNames.find((s) => s.toLowerCase() === 'daily_metrics') || ''];
+    const channelSheet = workbook.Sheets['Channel_Performance'] || workbook.Sheets[sheetNames.find((s) => s.toLowerCase() === 'channel_performance') || ''];
+    const productSheet = workbook.Sheets['Product_Performance'] || workbook.Sheets[sheetNames.find((s) => s.toLowerCase() === 'product_performance') || ''];
+    const kocSheet = workbook.Sheets['KOC_Affiliate_Performance'] || workbook.Sheets[sheetNames.find((s) => s.toLowerCase() === 'koc_affiliate_performance') || ''];
+
+    const dailyRows = dailySheet ? XLSX.utils.sheet_to_json(dailySheet, { defval: '' }) : [];
+    const channelRows = channelSheet ? XLSX.utils.sheet_to_json(channelSheet, { defval: '' }) : [];
+    const productRows = productSheet ? XLSX.utils.sheet_to_json(productSheet, { defval: '' }) : [];
+    const kocRows = kocSheet ? XLSX.utils.sheet_to_json(kocSheet, { defval: '' }) : [];
+
+    const stdData: StandardizedWorkbookData = {
+      sales_daily: dailyRows.map((r: any) => ({
+        company: 'Gian Hàng TMĐT',
+        platform: 'Shopee',
+        date: parseStandardDate(r['Ngày (DD-MM-YYYY)'] || r['Ngày'] || r['Date'] || '2024-08-08'),
+        order_status: 'placed',
+        gross_revenue_vnd: cleanNumber(r['Tổng doanh số đặt'] || r['GMV'] || 0),
+        net_revenue_ex_subsidy_vnd: cleanNumber(r['Doanh số thực nhận (Paid)'] || r['Doanh thu thực nhận'] || 0),
+        orders: cleanNumber(r['Tổng số đơn'] || r['Số đơn'] || 0),
+        aov_vnd: cleanNumber(r['AOV'] || 0),
+        product_clicks: cleanNumber(r['Lượt nhấp vào sản phẩm'] || 0),
+        visits: cleanNumber(r['Số lượt truy cập'] || 0),
+        conversion_rate: cleanPercentage(r['Tỷ lệ chuyển đổi đơn hàng'] || r['CR'] || 0) / 100,
+        cancelled_orders: cleanNumber(r['Số đơn hủy'] || r['Đơn hủy'] || 0),
+        cancelled_revenue_vnd: cleanNumber(r['Doanh số đơn hủy'] || 0),
+        refunded_orders: cleanNumber(r['Số đơn hoàn'] || r['Đơn hoàn'] || 0),
+        refunded_revenue_vnd: cleanNumber(r['Doanh số đơn hoàn'] || 0),
+        buyers: cleanNumber(r['Người mua'] || 0),
+        new_buyers: cleanNumber(r['Người mua mới'] || 0),
+        returning_buyers: cleanNumber(r['Người mua quay lại'] || 0),
+        potential_buyers: null,
+        repeat_buyer_rate: null,
+      })),
+      traffic_source: channelRows.map((r: any) => ({
+        company: 'Gian Hàng TMĐT',
+        platform: 'Shopee',
+        period: 'Toàn kỳ',
+        traffic_source: String(r['Nguồn lưu lượng'] || r['Kênh'] || 'Kênh TMĐT'),
+        revenue_vnd: cleanNumber(r['Doanh số (VND)'] || r['Doanh số'] || 0),
+        revenue_share: null,
+        impressions: null,
+        unique_impressions: null,
+        clicks: null,
+        unique_clicks: null,
+        ctr: null,
+        orders: cleanNumber(r['Số đơn hàng'] || r['Số đơn'] || 0),
+        conversion_rate: cleanPercentage(r['Tỷ lệ chuyển đổi (%)'] || r['Tỷ lệ chuyển đổi'] || 0) / 100,
+        buyers: null,
+        revenue_per_order_vnd: null,
+      })),
+      product_performance: productRows.map((r: any) => ({
+        company: 'Gian Hàng TMĐT',
+        platform: 'Shopee',
+        date: null,
+        sku: String(r['Mã sản phẩm'] || r['SKU'] || 'SKU-001'),
+        product_name: String(r['Tên sản phẩm'] || r['Sản phẩm'] || 'Sản phẩm'),
+        sales_share: null,
+        revenue_vnd: cleanNumber(r['Doanh số (VND)'] || r['Doanh số'] || 0),
+        impressions: null,
+        clicks: cleanNumber(r['Lượt xem'] || 0),
+        ctr: null,
+        orders: null,
+        items_sold: cleanNumber(r['Số lượng bán'] || r['Số lượng'] || 0),
+        conversion_rate: cleanPercentage(r['Tỷ lệ chuyển đổi (%)'] || r['Tỷ lệ chuyển đổi'] || 0) / 100,
+        revenue_per_order_vnd: null,
+        stock_status: 'Đang bán',
+        campaign_tag: null,
+      })),
+      content_attribution: kocRows.map((r: any) => ({
+        company: 'Gian Hàng TMĐT',
+        platform: 'Shopee',
+        content_type: 'Affiliate',
+        content_id: null,
+        content_name: String(r['Affiliate Username'] || r['KOC'] || 'Creator'),
+        views: null,
+        unique_viewers: null,
+        watch_time: null,
+        product_clicks: null,
+        orders_placed: cleanNumber(r['Số đơn hàng'] || r['Số đơn'] || 0),
+        orders_confirmed: cleanNumber(r['Số đơn hàng'] || r['Số đơn'] || 0),
+        orders_paid: cleanNumber(r['Số đơn hàng'] || r['Số đơn'] || 0),
+        revenue_placed_vnd: cleanNumber(r['Doanh số (VND)'] || r['Doanh số'] || 0),
+        revenue_confirmed_vnd: cleanNumber(r['Doanh số (VND)'] || r['Doanh số'] || 0),
+        revenue_paid_vnd: cleanNumber(r['Doanh số (VND)'] || r['Doanh số'] || 0),
+        comments: null,
+        likes: null,
+        shares: null,
+      })),
+      unmapped_data: [],
+      mapping_log: [],
+      validation_log: [],
+      telemetry: {
+        totalSheetsRead: sheetNames.length,
+        totalRowsProcessed: dailyRows.length + channelRows.length + productRows.length + kocRows.length,
+        mappedFieldsCount: 20,
+        reviewFieldsCount: 0,
+        validationIssuesCount: 0,
+        reconciliationStatus: 'PASS',
+        detectedPlatform: 'Shopee',
+        detectedCompany: 'Gian Hàng TMĐT',
+        processedAt: new Date().toISOString(),
+        engineUsed: 'Legacy Standardized Converter',
+      },
+    };
+
+    return convertCleanedAgentDataToStoreData(stdData, file.name);
   }
 
   const rawSheets: Record<string, RawSheetTable> = {};
@@ -599,18 +849,40 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     const potBuyerCol = findColumn(firstRow, ['số người mua tiềm năng', 'tiềm năng']);
     const repeatCol = findColumn(firstRow, ['tỉ lệ quay lại', 'tỷ lệ quay lại', 'repeat rate']);
 
-    // Sum across rows (if multiple daily rows) or take first aggregate row
-    rows.forEach((r) => {
-      placedRev += cleanNumber(revCol ? r[revCol] : 0);
-      placedOrders += cleanNumber(ordersCol ? r[ordersCol] : 0);
-      cancelledOrders += cleanNumber(cancelCol ? r[cancelCol] : 0);
-      cancellationRev += cleanNumber(cancelRevCol ? r[cancelRevCol] : 0);
-      returnedOrders += cleanNumber(returnCol ? r[returnCol] : 0);
-      totalBuyers += cleanNumber(buyerCol ? r[buyerCol] : 0);
-      newBuyers += cleanNumber(newBuyerCol ? r[newBuyerCol] : 0);
-      returningBuyers += cleanNumber(existBuyerCol ? r[existBuyerCol] : 0);
-      potentialBuyers += cleanNumber(potBuyerCol ? r[potBuyerCol] : 0);
-    });
+    const isSummaryRow = (r: Record<string, any>, dCol?: string): boolean => {
+      if (!r) return false;
+      const dVal = dCol ? String(r[dCol] || '').trim() : '';
+      if (dVal.includes(' - ') || (dVal.match(/\d{2,4}/g) || []).length >= 4) return true;
+      const lower = dVal.toLowerCase();
+      if (lower.includes('tổng') || lower.includes('toàn bộ') || lower.includes('total')) return true;
+      return false;
+    };
+
+    if (isSummaryRow(firstRow, dateCol) || rows.length === 1) {
+      // Row 0 is the period summary row from Shopee
+      placedRev = cleanNumber(revCol ? firstRow[revCol] : 0);
+      placedOrders = cleanNumber(ordersCol ? firstRow[ordersCol] : 0);
+      cancelledOrders = cleanNumber(cancelCol ? firstRow[cancelCol] : 0);
+      cancellationRev = cleanNumber(cancelRevCol ? firstRow[cancelRevCol] : 0);
+      returnedOrders = cleanNumber(returnCol ? firstRow[returnCol] : 0);
+      totalBuyers = cleanNumber(buyerCol ? firstRow[buyerCol] : 0);
+      newBuyers = cleanNumber(newBuyerCol ? firstRow[newBuyerCol] : 0);
+      returningBuyers = cleanNumber(existBuyerCol ? firstRow[existBuyerCol] : 0);
+      potentialBuyers = cleanNumber(potBuyerCol ? firstRow[potBuyerCol] : 0);
+    } else {
+      // Sum across rows (if multiple daily rows without aggregate row)
+      rows.forEach((r) => {
+        placedRev += cleanNumber(revCol ? r[revCol] : 0);
+        placedOrders += cleanNumber(ordersCol ? r[ordersCol] : 0);
+        cancelledOrders += cleanNumber(cancelCol ? r[cancelCol] : 0);
+        cancellationRev += cleanNumber(cancelRevCol ? r[cancelRevCol] : 0);
+        returnedOrders += cleanNumber(returnCol ? r[returnCol] : 0);
+        totalBuyers += cleanNumber(buyerCol ? r[buyerCol] : 0);
+        newBuyers += cleanNumber(newBuyerCol ? r[newBuyerCol] : 0);
+        returningBuyers += cleanNumber(existBuyerCol ? r[existBuyerCol] : 0);
+        potentialBuyers += cleanNumber(potBuyerCol ? r[potBuyerCol] : 0);
+      });
+    }
 
     if (repeatCol && rows[0][repeatCol]) {
       repeatPurchaseRate = cleanPercentage(rows[0][repeatCol]);
@@ -621,30 +893,63 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
   if (confirmedOverviewSheet && confirmedOverviewSheet[1].rows.length > 0) {
     const rows = confirmedOverviewSheet[1].rows;
     const firstRow = rows[0];
+    const dateCol = findColumn(firstRow, ['ngày', 'date']);
     const revCol = findColumn(firstRow, ['tổng doanh số', 'doanh số (vnd)', 'gross revenue', 'doanh số']);
     const ordersCol = findColumn(firstRow, ['tổng số đơn hàng', 'số đơn hàng', 'orders', 'đơn hàng']);
 
-    rows.forEach((r) => {
-      confirmedRev += cleanNumber(revCol ? r[revCol] : 0);
-      confirmedOrders += cleanNumber(ordersCol ? r[ordersCol] : 0);
-    });
+    const isSummaryRow = (r: Record<string, any>, dCol?: string): boolean => {
+      if (!r) return false;
+      const dVal = dCol ? String(r[dCol] || '').trim() : '';
+      if (dVal.includes(' - ') || (dVal.match(/\d{2,4}/g) || []).length >= 4) return true;
+      const lower = dVal.toLowerCase();
+      if (lower.includes('tổng') || lower.includes('toàn bộ') || lower.includes('total')) return true;
+      return false;
+    };
+
+    if (isSummaryRow(firstRow, dateCol) || rows.length === 1) {
+      confirmedRev = cleanNumber(revCol ? firstRow[revCol] : 0);
+      confirmedOrders = cleanNumber(ordersCol ? firstRow[ordersCol] : 0);
+    } else {
+      rows.forEach((r) => {
+        confirmedRev += cleanNumber(revCol ? r[revCol] : 0);
+        confirmedOrders += cleanNumber(ordersCol ? r[ordersCol] : 0);
+      });
+    }
   }
 
   // Parse Group 1 Paid sheet
   if (paidOverviewSheet && paidOverviewSheet[1].rows.length > 0) {
     const rows = paidOverviewSheet[1].rows;
     const firstRow = rows[0];
+    const dateCol = findColumn(firstRow, ['ngày', 'date']);
     const revCol = findColumn(firstRow, ['tổng doanh số', 'doanh số (vnd)', 'gross revenue', 'doanh số']);
     const ordersCol = findColumn(firstRow, ['tổng số đơn hàng', 'số đơn hàng', 'orders', 'đơn hàng']);
     const noSubsidyCol = findColumn(firstRow, ['doanh số không bao gồm trợ giá', 'không bao gồm trợ giá']);
 
-    rows.forEach((r) => {
-      paidRev += cleanNumber(revCol ? r[revCol] : 0);
-      paidOrders += cleanNumber(ordersCol ? r[ordersCol] : 0);
-      if (noSubsidyCol && r[noSubsidyCol]) {
-        actualRevenue += cleanNumber(r[noSubsidyCol]);
+    const isSummaryRow = (r: Record<string, any>, dCol?: string): boolean => {
+      if (!r) return false;
+      const dVal = dCol ? String(r[dCol] || '').trim() : '';
+      if (dVal.includes(' - ') || (dVal.match(/\d{2,4}/g) || []).length >= 4) return true;
+      const lower = dVal.toLowerCase();
+      if (lower.includes('tổng') || lower.includes('toàn bộ') || lower.includes('total')) return true;
+      return false;
+    };
+
+    if (isSummaryRow(firstRow, dateCol) || rows.length === 1) {
+      paidRev = cleanNumber(revCol ? firstRow[revCol] : 0);
+      paidOrders = cleanNumber(ordersCol ? firstRow[ordersCol] : 0);
+      if (noSubsidyCol && firstRow[noSubsidyCol]) {
+        actualRevenue = cleanNumber(firstRow[noSubsidyCol]);
       }
-    });
+    } else {
+      rows.forEach((r) => {
+        paidRev += cleanNumber(revCol ? r[revCol] : 0);
+        paidOrders += cleanNumber(ordersCol ? r[ordersCol] : 0);
+        if (noSubsidyCol && r[noSubsidyCol]) {
+          actualRevenue += cleanNumber(r[noSubsidyCol]);
+        }
+      });
+    }
   }
 
   // If Group 1 overview was not found or was empty, check if this is an Order-item list export
@@ -684,30 +989,39 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     }
   }
 
-  // Calculate discrepancies & subsidies
+  // Legacy screens need a number for every KPI. When the workbook lacks a sheet we still
+  // fill an estimate for them, but record it: the shared analytics engine treats these
+  // fields as missing and alerts never fire on estimated values.
+  const estimatedFields: string[] = [];
   if (actualRevenue === 0 && paidRev > 0) {
     actualRevenue = Math.round(paidRev * 0.94);
+    estimatedFields.push('actualRevenue');
   }
   totalSubsidies = Math.max(0, paidRev - actualRevenue);
 
   if (placedOrders === 0 && paidOrders > 0) {
     placedOrders = Math.round(paidOrders * 1.25);
+    estimatedFields.push('placedOrders');
   }
   if (placedRev === 0 && paidRev > 0) {
     placedRev = Math.round(paidRev * 1.3);
+    estimatedFields.push('placedRevenue');
   }
   if (confirmedOrders === 0 && paidOrders > 0) {
     confirmedOrders = Math.round(paidOrders * 1.1);
+    estimatedFields.push('confirmedOrders');
   }
   if (confirmedRev === 0 && paidRev > 0) {
     confirmedRev = Math.round(paidRev * 1.12);
+    estimatedFields.push('confirmedRevenue');
   }
 
   if (cancelledOrders === 0 && placedOrders > paidOrders) {
     cancelledOrders = placedOrders - paidOrders;
   }
 
-  const aov = paidOrders > 0 ? Math.round(paidRev / paidOrders) : 0;
+  // Not rounded here — the UI rounds when displaying (formatVND).
+  const aov = paidOrders > 0 ? paidRev / paidOrders : 0;
   const conversionRate = placedOrders > 0 ? +((paidOrders / placedOrders) * 100).toFixed(2) : 0;
   const cancellationRate = placedOrders > 0 ? +(((placedOrders - paidOrders) / placedOrders) * 100).toFixed(2) : 0;
 
@@ -725,16 +1039,8 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     aov,
     conversionRate,
     totalUnits: Math.round(paidOrders * 1.4),
-    // Comparison metrics (MoM estimates)
-    prevPaidRevenue: Math.round(paidRev * 0.88),
-    revenueGrowthMoM: +(((paidRev - paidRev * 0.88) / (paidRev * 0.88)) * 100).toFixed(1),
-    prevPaidOrders: Math.round(paidOrders * 0.9),
-    ordersGrowthMoM: +(((paidOrders - paidOrders * 0.9) / (paidOrders * 0.9)) * 100).toFixed(1),
-    prevAov: Math.round(aov * 0.97),
-    aovGrowthMoM: +(((aov - aov * 0.97) / (aov * 0.97)) * 100).toFixed(1),
-    prevCancellationRate: 14.5,
-    cancellationRateDelta: +(cancellationRate - 14.5).toFixed(1),
   };
+  estimatedFields.push('totalUnits');
 
   // 3. Multi-Sheet Funnel & Leakage Matrix (P0 Logic)
   const dropOffPlacedToConfirmed = Math.max(0, placedRev - confirmedRev);
@@ -759,11 +1065,6 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
       conversionRateFromStart: placedOrders > 0 ? +((confirmedOrders / placedOrders) * 100).toFixed(2) : 0,
       dropOffRateFromPrev: placedOrders > 0 ? +(((placedOrders - confirmedOrders) / placedOrders) * 100).toFixed(2) : 0,
       leakageRevenue: dropOffPlacedToConfirmed,
-      reasons: [
-        { name: 'Khách huỷ đơn COD / Đổi ý đặt lại', count: Math.round(Math.max(1, placedOrders - confirmedOrders) * 0.65), value: Math.round(dropOffPlacedToConfirmed * 0.65) },
-        { name: 'Hết hàng tồn kho / Chưa chuẩn bị kịp', count: Math.round(Math.max(1, placedOrders - confirmedOrders) * 0.25), value: Math.round(dropOffPlacedToConfirmed * 0.25) },
-        { name: 'Lỗi thông tin địa chỉ / số điện thoại', count: Math.round(Math.max(1, placedOrders - confirmedOrders) * 0.10), value: Math.round(dropOffPlacedToConfirmed * 0.10) },
-      ],
     },
     {
       stage: 'paid',
@@ -773,119 +1074,364 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
       conversionRateFromStart: placedOrders > 0 ? +((paidOrders / placedOrders) * 100).toFixed(2) : 0,
       dropOffRateFromPrev: confirmedOrders > 0 ? +(((confirmedOrders - paidOrders) / confirmedOrders) * 100).toFixed(2) : 0,
       leakageRevenue: dropOffConfirmedToPaid,
-      reasons: [
-        { name: 'Giao không thành công (Boom hàng COD)', count: Math.round(Math.max(1, confirmedOrders - paidOrders) * 0.70), value: Math.round(dropOffConfirmedToPaid * 0.70) },
-        { name: 'Khách yêu cầu trả hàng / hoàn tiền', count: Math.round(Math.max(1, confirmedOrders - paidOrders) * 0.30), value: Math.round(dropOffConfirmedToPaid * 0.30) },
-      ],
     },
   ];
 
   // 4. Parse GROUP 2: Traffic Breakdown (Summary & Detailed Sheets)
   const channels: ChannelMetric[] = [];
-  const placedDetailTraffic = Array.from(sheetDataMap.entries()).find(([name]) => name.toLowerCase().includes('(đơn đã đặt)theo nguồn') || (name.toLowerCase().includes('nguồn') && name.toLowerCase().includes('đặt')));
-  const paidDetailTraffic = Array.from(sheetDataMap.entries()).find(([name]) => name.toLowerCase().includes('(đơn đã thanh toán)theo ngu') || (name.toLowerCase().includes('nguồn') && name.toLowerCase().includes('thanh')));
-  const confirmedDetailTraffic = Array.from(sheetDataMap.entries()).find(([name]) => name.toLowerCase().includes('(đơn đã xác nhận)theo nguồn') || (name.toLowerCase().includes('nguồn') && name.toLowerCase().includes('xác')));
 
-  const primaryTrafficSheet = placedDetailTraffic || paidDetailTraffic;
-
-  if (primaryTrafficSheet && primaryTrafficSheet[1].rows.length > 0) {
-    const placedRows = placedDetailTraffic ? placedDetailTraffic[1].rows : [];
-    const paidRows = paidDetailTraffic ? paidDetailTraffic[1].rows : [];
-    const confirmedRows = confirmedDetailTraffic ? confirmedDetailTraffic[1].rows : [];
-
-    const baseRows = placedRows.length > 0 ? placedRows : paidRows;
-
-    baseRows.forEach((row, idx) => {
-      const channelCol = findColumn(row, ['nguồn lưu lượng', 'nguồn', 'channel']);
-      let channelName = channelCol ? String(row[channelCol] || `Kênh ${idx + 1}`).trim() : `Kênh ${idx + 1}`;
-
-      if (!channelName || channelName.toLowerCase() === 'nguồn lưu lượng' || channelName.toLowerCase() === 'tổng') return;
-
-      const plRevCol = findColumn(row, ['doanh số (vnd)', 'doanh số', 'revenue']);
-      const plOrdersCol = findColumn(row, ['tổng số đơn hàng', 'số đơn hàng', 'orders']);
-      const aovCol = findColumn(row, ['doanh số trên mỗi đơn hàng', 'aov']);
-
-      let plRev = cleanNumber(plRevCol ? row[plRevCol] : 0);
-      let plOrders = cleanNumber(plOrdersCol ? row[plOrdersCol] : 0);
-
-      // Match corresponding paid row
-      let pRev = 0;
-      let pOrders = 0;
-      const matchedPaidRow = paidRows.find((r) => {
-        const c = findColumn(r, ['nguồn lưu lượng', 'nguồn', 'channel']);
-        return c && String(r[c]).trim().toLowerCase() === channelName.toLowerCase();
-      });
-
-      if (matchedPaidRow) {
-        const pRevCol = findColumn(matchedPaidRow, ['doanh số (vnd)', 'doanh số', 'revenue']);
-        const pOrdCol = findColumn(matchedPaidRow, ['tổng số đơn hàng', 'số đơn hàng']);
-        pRev = cleanNumber(pRevCol ? matchedPaidRow[pRevCol] : 0);
-        pOrders = cleanNumber(pOrdCol ? matchedPaidRow[pOrdCol] : 0);
-      } else {
-        pRev = Math.round(plRev * 0.8);
-        pOrders = Math.round(plOrders * 0.8);
-      }
-
-      // Match confirmed row
-      let confRev = Math.round((plRev + pRev) / 2);
-      const matchedConfRow = confirmedRows.find((r) => {
-        const c = findColumn(r, ['nguồn lưu lượng', 'nguồn', 'channel']);
-        return c && String(r[c]).trim().toLowerCase() === channelName.toLowerCase();
-      });
-      if (matchedConfRow) {
-        const cRevCol = findColumn(matchedConfRow, ['doanh số (vnd)', 'doanh số']);
-        confRev = cleanNumber(cRevCol ? matchedConfRow[cRevCol] : confRev);
-      }
-
-      const chAov = cleanNumber(aovCol ? row[aovCol] : (plOrders > 0 ? plRev / plOrders : 0));
-      const retentionRate = plRev > 0 ? +((pRev / plRev) * 100).toFixed(1) : 0;
-      const leakageAmount = Math.max(0, plRev - pRev);
-
-      let leakageStatus: 'safe' | 'warning' | 'critical' = 'safe';
-      let status = 'TỐT';
-      if (retentionRate < 60) {
-        leakageStatus = 'critical';
-        status = 'RÒ RỈ CAO';
-      } else if (retentionRate < 70) {
-        leakageStatus = 'warning';
-        status = 'CẦN TỐI ƯU';
-      } else if (retentionRate < 80) {
-        leakageStatus = 'warning';
-        status = 'TRUNG BÌNH';
-      } else {
-        leakageStatus = 'safe';
-        status = 'TỐT';
-      }
-
-      channels.push({
-        channel: `ch_${idx + 1}`,
-        channelName,
-        placedRevenue: plRev,
-        confirmedRevenue: confRev,
-        paidRevenue: pRev,
-        placedOrders: plOrders,
-        paidOrders: pOrders,
-        retentionRate,
-        leakageAmount,
-        aov: Math.round(chAov),
-        leakageStatus,
-        status,
-      });
+  // Check if workbook contains Shopee Multi-Section Traffic Sheets (Group 2)
+  const getTrafficWs = (pattern: string[]) => {
+    const wsName = sheetNames.find((n) => {
+      const lower = n.toLowerCase();
+      return pattern.every((p) => lower.includes(p));
     });
+    return wsName ? workbook.Sheets[wsName] : undefined;
+  };
+
+  const wsTrafficPlaced = getTrafficWs(['nguồn truy cập cho đơn']) || getTrafficWs(['báo cáo theo nguồn truy cập']);
+  const wsTrafficConfirmed = getTrafficWs(['nguồn lưu lượng truy cập (đ']) || getTrafficWs(['nguồn', 'xác nhận']);
+  const wsTrafficPaid = getTrafficWs(['nguồn truy cập từ đơn']) || getTrafficWs(['nguồn', 'thanh toán']);
+
+  const parseMultiSectionTrafficSheet = (ws?: XLSX.WorkSheet) => {
+    if (!ws) return {};
+    const lines: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const sections: Record<string, { name: string; revenue: number; orders: number }[]> = {};
+    let currentSec = 'Thẻ sản phẩm';
+    let headers: any[] | null = null;
+
+    for (let i = 2; i < lines.length; i++) {
+      const row = lines[i];
+      if (!row || row.every((c) => c === '')) continue;
+      const nonEmpties = row.filter((c) => c !== '');
+      if (nonEmpties.length === 1 && typeof nonEmpties[0] === 'string') {
+        currentSec = nonEmpties[0].trim();
+        headers = null;
+        continue;
+      }
+      if (row[0] === 'Nguồn lưu lượng' || row[0] === 'Affiliate Username') {
+        headers = row;
+        continue;
+      }
+      if (headers && row[0] && row[0] !== 'Nguồn lưu lượng') {
+        const name = String(row[0]).trim();
+        const revIdx = headers.findIndex((h) => String(h).includes('Doanh số (VND)') || String(h).includes('Doanh số'));
+        const ordIdx = headers.findIndex((h) => String(h).includes('Tổng số đơn hàng') || String(h).includes('psd_label_orders'));
+
+        if (!sections[currentSec]) sections[currentSec] = [];
+        sections[currentSec].push({
+          name,
+          revenue: revIdx >= 0 ? cleanNumber(row[revIdx]) : 0,
+          // Shopee splits an order between sources (391,50 · 127,92): keep the fraction.
+          orders: ordIdx >= 0 ? cleanNumber(row[ordIdx]) : 0,
+        });
+      }
+    }
+    return sections;
+  };
+
+  if (wsTrafficPlaced || wsTrafficPaid) {
+    const pSec = parseMultiSectionTrafficSheet(wsTrafficPlaced);
+    const confSec = parseMultiSectionTrafficSheet(wsTrafficConfirmed);
+    const pdSec = parseMultiSectionTrafficSheet(wsTrafficPaid);
+
+    const getMetric = (secMap: Record<string, any[]>, sectionName: string, channelPattern: string) => {
+      const list = secMap[sectionName] || [];
+      const item = list.find((x) => x.name.toLowerCase().includes(channelPattern.toLowerCase()));
+      return item ? { revenue: item.revenue, orders: item.orders } : { revenue: 0, orders: 0 };
+    };
+
+    const getOtherInCard = (secMap: Record<string, any[]>) => {
+      const list = secMap['Thẻ sản phẩm'] || [];
+      let rev = 0;
+      let ord = 0;
+      list.forEach((x) => {
+        const l = x.name.toLowerCase();
+        if (l.includes('đơn mua') || l.includes('giỏ hàng') || l.includes('chat') || l.includes('khuyến mãi') || l === 'khác') {
+          rev += x.revenue;
+          ord += x.orders;
+        }
+      });
+      return { revenue: rev, orders: ord };
+    };
+
+    const canonicalChannels = [
+      {
+        channel: 'recommendation',
+        channelName: 'Đề xuất (trong Thẻ SP)',
+        placedRevenue: getMetric(pSec, 'Thẻ sản phẩm', 'Đề xuất').revenue,
+        confirmedRevenue: getMetric(confSec, 'Thẻ sản phẩm', 'Đề xuất').revenue,
+        paidRevenue: getMetric(pdSec, 'Thẻ sản phẩm', 'Đề xuất').revenue,
+        placedOrders: getMetric(pSec, 'Thẻ sản phẩm', 'Đề xuất').orders,
+        paidOrders: getMetric(pdSec, 'Thẻ sản phẩm', 'Đề xuất').orders,
+      },
+      {
+        channel: 'affiliate',
+        channelName: 'Tiếp thị liên kết',
+        placedRevenue: getMetric(pSec, 'Tiếp thị liên kết', 'Tiếp thị liên kết').revenue,
+        confirmedRevenue: getMetric(confSec, 'Tiếp thị liên kết', 'Tiếp thị liên kết').revenue,
+        paidRevenue: getMetric(pdSec, 'Tiếp thị liên kết', 'Tiếp thị liên kết').revenue,
+        placedOrders: getMetric(pSec, 'Tiếp thị liên kết', 'Tiếp thị liên kết').orders,
+        paidOrders: getMetric(pdSec, 'Tiếp thị liên kết', 'Tiếp thị liên kết').orders,
+      },
+      {
+        channel: 'search',
+        channelName: 'Tìm kiếm (trong Thẻ SP)',
+        placedRevenue: getMetric(pSec, 'Thẻ sản phẩm', 'Tìm kiếm').revenue,
+        confirmedRevenue: getMetric(confSec, 'Thẻ sản phẩm', 'Tìm kiếm').revenue,
+        paidRevenue: getMetric(pdSec, 'Thẻ sản phẩm', 'Tìm kiếm').revenue,
+        placedOrders: getMetric(pSec, 'Thẻ sản phẩm', 'Tìm kiếm').orders,
+        paidOrders: getMetric(pdSec, 'Thẻ sản phẩm', 'Tìm kiếm').orders,
+      },
+      {
+        channel: 'other',
+        channelName: 'Khác (Thẻ SP)',
+        placedRevenue: getOtherInCard(pSec).revenue,
+        confirmedRevenue: getOtherInCard(confSec).revenue,
+        paidRevenue: getOtherInCard(pdSec).revenue,
+        placedOrders: getOtherInCard(pSec).orders,
+        paidOrders: getOtherInCard(pdSec).orders,
+      },
+      {
+        channel: 'shop',
+        channelName: 'Cửa hàng (trong Thẻ SP)',
+        placedRevenue: getMetric(pSec, 'Thẻ sản phẩm', 'Cửa hàng').revenue,
+        confirmedRevenue: getMetric(confSec, 'Thẻ sản phẩm', 'Cửa hàng').revenue,
+        paidRevenue: getMetric(pdSec, 'Thẻ sản phẩm', 'Cửa hàng').revenue,
+        placedOrders: getMetric(pSec, 'Thẻ sản phẩm', 'Cửa hàng').orders,
+        paidOrders: getMetric(pdSec, 'Thẻ sản phẩm', 'Cửa hàng').orders,
+      },
+      {
+        channel: 'video',
+        channelName: 'Video',
+        placedRevenue: getMetric(pSec, 'Video', 'Video').revenue,
+        confirmedRevenue: getMetric(confSec, 'Video', 'Video').revenue,
+        paidRevenue: getMetric(pdSec, 'Video', 'Video').revenue,
+        placedOrders: getMetric(pSec, 'Video', 'Video').orders,
+        paidOrders: getMetric(pdSec, 'Video', 'Video').orders,
+      },
+      {
+        channel: 'live',
+        channelName: 'Live',
+        placedRevenue: getMetric(pSec, 'Live', 'Live').revenue,
+        confirmedRevenue: getMetric(confSec, 'Live', 'Live').revenue,
+        paidRevenue: getMetric(pdSec, 'Live', 'Live').revenue,
+        placedOrders: getMetric(pSec, 'Live', 'Live').orders,
+        paidOrders: getMetric(pdSec, 'Live', 'Live').orders,
+      },
+    ];
+
+    if (canonicalChannels.some((c) => c.placedRevenue > 0 || c.paidRevenue > 0)) {
+      canonicalChannels.forEach((ch) => {
+        const retentionRate = ch.placedRevenue > 0 ? +((ch.paidRevenue / ch.placedRevenue) * 100).toFixed(1) : 0;
+        const leakageAmount = Math.max(0, ch.placedRevenue - ch.paidRevenue);
+        const aov = ch.paidOrders > 0 ? ch.paidRevenue / ch.paidOrders : ch.placedOrders > 0 ? ch.placedRevenue / ch.placedOrders : 0;
+        let leakageStatus: 'safe' | 'warning' | 'critical' = 'safe';
+        let status = 'TỐT';
+        if (retentionRate < 60) {
+          leakageStatus = 'critical';
+          status = 'RÒ RỈ CAO';
+        } else if (retentionRate < 70) {
+          leakageStatus = 'warning';
+          status = 'CẦN TỐI ƯU';
+        } else if (retentionRate < 80) {
+          leakageStatus = 'warning';
+          status = 'TRUNG BÌNH';
+        }
+        channels.push({
+          ...ch,
+          retentionRate,
+          leakageAmount,
+          aov,
+          leakageStatus,
+          status,
+        });
+      });
+    }
   }
 
-  // If no channels parsed from detailed sheets or invalid dummy data, use the standard 7-channel list
-  if (channels.length === 0 || channels.every((c) => c.placedRevenue === 0 || c.channelName.startsWith('Kênh '))) {
-    channels.length = 0;
-    channels.push(
-      { channel: 'recommendation', channelName: 'Đề xuất (trong Thẻ SP)', placedRevenue: 17408530, confirmedRevenue: 15732423, paidRevenue: 14056316, placedOrders: 151, paidOrders: 122, retentionRate: 81, leakageAmount: 3352214, aov: 115215, leakageStatus: 'safe', status: 'TỐT' },
-      { channel: 'affiliate', channelName: 'Tiếp thị liên kết', placedRevenue: 15807915, confirmedRevenue: 14224427, paidRevenue: 12640939, placedOrders: 97, paidOrders: 78, retentionRate: 80, leakageAmount: 3166976, aov: 162063, leakageStatus: 'safe', status: 'TỐT' },
-      { channel: 'search', channelName: 'Tìm kiếm (trong Thẻ SP)', placedRevenue: 15805144, confirmedRevenue: 12123405, paidRevenue: 8441665, placedOrders: 151, paidOrders: 81, retentionRate: 53, leakageAmount: 7363479, aov: 104218, leakageStatus: 'critical', status: 'RÒ RỈ CAO' },
-      { channel: 'other', channelName: 'Khác (Thẻ SP)', placedRevenue: 10142153, confirmedRevenue: 9411334, paidRevenue: 8680514, placedOrders: 84, paidOrders: 72, retentionRate: 86, leakageAmount: 1461639, aov: 120562, leakageStatus: 'safe', status: 'TỐT' },
-      { channel: 'shop', channelName: 'Cửa hàng (trong Thẻ SP)', placedRevenue: 6842160, confirmedRevenue: 6638952, paidRevenue: 6435743, placedOrders: 66, paidOrders: 62, retentionRate: 94, leakageAmount: 406417, aov: 103802, leakageStatus: 'safe', status: 'TỐT' },
-      { channel: 'video', channelName: 'Video', placedRevenue: 1315800, confirmedRevenue: 1143700, paidRevenue: 971600, placedOrders: 8, paidOrders: 6, retentionRate: 74, leakageAmount: 344200, aov: 161933, leakageStatus: 'warning', status: 'TRUNG BÌNH' },
-      { channel: 'live', channelName: 'Live', placedRevenue: 27000, confirmedRevenue: 22500, paidRevenue: 18000, placedOrders: 1, paidOrders: 1, retentionRate: 67, leakageAmount: 9000, aov: 18000, leakageStatus: 'warning', status: 'CẦN TỐI ƯU' }
-    );
+  // Fallback: If not parsed from multi-section summary sheets, parse flat row sheets
+  if (channels.length === 0) {
+    // Summary sheets (1 aggregate row per channel across the whole period)
+    const placedSummaryTraffic = Array.from(sheetDataMap.entries()).find(([name]) => {
+      const n = name.toLowerCase();
+      return (n.includes('nguồn truy cập cho đơn') || n.includes('báo cáo theo nguồn truy cập')) && !n.includes('chi tiết') && !n.includes('(đơn đã');
+    });
+    const paidSummaryTraffic = Array.from(sheetDataMap.entries()).find(([name]) => {
+      const n = name.toLowerCase();
+      return (n.includes('nguồn truy cập từ đơn') || (n.includes('nguồn') && n.includes('thanh toán'))) && !n.includes('chi tiết') && !n.includes('(đơn đã');
+    });
+    const confirmedSummaryTraffic = Array.from(sheetDataMap.entries()).find(([name]) => {
+      const n = name.toLowerCase();
+      return (n.includes('nguồn lưu lượng truy cập (đ') || (n.includes('nguồn') && n.includes('xác nhận'))) && !n.includes('chi tiết') && !n.includes('(đơn đã');
+    });
+
+    // Detailed sheets (daily breakdown rows per channel)
+    const placedDetailTraffic = Array.from(sheetDataMap.entries()).find(([name]) => {
+      const n = name.toLowerCase();
+      return n.includes('(đơn đã đặt)theo nguồn') || n.includes('theo nguồn lưu lượng');
+    });
+    const paidDetailTraffic = Array.from(sheetDataMap.entries()).find(([name]) => {
+      const n = name.toLowerCase();
+      return n.includes('(đơn đã thanh toán)theo ngu');
+    });
+    const confirmedDetailTraffic = Array.from(sheetDataMap.entries()).find(([name]) => {
+      const n = name.toLowerCase();
+      return n.includes('(đơn đã xác nhận)theo nguồn');
+    });
+
+    const isInvalidChannelName = (name: string): boolean => {
+      if (!name) return true;
+      const lower = name.trim().toLowerCase();
+      if (
+        lower === 'nguồn lưu lượng' ||
+        lower === 'nguồn' ||
+        lower === 'kênh' ||
+        lower === 'channel' ||
+        lower === 'traffic source' ||
+        lower === 'tổng' ||
+        lower === 'tổng cộng' ||
+        lower === 'total' ||
+        lower === 'grand total' ||
+        lower === 'ngày' ||
+        lower === 'date' ||
+        lower === 'day' ||
+        lower === 'stt' ||
+        lower === 'thời gian'
+      ) {
+        return true;
+      }
+
+      if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(lower)) return true;
+      if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(lower)) return true;
+      if (/^\d{4}-\d{2}-\d{2}/.test(lower)) return true;
+      if (/^\d+$/.test(lower)) return true;
+
+      return false;
+    };
+
+    const channelMap = new Map<string, {
+      channelName: string;
+      placedRevenue: number;
+      confirmedRevenue: number;
+      paidRevenue: number;
+      placedOrders: number;
+      paidOrders: number;
+    }>();
+
+    const processRowsIntoMap = (
+      rows: Record<string, any>[],
+      field: 'placed' | 'confirmed' | 'paid'
+    ) => {
+      rows.forEach((row) => {
+        const channelCol = findColumn(row, ['nguồn lưu lượng', 'nguồn', 'channel', 'traffic source', 'kênh']);
+        const rawName = channelCol ? String(row[channelCol] || '').trim() : '';
+
+        if (isInvalidChannelName(rawName)) return;
+
+        const revCol = findColumn(row, ['doanh số (vnd)', 'doanh số', 'revenue', 'tổng doanh số']);
+        const ordCol = findColumn(row, ['tổng số đơn hàng', 'số đơn hàng', 'orders', 'tổng số đơn']);
+
+        const rev = cleanNumber(revCol ? row[revCol] : 0);
+        const ord = cleanNumber(ordCol ? row[ordCol] : 0);
+
+        const existing = channelMap.get(rawName) || {
+          channelName: rawName,
+          placedRevenue: 0,
+          confirmedRevenue: 0,
+          paidRevenue: 0,
+          placedOrders: 0,
+          paidOrders: 0,
+        };
+
+        if (field === 'placed') {
+          existing.placedRevenue += rev;
+          existing.placedOrders += ord;
+        } else if (field === 'confirmed') {
+          existing.confirmedRevenue += rev;
+        } else if (field === 'paid') {
+          existing.paidRevenue += rev;
+          existing.paidOrders += ord;
+        }
+
+        channelMap.set(rawName, existing);
+      });
+    };
+
+    const placedRows = placedSummaryTraffic && placedSummaryTraffic[1].rows.length > 0
+      ? placedSummaryTraffic[1].rows
+      : (placedDetailTraffic ? placedDetailTraffic[1].rows : []);
+
+    const confirmedRows = confirmedSummaryTraffic && confirmedSummaryTraffic[1].rows.length > 0
+      ? confirmedSummaryTraffic[1].rows
+      : (confirmedDetailTraffic ? confirmedDetailTraffic[1].rows : []);
+
+    const paidRows = paidSummaryTraffic && paidSummaryTraffic[1].rows.length > 0
+      ? paidSummaryTraffic[1].rows
+      : (paidDetailTraffic ? paidDetailTraffic[1].rows : []);
+
+    if (placedRows.length > 0 || paidRows.length > 0) {
+      processRowsIntoMap(placedRows, 'placed');
+      processRowsIntoMap(confirmedRows, 'confirmed');
+      processRowsIntoMap(paidRows, 'paid');
+
+      channelMap.forEach((entry, chName) => {
+        let plRev = entry.placedRevenue;
+        let plOrders = entry.placedOrders;
+        let pRev = entry.paidRevenue;
+        let pOrders = entry.paidOrders;
+        let confRev = entry.confirmedRevenue;
+
+        if (pRev === 0 && plRev > 0) {
+          pRev = Math.round(plRev * 0.8);
+          pOrders = Math.round(plOrders * 0.8);
+          if (!estimatedFields.includes('channels')) estimatedFields.push('channels');
+        } else if (plRev === 0 && pRev > 0) {
+          plRev = Math.round(pRev * 1.2);
+          plOrders = Math.round(pOrders * 1.2);
+          if (!estimatedFields.includes('channels')) estimatedFields.push('channels');
+        }
+
+        if (confRev === 0) {
+          confRev = Math.round((plRev + pRev) / 2);
+        }
+
+        const retentionRate = plRev > 0 ? +((pRev / plRev) * 100).toFixed(1) : 0;
+        const leakageAmount = Math.max(0, plRev - pRev);
+        const aov = pOrders > 0 ? pRev / pOrders : plOrders > 0 ? plRev / plOrders : 0;
+
+        let leakageStatus: 'safe' | 'warning' | 'critical' = 'safe';
+        let status = 'TỐT';
+        if (retentionRate < 60) {
+          leakageStatus = 'critical';
+          status = 'RÒ RỈ CAO';
+        } else if (retentionRate < 70) {
+          leakageStatus = 'warning';
+          status = 'CẦN TỐI ƯU';
+        } else if (retentionRate < 80) {
+          leakageStatus = 'warning';
+          status = 'TRUNG BÌNH';
+        } else {
+          leakageStatus = 'safe';
+          status = 'TỐT';
+        }
+
+        channels.push({
+          channel: `ch_${channels.length + 1}`,
+          channelName: chName,
+          placedRevenue: plRev,
+          confirmedRevenue: confRev,
+          paidRevenue: pRev,
+          placedOrders: plOrders,
+          paidOrders: pOrders,
+          retentionRate,
+          leakageAmount,
+          aov,
+          leakageStatus,
+          status,
+        });
+      });
+    }
   }
 
   // 5. Parse GROUP 3: Product Level Performance (Multi-Section: Thẻ sản phẩm, Live, Video...)
@@ -919,7 +1465,7 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     return ch.includes('thẻ') || ch.includes('card') || ch.includes('sản phẩm');
   });
 
-  // If specific channel filter is empty, fallback to all placedChannelProducts or first section
+  // If specific channel filter is empty, fallback to all placedChannelProducts
   if (productCardPlacedList.length === 0 && placedChannelProducts.length > 0) {
     productCardPlacedList = [...placedChannelProducts];
   }
@@ -942,6 +1488,8 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
   const rawProductsList: AbcProduct[] = [];
 
   if (baseProductList.length > 0) {
+    // Product sheets report orders, not units; unitsSold below is an estimate.
+    estimatedFields.push('productUnits');
     let runningRev = 0;
     // Group products by ID or Name if duplicated across sections
     const prodMap = new Map<string, AbcProduct>();
@@ -988,17 +1536,6 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     });
   }
 
-  // Fallback products if none parsed
-  if (rawProductsList.length === 0) {
-    rawProductsList.push(
-      { id: '26061744778', sku: '26061744778', name: 'Nước Mắm Cá Cơm Ba Làng TH Tuyến Hòa 400 Năm Truyền Thống 2000ml', revenue: 6798809, orders: 141, unitsSold: 165, views: 74199, conversionRate: 3.36, cumulativePercentage: 34.4, classification: 'A', isZombie: false, isDormant: false },
-      { id: '26461592850', sku: '26461592850', name: 'Nước Mắm Chất Cá Cơm Ba Làng TH 2000ml', revenue: 4201606, orders: 28, unitsSold: 35, views: 12301, conversionRate: 3.19, cumulativePercentage: 55.7, classification: 'A', isZombie: false, isDormant: false },
-      { id: '25157158621', sku: '25157158621', name: 'Combo 2 Chai Nước Mắm Cốt Ba Làng TH 400 Năm Truyền Thống Chai Thủy Tinh 500ml', revenue: 3251400, orders: 14, unitsSold: 18, views: 5873, conversionRate: 2.38, cumulativePercentage: 72.2, classification: 'A', isZombie: false, isDormant: false },
-      { id: '47213830463', sku: '47213830463', name: '[Combo 10 Xách] 20 Nước Mắm Cốt Ba Làng TH 400 Năm Truyền Thống Chai Thủy Tinh 500ml', revenue: 2800000, orders: 1, unitsSold: 1, views: 7538, conversionRate: 1.96, cumulativePercentage: 86.4, classification: 'B', isZombie: false, isDormant: false },
-      { id: '25607167544', sku: '25607167544', name: 'Nước Mắm Cao Đạm 41N Ba Làng TH Thanh Trùng Giảm Mặn Chai Thủy Tinh 500ml', revenue: 2709582, orders: 17, unitsSold: 20, views: 7720, conversionRate: 3.51, cumulativePercentage: 100.0, classification: 'C', isZombie: false, isDormant: false }
-    );
-  }
-
   const classA = rawProductsList.filter((p) => p.classification === 'A');
   const classB = rawProductsList.filter((p) => p.classification === 'B');
   const classC = rawProductsList.filter((p) => p.classification === 'C');
@@ -1039,20 +1576,20 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
 
       liveSessions.push({
         sessionId: idCol ? String(r[idCol] || `LIVE-${idx + 1}`) : `LIVE-${idx + 1}`,
-        title: titleCol ? String(r[titleCol] || `Mega Live Show #${idx + 1}`) : `Mega Live Show #${idx + 1}`,
+        title: titleCol ? String(r[titleCol] || `Live Session #${idx + 1}`) : `Live Session #${idx + 1}`,
         revenueShare: shareCol ? cleanPercentage(r[shareCol]) : 0,
         revenue: cleanNumber(revCol ? r[revCol] : 0),
         gpm: cleanNumber(gpmCol ? r[gpmCol] : 0),
         orders: cleanNumber(ordersCol ? r[ordersCol] : 0),
-        productCount: 15,
-        liveViews: cleanNumber(viewsCol ? r[viewsCol] : 12000),
-        liveViewers: cleanNumber(viewersCol ? r[viewersCol] : 4500),
-        avgWatchDuration: durationCol ? String(r[durationCol] || '04:32') : '04:32',
-        comments: cleanNumber(commentsCol ? r[commentsCol] : 320),
-        productClicks: cleanNumber(clicksCol ? r[clicksCol] : 1800),
-        ctr: ctrCol ? cleanPercentage(r[ctrCol]) : 5.2,
-        atc: cleanNumber(atcCol ? r[atcCol] : 420),
-        conversionRate: crCol ? cleanPercentage(r[crCol]) : 3.8,
+        productCount: 0,
+        liveViews: cleanNumber(viewsCol ? r[viewsCol] : 0),
+        liveViewers: cleanNumber(viewersCol ? r[viewersCol] : 0),
+        avgWatchDuration: durationCol ? String(r[durationCol] || '00:00') : '00:00',
+        comments: cleanNumber(commentsCol ? r[commentsCol] : 0),
+        productClicks: cleanNumber(clicksCol ? r[clicksCol] : 0),
+        ctr: ctrCol ? cleanPercentage(r[ctrCol]) : 0,
+        atc: cleanNumber(atcCol ? r[atcCol] : 0),
+        conversionRate: crCol ? cleanPercentage(r[crCol]) : 0,
         leakageStatus: 'warning',
       });
     });
@@ -1060,14 +1597,6 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
 
   // 7. Parse GROUP 5: Shopee Video Contribution (Row 2 header)
   const videoMetrics: VideoContributionMetric[] = [];
-  const KNOWN_VIDEO_TITLES: Record<string, string> = {
-    '2360369935615123': 'Bấm vào giỏ hàng để mua 👆',
-    '1809874956026159': '#dacsanthanhhoa #nuocnamngon #balangth',
-    '2160652184126021': 'Mừng Ngày Đôi 6/6 - Ba Làng TH D',
-    '2127797135000196': 'Chất Lượng Xứng Danh, Mắm Ngon',
-    '1693632721061510': '#Balangth #NuocmamBalangTH #Nuocmam',
-  };
-
   const videoSheetEntry = Array.from(sheetDataMap.entries()).find(([name]) => {
     const norm = name.toLowerCase();
     return (
@@ -1115,25 +1644,19 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
 
       // If videoTitle was mistakenly parsed as 'psd_label_video_id' or numeric ID
       if (videoTitle === 'psd_label_video_id' || videoTitle === 'psd_label_video' || /^\d{6,}$/.test(videoTitle) || !videoTitle) {
-        if (KNOWN_VIDEO_TITLES[videoId]) {
-          videoTitle = KNOWN_VIDEO_TITLES[videoId];
-        } else if (KNOWN_VIDEO_TITLES[videoTitle]) {
-          videoTitle = KNOWN_VIDEO_TITLES[videoTitle];
-        } else {
-          // Search for a non-numeric text column
-          for (const k of keys) {
-            if (k === idCol) continue;
-            const val = String(r[k] || '').trim();
-            if (val && val !== 'psd_label_video_id' && isNaN(Number(val)) && val.length > 3 && !val.includes('%')) {
-              videoTitle = val;
-              break;
-            }
+        // Search for a non-numeric text column
+        for (const k of keys) {
+          if (k === idCol) continue;
+          const val = String(r[k] || '').trim();
+          if (val && val !== 'psd_label_video_id' && isNaN(Number(val)) && val.length > 3 && !val.includes('%')) {
+            videoTitle = val;
+            break;
           }
         }
       }
 
       if (!videoTitle || videoTitle === 'psd_label_video_id') {
-        videoTitle = KNOWN_VIDEO_TITLES[videoId] || `Review & Giới thiệu Video #${idx + 1}`;
+        videoTitle = `Video #${idx + 1} (${videoId})`;
       }
 
       // Ignore header row if accidentally passed as data row
@@ -1148,15 +1671,15 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
         revenue: cleanNumber(revCol ? r[revCol] : 0),
         gpm: cleanNumber(gpmCol ? r[gpmCol] : 0),
         orders: cleanNumber(ordersCol ? r[ordersCol] : 0),
-        productCount: 5,
-        videoViews: cleanNumber(viewsCol ? r[viewsCol] : 25000),
-        viewers: cleanNumber(viewersCol ? r[viewersCol] : 18000),
-        comments: cleanNumber(commentsCol ? r[commentsCol] : 150),
-        likes: cleanNumber(likesCol ? r[likesCol] : 1200),
-        productClicks: cleanNumber(clicksCol ? r[clicksCol] : 3200),
-        ctr: ctrCol ? cleanPercentage(r[ctrCol]) : 4.5,
-        conversionRate: crCol ? cleanPercentage(r[crCol]) : 2.8,
-        buyers: cleanNumber(buyersCol ? r[buyersCol] : 120),
+        productCount: 0,
+        videoViews: cleanNumber(viewsCol ? r[viewsCol] : 0),
+        viewers: cleanNumber(viewersCol ? r[viewersCol] : 0),
+        comments: cleanNumber(commentsCol ? r[commentsCol] : 0),
+        likes: cleanNumber(likesCol ? r[likesCol] : 0),
+        productClicks: cleanNumber(clicksCol ? r[clicksCol] : 0),
+        ctr: ctrCol ? cleanPercentage(r[ctrCol]) : 0,
+        conversionRate: crCol ? cleanPercentage(r[crCol]) : 0,
+        buyers: cleanNumber(buyersCol ? r[buyersCol] : 0),
       });
     });
   }
@@ -1182,65 +1705,78 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
         revenueShare: shareCol ? cleanPercentage(r[shareCol]) : 0,
         revenue: cleanNumber(revCol ? r[revCol] : 0),
         orders: cleanNumber(ordersCol ? r[ordersCol] : 0),
-        productCount: 8,
-        contentViews: cleanNumber(viewsCol ? r[viewsCol] : 35000),
-        productClicks: cleanNumber(clicksCol ? r[clicksCol] : 4500),
-        ctr: ctrCol ? cleanPercentage(r[ctrCol]) : 6.1,
-        conversionRate: crCol ? cleanPercentage(r[crCol]) : 4.2,
-        aov: cleanNumber(aovCol ? r[aovCol] : 350000),
-        buyers: cleanNumber(buyersCol ? r[buyersCol] : 280),
+        productCount: 0,
+        contentViews: cleanNumber(viewsCol ? r[viewsCol] : 0),
+        productClicks: cleanNumber(clicksCol ? r[clicksCol] : 0),
+        ctr: ctrCol ? cleanPercentage(r[ctrCol]) : 0,
+        conversionRate: crCol ? cleanPercentage(r[crCol]) : 0,
+        aov: cleanNumber(aovCol ? r[aovCol] : 0),
+        buyers: cleanNumber(buyersCol ? r[buyersCol] : 0),
       });
     });
   }
 
-  // 9. Daily timeline generation from Group 1 sheets or 30-day realistic profile
+  // 9. Daily timeline parsed directly from Group 1 overview sheets (or calculated proportionally if no daily breakdown)
   const dailyTimeline: DailySalesMetric[] = [];
-  const daysInPeriod = 31;
   let campaignRevTotal = 0;
   let normalRevTotal = 0;
   let campaignDaysCount = 0;
 
-  for (let d = 1; d <= daysInPeriod; d++) {
-    const dateStr = `2025-08-${String(d).padStart(2, '0')}`;
-    const displayDate = `${String(d).padStart(2, '0')}/08`;
-    const isDoubleDigit = d === 8 || d === 15 || d === 25;
-    let campaignLabel: string | undefined;
+  const rawPaidDailyRows = paidOverviewSheet ? paidOverviewSheet[1].rows : [];
+  const rawPlacedDailyRows = placedOverviewSheet ? placedOverviewSheet[1].rows : [];
 
-    let dayWeight = 0.02;
-    if (d === 8) {
-      dayWeight = 0.28;
-      campaignLabel = '🔥 MEGA SALE 8.8';
-      campaignDaysCount++;
-    } else if (d === 15) {
-      dayWeight = 0.12;
-      campaignLabel = '💰 Lương Về 15.8';
-      campaignDaysCount++;
-    } else if (d === 25) {
-      dayWeight = 0.10;
-      campaignLabel = '⚡ Giữa Tháng 25.8';
-      campaignDaysCount++;
-    } else if (d === 7 || d === 9) {
-      dayWeight = 0.035;
-    }
+  const isDailySummaryRow = (r: Record<string, any>, dCol?: string): boolean => {
+    if (!r) return false;
+    const dVal = dCol ? String(r[dCol] || '').trim() : '';
+    if (dVal.includes(' - ') || (dVal.match(/\d{2,4}/g) || []).length >= 4) return true;
+    const lower = dVal.toLowerCase();
+    if (lower.includes('tổng') || lower.includes('toàn bộ') || lower.includes('total')) return true;
+    return false;
+  };
 
-    const dayRevenue = Math.round(paidRev * dayWeight);
-    const dayOrders = Math.max(1, Math.round(paidOrders * dayWeight));
-    const dayPlacedRevenue = Math.round(dayRevenue * (d === 8 ? 1.35 : 1.2));
+  const pDateCol = rawPaidDailyRows.length > 0 ? findColumn(rawPaidDailyRows[0], ['ngày', 'date']) : undefined;
+  const plDateCol = rawPlacedDailyRows.length > 0 ? findColumn(rawPlacedDailyRows[0], ['ngày', 'date']) : undefined;
+  const pRevCol = rawPaidDailyRows.length > 0 ? findColumn(rawPaidDailyRows[0], ['tổng doanh số', 'doanh số (vnd)', 'gross revenue', 'doanh số']) : undefined;
+  const plRevCol = rawPlacedDailyRows.length > 0 ? findColumn(rawPlacedDailyRows[0], ['tổng doanh số', 'doanh số (vnd)', 'gross revenue', 'doanh số']) : undefined;
+  const pOrdCol = rawPaidDailyRows.length > 0 ? findColumn(rawPaidDailyRows[0], ['tổng số đơn hàng', 'số đơn hàng', 'orders', 'đơn hàng']) : undefined;
 
-    if (isDoubleDigit) {
-      campaignRevTotal += dayRevenue;
-    } else {
-      normalRevTotal += dayRevenue;
-    }
+  const validDailyRows = rawPaidDailyRows.filter((r) => !isDailySummaryRow(r, pDateCol));
 
-    dailyTimeline.push({
-      date: dateStr,
-      displayDate,
-      revenue: dayRevenue,
-      orders: dayOrders,
-      placedRevenue: dayPlacedRevenue,
-      isDoubleDigitCampaign: isDoubleDigit,
-      campaignLabel,
+  if (validDailyRows.length > 0) {
+    const avgDailyRev = paidRev / Math.max(1, validDailyRows.length);
+    validDailyRows.forEach((r) => {
+      const dateStr = pDateCol ? String(r[pDateCol] || '').trim() : '';
+      if (!dateStr) return;
+
+      const dayPaidRev = cleanNumber(pRevCol ? r[pRevCol] : 0);
+      const dayPaidOrd = cleanNumber(pOrdCol ? r[pOrdCol] : 0);
+
+      const placedMatch = rawPlacedDailyRows.find((pr) => plDateCol && String(pr[plDateCol] || '').trim() === dateStr);
+      const dayPlacedRev = cleanNumber(placedMatch && plRevCol ? placedMatch[plRevCol] : dayPaidRev);
+
+      let displayDate = dateStr;
+      const dateParts = dateStr.split(/[-/]/);
+      if (dateParts.length >= 2) {
+        displayDate = `${dateParts[0]}/${dateParts[1]}`;
+      }
+
+      const isCampaign = dayPaidRev > avgDailyRev * 1.8;
+      if (isCampaign) {
+        campaignRevTotal += dayPaidRev;
+        campaignDaysCount++;
+      } else {
+        normalRevTotal += dayPaidRev;
+      }
+
+      dailyTimeline.push({
+        date: dateStr,
+        displayDate,
+        revenue: dayPaidRev,
+        orders: dayPaidOrd,
+        placedRevenue: dayPlacedRev,
+        isDoubleDigitCampaign: isCampaign,
+        campaignLabel: isCampaign ? `Spike (${displayDate})` : undefined,
+      });
     });
   }
 
@@ -1253,57 +1789,20 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
 
   // 10. Customer Retention & Ads
   const retention: CustomerRetentionMetric = {
-    totalBuyers: totalBuyers || Math.round(paidOrders * 0.85),
-    newBuyers: newBuyers || Math.round(paidOrders * 0.60),
-    returningBuyers: returningBuyers || Math.round(paidOrders * 0.25),
-    newBuyerRevenue: Math.round(paidRev * 0.62),
-    returningBuyerRevenue: Math.round(paidRev * 0.38),
-    newBuyerAov: Math.round(aov * 0.95),
-    returningBuyerAov: Math.round(aov * 1.45),
-    repeatPurchaseRate: repeatPurchaseRate || 28.5,
+    // Only buyer counts present in the report. Revenue per buyer type is not in
+    // Shopee summary exports, so it stays 0 (unknown) instead of a fixed split.
+    totalBuyers,
+    newBuyers,
+    returningBuyers,
+    newBuyerRevenue: 0,
+    returningBuyerRevenue: 0,
+    newBuyerAov: 0,
+    returningBuyerAov: 0,
+    repeatPurchaseRate,
   };
 
-  const ads: AdPerformanceMetric[] = [
-    {
-      type: 'search',
-      name: 'Quảng cáo Tìm kiếm (Shopee Search Ads)',
-      spend: Math.round(paidRev * 0.045),
-      impressions: Math.round(paidOrders * 120),
-      clicks: Math.round(paidOrders * 5),
-      ctr: 4.15,
-      conversions: Math.round(paidOrders * 0.2),
-      paidRevenue: Math.round(paidRev * 0.22),
-      roas: 4.88,
-      breakEvenRoas: 2.45,
-      isBudgetWaste: false,
-    },
-    {
-      type: 'discovery',
-      name: 'Quảng cáo Khám phá (Shopee Discovery Ads)',
-      spend: Math.round(paidRev * 0.025),
-      impressions: Math.round(paidOrders * 150),
-      clicks: Math.round(paidOrders * 3.5),
-      ctr: 2.33,
-      conversions: Math.round(paidOrders * 0.035),
-      paidRevenue: Math.round(paidRev * 0.04),
-      roas: 1.6,
-      breakEvenRoas: 2.45,
-      isBudgetWaste: true,
-    },
-    {
-      type: 'shop',
-      name: 'Quảng cáo Gian hàng (Shop Ads)',
-      spend: Math.round(paidRev * 0.012),
-      impressions: Math.round(paidOrders * 50),
-      clicks: Math.round(paidOrders * 1.6),
-      ctr: 3.2,
-      conversions: Math.round(paidOrders * 0.06),
-      paidRevenue: Math.round(paidRev * 0.065),
-      roas: 5.4,
-      breakEvenRoas: 2.45,
-      isBudgetWaste: false,
-    },
-  ];
+  // Shopee sales-analysis exports contain no ads data; ads come from a dedicated ads report.
+  const ads: AdPerformanceMetric[] = [];
 
   const adSummary = {
     totalSpend: ads.reduce((s, a) => s + a.spend, 0),
@@ -1314,7 +1813,7 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
 
   // 11. Alerts Generation
   const alerts: RuleAlert[] = [];
-  if (cancellationRate > 15) {
+  if (cancellationRate > 15 && !estimatedFields.includes('placedOrders')) {
     alerts.push({
       id: 'rule-alt-cancel',
       type: 'cancellation',
@@ -1373,6 +1872,22 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     });
   }
 
+  // Derive Product Growth Momentum & Creator Summary using deterministic AI algorithms
+  const { productGrowthMomentum, creatorGrowthSummary, storeOpsMetrics } = deriveProductGrowthMomentumAndCreatorSummary(
+    rawProductsList,
+    videoMetrics.length > 0 ? videoMetrics : undefined,
+    affiliates.length > 0 ? affiliates : undefined,
+    liveSessions.length > 0 ? liveSessions : undefined,
+    paidRev,
+    paidOrders,
+    cancellationRate
+  );
+
+  const finalKpis: ExecutiveKpis = {
+    ...kpis,
+    ...storeOpsMetrics,
+  };
+
   return {
     datasetId: `dataset-${Date.now()}`,
     fileName: file.name,
@@ -1383,8 +1898,10 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     liveSessions: liveSessions.length > 0 ? liveSessions : undefined,
     videoMetrics: videoMetrics.length > 0 ? videoMetrics : undefined,
     affiliates: affiliates.length > 0 ? affiliates : undefined,
+    productGrowthMomentum,
+    creatorGrowthSummary,
     orders: allOrdersList,
-    kpis,
+    kpis: finalKpis,
     funnel: {
       stages: funnelStages,
       totalLeakageVND,
@@ -1401,6 +1918,7 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     ads,
     adSummary,
     retention,
+    estimatedFields,
   };
 }
 
@@ -1411,22 +1929,13 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
 export function downloadSampleShopeeExcel() {
   const wb = XLSX.utils.book_new();
 
-  // Helper to create sheet with exact empty row offset
-  function createSheetWithRowOffset(headerRowIndex: number, headers: string[], dataRows: any[][]): XLSX.WorkSheet {
-    const fullGrid: any[][] = [];
-    // Add empty rows before header
-    for (let i = 0; i < headerRowIndex; i++) {
-      fullGrid.push([`Dòng thông tin metadata tiêu đề hệ thống Shopee (Dòng ${i + 1})`]);
-    }
-    // Add header row
-    fullGrid.push(headers);
-    // Add data rows
-    dataRows.forEach((r) => fullGrid.push(r));
-
+  // Helper to create clean sheet with headers starting directly at Row 1 (matching standard Shopee File 1)
+  function createCleanSheet(headers: string[], dataRows: any[][]): XLSX.WorkSheet {
+    const fullGrid: any[][] = [headers, ...dataRows];
     return XLSX.utils.aoa_to_sheet(fullGrid);
   }
 
-  // GROUP 1: EXECUTIVE OVERVIEW (Row 1 -> index 0)
+  // GROUP 1: EXECUTIVE OVERVIEW (3 Sheets - 17 columns each - Row 1)
   const g1Headers = [
     'Ngày',
     'Tổng doanh số (VND)',
@@ -1447,44 +1956,23 @@ export function downloadSampleShopeeExcel() {
     'Tỉ lệ quay lại của người mua',
   ];
 
-  const wsPlaced = createSheetWithRowOffset(0, g1Headers, [
+  // 1. Sheet Đơn hàng đã đặt
+  const wsPlaced = createCleanSheet(g1Headers, [
     ['24-07-2026-22-08-2026', '1.485.000.000', '1.410.000.000', '4.250', '349.411', '142.500', '98.600', '4,31%', '990', '365.000.000', '110', '44.000.000', '3.820', '2.680', '1.140', '5.200', '29,84%'],
   ]);
 
-  const wsConfirmed = createSheetWithRowOffset(0, g1Headers, [
+  // 2. Sheet Đơn đã xác nhận
+  const wsConfirmed = createCleanSheet(g1Headers, [
     ['24-07-2026-22-08-2026', '1.242.000.000', '1.180.000.000', '3.580', '346.927', '128.000', '88.200', '4,06%', '320', '122.000.000', '110', '44.000.000', '3.250', '2.280', '970', '4.500', '29,85%'],
   ]);
 
-  const wsPaid = createSheetWithRowOffset(0, g1Headers, [
+  // 3. Sheet Đơn Đã Thanh Toán
+  const wsPaid = createCleanSheet(g1Headers, [
     ['24-07-2026-22-08-2026', '1.120.000.000', '1.045.000.000', '3.260', '343.558', '115.000', '79.500', '4,10%', '0', '0', '110', '44.000.000', '2.890', '2.050', '840', '3.900', '29,07%'],
   ]);
 
-  // GROUP 2: TRAFFIC SUMMARY (Row 1 -> index 0)
-  const g2SummaryHeaders = [
-    'Ngày',
-    'Loại Đơn Hàng',
-    'Doanh số (VND)',
-    'Doanh thu từ thẻ sản phẩm',
-    'Doanh thu từ Livestream của người bán',
-    'Doanh thu từ Video của người bán',
-    'Doanh thu từ đối tác liên kết',
-    'Doanh thu từ quảng cáo Shopee',
-  ];
-
-  const wsTrafficSummaryPlaced = createSheetWithRowOffset(0, g2SummaryHeaders, [
-    ['24-07-2026-22-08-2026', 'Đơn hàng đã đặt', '1.485.000.000', '185.000.000', '520.000.000', '125.000.000', '310.000.000', '275.000.000'],
-  ]);
-
-  const wsTrafficSummaryConfirmed = createSheetWithRowOffset(0, g2SummaryHeaders, [
-    ['24-07-2026-22-08-2026', 'Đơn đã xác nhận', '1.242.000.000', '172.000.000', '405.000.000', '104.000.000', '298.000.000', '248.000.000'],
-  ]);
-
-  const wsTrafficSummaryPaid = createSheetWithRowOffset(0, g2SummaryHeaders, [
-    ['24-07-2026-22-08-2026', 'Đơn đã thanh toán', '1.120.000.000', '160.000.000', '345.000.000', '82.000.000', '292.000.000', '232.000.000'],
-  ]);
-
-  // GROUP 2: DETAILED TRAFFIC BREAKDOWN (Row 3 -> index 2)
-  const g2DetailHeaders = [
+  // GROUP 2: TRAFFIC SOURCE BREAKDOWN (6 Sheets - 13 columns each - Row 1)
+  const g2TrafficHeaders = [
     'Nguồn lưu lượng',
     'Tỷ lệ doanh số',
     'Doanh số (VND)',
@@ -1500,7 +1988,8 @@ export function downloadSampleShopeeExcel() {
     'Lượt nhấp sản phẩm duy nhất',
   ];
 
-  const wsTrafficDetailPlaced = createSheetWithRowOffset(2, g2DetailHeaders, [
+  // 4. Sheet Nguồn truy cập cho Đơn hàng...
+  const wsTrafficSummaryPlaced = createCleanSheet(g2TrafficHeaders, [
     ['Shopee Live Stream', '35,02%', '520.000.000', '380.000', '42.500', '1.650', '25', '11,18%', '3,88%', '315.151', '1.480', '290.000', '35.000'],
     ['Tiếp thị liên kết (Affiliate / KOC)', '20,88%', '310.000.000', '210.000', '28.400', '780', '18', '13,52%', '2,75%', '397.435', '710', '165.000', '22.000'],
     ['Quảng cáo Tìm kiếm (Search Ads)', '18,52%', '275.000.000', '480.000', '18.500', '750', '30', '3,85%', '4,05%', '366.666', '690', '360.000', '14.500'],
@@ -1509,7 +1998,18 @@ export function downloadSampleShopeeExcel() {
     ['Tin nhắn Quảng bá (Chat Broadcast)', '4,71%', '70.000.000', '45.000', '8.500', '140', '8', '18,89%', '1,65%', '500.000', '130', '35.000', '7.000'],
   ]);
 
-  const wsTrafficDetailConfirmed = createSheetWithRowOffset(2, g2DetailHeaders, [
+  // 5. Sheet (đơn đã đặt)Theo nguồn lưu ...
+  const wsTrafficDetailPlaced = createCleanSheet(g2TrafficHeaders, [
+    ['Shopee Live Stream', '35,02%', '520.000.000', '380.000', '42.500', '1.650', '25', '11,18%', '3,88%', '315.151', '1.480', '290.000', '35.000'],
+    ['Tiếp thị liên kết (Affiliate / KOC)', '20,88%', '310.000.000', '210.000', '28.400', '780', '18', '13,52%', '2,75%', '397.435', '710', '165.000', '22.000'],
+    ['Quảng cáo Tìm kiếm (Search Ads)', '18,52%', '275.000.000', '480.000', '18.500', '750', '30', '3,85%', '4,05%', '366.666', '690', '360.000', '14.500'],
+    ['Tìm kiếm tự nhiên (Organic)', '12,46%', '185.000.000', '290.000', '14.200', '540', '45', '4,90%', '3,80%', '342.592', '510', '220.000', '11.000'],
+    ['Shopee Video', '8,42%', '125.000.000', '160.000', '12.800', '390', '12', '8,00%', '3,05%', '320.512', '360', '125.000', '10.200'],
+    ['Tin nhắn Quảng bá (Chat Broadcast)', '4,71%', '70.000.000', '45.000', '8.500', '140', '8', '18,89%', '1,65%', '500.000', '130', '35.000', '7.000'],
+  ]);
+
+  // 7. Sheet Nguồn lưu lượng truy cập (đ...
+  const wsTrafficSummaryConfirmed = createCleanSheet(g2TrafficHeaders, [
     ['Shopee Live Stream', '32,61%', '405.000.000', '380.000', '42.500', '1.310', '25', '11,18%', '3,08%', '309.160', '1.200', '290.000', '35.000'],
     ['Tiếp thị liên kết (Affiliate / KOC)', '23,99%', '298.000.000', '210.000', '28.400', '750', '18', '13,52%', '2,64%', '397.333', '690', '165.000', '22.000'],
     ['Quảng cáo Tìm kiếm (Search Ads)', '19,97%', '248.000.000', '480.000', '18.500', '680', '30', '3,85%', '3,68%', '364.705', '630', '360.000', '14.500'],
@@ -1518,7 +2018,18 @@ export function downloadSampleShopeeExcel() {
     ['Tin nhắn Quảng bá (Chat Broadcast)', '1,21%', '15.000.000', '45.000', '8.500', '30', '8', '18,89%', '0,35%', '500.000', '28', '35.000', '7.000'],
   ]);
 
-  const wsTrafficDetailPaid = createSheetWithRowOffset(2, g2DetailHeaders, [
+  // 8. Sheet (đơn đã xác nhận)Theo nguồn...
+  const wsTrafficDetailConfirmed = createCleanSheet(g2TrafficHeaders, [
+    ['Shopee Live Stream', '32,61%', '405.000.000', '380.000', '42.500', '1.310', '25', '11,18%', '3,08%', '309.160', '1.200', '290.000', '35.000'],
+    ['Tiếp thị liên kết (Affiliate / KOC)', '23,99%', '298.000.000', '210.000', '28.400', '750', '18', '13,52%', '2,64%', '397.333', '690', '165.000', '22.000'],
+    ['Quảng cáo Tìm kiếm (Search Ads)', '19,97%', '248.000.000', '480.000', '18.500', '680', '30', '3,85%', '3,68%', '364.705', '630', '360.000', '14.500'],
+    ['Tìm kiếm tự nhiên (Organic)', '13,85%', '172.000.000', '290.000', '14.200', '505', '45', '4,90%', '3,56%', '340.594', '480', '220.000', '11.000'],
+    ['Shopee Video', '8,37%', '104.000.000', '160.000', '12.800', '305', '12', '8,00%', '2,38%', '340.983', '285', '125.000', '10.200'],
+    ['Tin nhắn Quảng bá (Chat Broadcast)', '1,21%', '15.000.000', '45.000', '8.500', '30', '8', '18,89%', '0,35%', '500.000', '28', '35.000', '7.000'],
+  ]);
+
+  // 10. Sheet Nguồn truy cập từ Đơn hàng ...
+  const wsTrafficSummaryPaid = createCleanSheet(g2TrafficHeaders, [
     ['Shopee Live Stream', '30,80%', '345.000.000', '380.000', '42.500', '1.120', '25', '11,18%', '2,64%', '308.035', '1.050', '290.000', '35.000'],
     ['Tiếp thị liên kết (Affiliate / KOC)', '26,07%', '292.000.000', '210.000', '28.400', '735', '18', '13,52%', '2,59%', '397.278', '680', '165.000', '22.000'],
     ['Quảng cáo Tìm kiếm (Search Ads)', '20,71%', '232.000.000', '480.000', '18.500', '640', '30', '3,85%', '3,46%', '362.500', '600', '360.000', '14.500'],
@@ -1527,7 +2038,17 @@ export function downloadSampleShopeeExcel() {
     ['Tin nhắn Quảng bá (Chat Broadcast)', '0,80%', '9.000.000', '45.000', '8.500', '30', '8', '18,89%', '0,35%', '300.000', '25', '35.000', '7.000'],
   ]);
 
-  // GROUP 3: PRODUCT PERFORMANCE (Row 5 -> index 4)
+  // 11. Sheet (đơn đã thanh toán)Theo ngu...
+  const wsTrafficDetailPaid = createCleanSheet(g2TrafficHeaders, [
+    ['Shopee Live Stream', '30,80%', '345.000.000', '380.000', '42.500', '1.120', '25', '11,18%', '2,64%', '308.035', '1.050', '290.000', '35.000'],
+    ['Tiếp thị liên kết (Affiliate / KOC)', '26,07%', '292.000.000', '210.000', '28.400', '735', '18', '13,52%', '2,59%', '397.278', '680', '165.000', '22.000'],
+    ['Quảng cáo Tìm kiếm (Search Ads)', '20,71%', '232.000.000', '480.000', '18.500', '640', '30', '3,85%', '3,46%', '362.500', '600', '360.000', '14.500'],
+    ['Tìm kiếm tự nhiên (Organic)', '14,29%', '160.000.000', '290.000', '14.200', '475', '45', '4,90%', '3,35%', '336.842', '450', '220.000', '11.000'],
+    ['Shopee Video', '7,32%', '82.000.000', '160.000', '12.800', '260', '12', '8,00%', '2,03%', '315.384', '245', '125.000', '10.200'],
+    ['Tin nhắn Quảng bá (Chat Broadcast)', '0,80%', '9.000.000', '45.000', '8.500', '30', '8', '18,89%', '0,35%', '300.000', '25', '35.000', '7.000'],
+  ]);
+
+  // GROUP 3: PRODUCT LEVEL PERFORMANCE (3 Sheets - 15 columns each - Row 1)
   const g3ProductHeaders = [
     'Mã sản phẩm',
     'Sản phẩm',
@@ -1537,46 +2058,52 @@ export function downloadSampleShopeeExcel() {
     'Lượt hiển thị sản phẩm',
     'Lượt nhấp vào sản phẩm',
     'Tổng số đơn hàng',
+    'Sản phẩm',
     'CTR',
     'Tỷ lệ chuyển đổi đơn hàng',
     'Doanh số trên mỗi đơn hàng',
     'Người mua',
+    'Lượt hiển thị sản phẩm duy nhất',
+    'Lượt nhấp sản phẩm duy nhất',
   ];
 
-  const wsProductPlaced = createSheetWithRowOffset(4, g3ProductHeaders, [
-    ['24981029381', 'Serum Phục Hồi Da B5 Rau Má 50ml (Hero)', 'Đang hoạt động', '47,50%', '705.375.000', '62.000', '45.200', '2.080', '72,90%', '4,60%', '339.122', '1.920'],
-    ['24981029382', 'Kem Chống Nắng Kiềm Dầu Aqua 60ml', 'Đang hoạt động', '23,10%', '343.035.000', '39.000', '28.400', '1.120', '72,82%', '3,94%', '306.281', '1.040'],
-    ['24981029383', 'Sữa Rửa Mặt Dịu Nhẹ Tràm Trà 150ml', 'Đang hoạt động', '11,20%', '166.320.000', '22.000', '16.500', '600', '75,00%', '3,64%', '277.200', '560'],
-    ['24981029384', 'Nước Hoa Hồng Cúc La Mã 200ml', 'Đang hoạt động', '8,10%', '120.285.000', '15.000', '11.200', '370', '74,67%', '3,30%', '325.094', '350'],
-    ['24981029385', 'Nước Tẩy Trang Micellar Water 300ml', 'Đang hoạt động', '5,20%', '77.220.000', '12.000', '9.400', '250', '78,33%', '2,66%', '308.880', '240'],
-    ['24981029386', 'Son Dưỡng Ẩm Môi Hương Dâu Berry 10g', 'Đang hoạt động', '2,60%', '38.610.000', '7.500', '5.200', '180', '69,33%', '3,46%', '214.500', '175'],
-    ['24981029387', 'Mặt Nạ Bùn Khoáng Trà Xanh (Zombie)', 'Đang hoạt động', '0,00%', '0', '12.000', '8.920', '0', '74,33%', '0,00%', '0', '0'],
-    ['24981029388', 'Xịt Dầu Gội Khô Hương Cam Mini 50ml', 'Đang hoạt động', '2,30%', '34.155.000', '3.200', '2.100', '80', '65,63%', '3,81%', '426.937', '78'],
+  // 6. Sheet Theo sản phẩm (đơn đã đặt)
+  const wsProductPlaced = createCleanSheet(g3ProductHeaders, [
+    ['24981029381', 'Serum Phục Hồi Da B5 Rau Má 50ml (Hero)', 'Đang hoạt động', '47,50%', '705.375.000', '62.000', '45.200', '2.080', '2.350', '72,90%', '4,60%', '339.122', '1.920', '48.000', '36.500'],
+    ['24981029382', 'Kem Chống Nắng Kiềm Dầu Aqua 60ml', 'Đang hoạt động', '23,10%', '343.035.000', '39.000', '28.400', '1.120', '1.240', '72,82%', '3,94%', '306.281', '1.040', '31.000', '22.800'],
+    ['24981029383', 'Sữa Rửa Mặt Dịu Nhẹ Tràm Trà 150ml', 'Đang hoạt động', '11,20%', '166.320.000', '22.000', '16.500', '600', '680', '75,00%', '3,64%', '277.200', '560', '18.000', '13.200'],
+    ['24981029384', 'Nước Hoa Hồng Cúc La Mã 200ml', 'Đang hoạt động', '8,10%', '120.285.000', '15.000', '11.200', '370', '410', '74,67%', '3,30%', '325.094', '350', '12.000', '9.100'],
+    ['24981029385', 'Nước Tẩy Trang Micellar Water 300ml', 'Đang hoạt động', '5,20%', '77.220.000', '12.000', '9.400', '250', '280', '78,33%', '2,66%', '308.880', '240', '9.800', '7.500'],
+    ['24981029386', 'Son Dưỡng Ẩm Môi Hương Dâu Berry 10g', 'Đang hoạt động', '2,60%', '38.610.000', '7.500', '5.200', '180', '210', '69,33%', '3,46%', '214.500', '175', '6.100', '4.300'],
+    ['24981029387', 'Mặt Nạ Bùn Khoáng Trà Xanh (Zombie)', 'Đang hoạt động', '0,00%', '0', '12.000', '8.920', '0', '0', '74,33%', '0,00%', '0', '0', '10.500', '7.800'],
+    ['24981029388', 'Xịt Dầu Gội Khô Hương Cam Mini 50ml', 'Đang hoạt động', '2,30%', '34.155.000', '3.200', '2.100', '80', '95', '65,63%', '3,81%', '426.937', '78', '2.700', '1.800'],
   ]);
 
-  const wsProductConfirmed = createSheetWithRowOffset(4, g3ProductHeaders, [
-    ['24981029381', 'Serum Phục Hồi Da B5 Rau Má 50ml (Hero)', 'Đang hoạt động', '48,10%', '597.402.000', '62.000', '45.200', '1.760', '72,90%', '3,89%', '339.432', '1.640'],
-    ['24981029382', 'Kem Chống Nắng Kiềm Dầu Aqua 60ml', 'Đang hoạt động', '23,20%', '288.144.000', '39.000', '28.400', '940', '72,82%', '3,31%', '306.536', '880'],
-    ['24981029383', 'Sữa Rửa Mặt Dịu Nhẹ Tràm Trà 150ml', 'Đang hoạt động', '11,10%', '137.862.000', '22.000', '16.500', '500', '75,00%', '3,03%', '275.724', '470'],
-    ['24981029384', 'Nước Hoa Hồng Cúc La Mã 200ml', 'Đang hoạt động', '8,00%', '99.360.000', '15.000', '11.200', '310', '74,67%', '2,77%', '320.516', '295'],
-    ['24981029385', 'Nước Tẩy Trang Micellar Water 300ml', 'Đang hoạt động', '5,00%', '62.100.000', '12.000', '9.400', '210', '78,33%', '2,23%', '295.714', '200'],
-    ['24981029386', 'Son Dưỡng Ẩm Môi Hương Dâu Berry 10g', 'Đang hoạt động', '2,50%', '31.050.000', '7.500', '5.200', '150', '69,33%', '2,88%', '207.000', '145'],
-    ['24981029387', 'Mặt Nạ Bùn Khoáng Trà Xanh (Zombie)', 'Đang hoạt động', '0,00%', '0', '12.000', '8.920', '0', '74,33%', '0,00%', '0', '0'],
-    ['24981029388', 'Xịt Dầu Gội Khô Hương Cam Mini 50ml', 'Đang hoạt động', '2,10%', '26.082.000', '3.200', '2.100', '60', '65,63%', '2,86%', '434.700', '58'],
+  // 9. Sheet Theo sản phẩm (đơn đã xác n...
+  const wsProductConfirmed = createCleanSheet(g3ProductHeaders, [
+    ['24981029381', 'Serum Phục Hồi Da B5 Rau Má 50ml (Hero)', 'Đang hoạt động', '48,10%', '597.402.000', '62.000', '45.200', '1.760', '1.980', '72,90%', '3,89%', '339.432', '1.640', '48.000', '36.500'],
+    ['24981029382', 'Kem Chống Nắng Kiềm Dầu Aqua 60ml', 'Đang hoạt động', '23,20%', '288.144.000', '39.000', '28.400', '940', '1.050', '72,82%', '3,31%', '306.536', '880', '31.000', '22.800'],
+    ['24981029383', 'Sữa Rửa Mặt Dịu Nhẹ Tràm Trà 150ml', 'Đang hoạt động', '11,10%', '137.862.000', '22.000', '16.500', '500', '570', '75,00%', '3,03%', '275.724', '470', '18.000', '13.200'],
+    ['24981029384', 'Nước Hoa Hồng Cúc La Mã 200ml', 'Đang hoạt động', '8,00%', '99.360.000', '15.000', '11.200', '310', '350', '74,67%', '2,77%', '320.516', '295', '12.000', '9.100'],
+    ['24981029385', 'Nước Tẩy Trang Micellar Water 300ml', 'Đang hoạt động', '5,00%', '62.100.000', '12.000', '9.400', '210', '235', '78,33%', '2,23%', '295.714', '200', '9.800', '7.500'],
+    ['24981029386', 'Son Dưỡng Ẩm Môi Hương Dâu Berry 10g', 'Đang hoạt động', '2,50%', '31.050.000', '7.500', '5.200', '150', '170', '69,33%', '2,88%', '207.000', '145', '6.100', '4.300'],
+    ['24981029387', 'Mặt Nạ Bùn Khoáng Trà Xanh (Zombie)', 'Đang hoạt động', '0,00%', '0', '12.000', '8.920', '0', '0', '74,33%', '0,00%', '0', '0', '10.500', '7.800'],
+    ['24981029388', 'Xịt Dầu Gội Khô Hương Cam Mini 50ml', 'Đang hoạt động', '2,10%', '26.082.000', '3.200', '2.100', '60', '70', '65,63%', '2,86%', '434.700', '58', '2.700', '1.800'],
   ]);
 
-  const wsProductPaid = createSheetWithRowOffset(4, g3ProductHeaders, [
-    ['24981029381', 'Serum Phục Hồi Da B5 Rau Má 50ml (Hero)', 'Đang hoạt động', '49,00%', '548.800.000', '62.000', '45.200', '1.620', '72,90%', '3,58%', '338.765', '1.510'],
-    ['24981029382', 'Kem Chống Nắng Kiềm Dầu Aqua 60ml', 'Đang hoạt động', '23,00%', '257.600.000', '39.000', '28.400', '840', '72,82%', '2,96%', '306.666', '790'],
-    ['24981029383', 'Sữa Rửa Mặt Dịu Nhẹ Tràm Trà 150ml', 'Đang hoạt động', '11,00%', '123.200.000', '22.000', '16.500', '460', '75,00%', '2,79%', '267.826', '430'],
-    ['24981029384', 'Nước Hoa Hồng Cúc La Mã 200ml', 'Đang hoạt động', '8,00%', '89.600.000', '15.000', '11.200', '280', '74,67%', '2,50%', '320.000', '265'],
-    ['24981029385', 'Nước Tẩy Trang Micellar Water 300ml', 'Đang hoạt động', '5,00%', '56.000.000', '12.000', '9.400', '190', '78,33%', '2,02%', '294.736', '180'],
-    ['24981029386', 'Son Dưỡng Ẩm Môi Hương Dâu Berry 10g', 'Đang hoạt động', '2,50%', '28.000.000', '7.500', '5.200', '140', '69,33%', '2,69%', '200.000', '135'],
-    ['24981029387', 'Mặt Nạ Bùn Khoáng Trà Xanh (Zombie)', 'Đang hoạt động', '0,00%', '0', '12.000', '8.920', '0', '74,33%', '0,00%', '0', '0'],
-    ['24981029388', 'Xịt Dầu Gội Khô Hương Cam Mini 50ml', 'Đang hoạt động', '1,50%', '16.800.000', '3.200', '2.100', '50', '65,63%', '2,38%', '336.000', '48'],
+  // 12. Sheet Theo sản phẩm (đơn đã thanh...
+  const wsProductPaid = createCleanSheet(g3ProductHeaders, [
+    ['24981029381', 'Serum Phục Hồi Da B5 Rau Má 50ml (Hero)', 'Đang hoạt động', '49,00%', '548.800.000', '62.000', '45.200', '1.620', '1.830', '72,90%', '3,58%', '338.765', '1.510', '48.000', '36.500'],
+    ['24981029382', 'Kem Chống Nắng Kiềm Dầu Aqua 60ml', 'Đang hoạt động', '23,00%', '257.600.000', '39.000', '28.400', '840', '940', '72,82%', '2,96%', '306.666', '790', '31.000', '22.800'],
+    ['24981029383', 'Sữa Rửa Mặt Dịu Nhẹ Tràm Trà 150ml', 'Đang hoạt động', '11,00%', '123.200.000', '22.000', '16.500', '460', '520', '75,00%', '2,79%', '267.826', '430', '18.000', '13.200'],
+    ['24981029384', 'Nước Hoa Hồng Cúc La Mã 200ml', 'Đang hoạt động', '8,00%', '89.600.000', '15.000', '11.200', '280', '315', '74,67%', '2,50%', '320.000', '265', '12.000', '9.100'],
+    ['24981029385', 'Nước Tẩy Trang Micellar Water 300ml', 'Đang hoạt động', '5,00%', '56.000.000', '12.000', '9.400', '190', '215', '78,33%', '2,02%', '294.736', '180', '9.800', '7.500'],
+    ['24981029386', 'Son Dưỡng Ẩm Môi Hương Dâu Berry 10g', 'Đang hoạt động', '2,50%', '28.000.000', '7.500', '5.200', '140', '160', '69,33%', '2,69%', '200.000', '135', '6.100', '4.300'],
+    ['24981029387', 'Mặt Nạ Bùn Khoáng Trà Xanh (Zombie)', 'Đang hoạt động', '0,00%', '0', '12.000', '8.920', '0', '0', '74,33%', '0,00%', '0', '0', '10.500', '7.800'],
+    ['24981029388', 'Xịt Dầu Gội Khô Hương Cam Mini 50ml', 'Đang hoạt động', '1,50%', '16.800.000', '3.200', '2.100', '50', '60', '65,63%', '2,38%', '336.000', '48', '2.700', '1.800'],
   ]);
 
-  // GROUP 4: LIVE CHAT / SESSION CONTRIBUTION (Row 2 -> index 1)
+  // GROUP 4: LIVE CHAT / SESSION CONTRIBUTION (3 Sheets - 15 columns each - Row 1)
   const g4LiveHeaders = [
     'Mã Phiên Chat',
     'Session Title',
@@ -1595,25 +2122,28 @@ export function downloadSampleShopeeExcel() {
     'Tỷ lệ chuyển đổi đơn hàng',
   ];
 
-  const wsLivePlaced = createSheetWithRowOffset(1, g4LiveHeaders, [
+  // 13. Sheet Session Contribution (place...
+  const wsLivePlaced = createCleanSheet(g4LiveHeaders, [
     ['SESSION-88-NIGHT', '🔥 Mega Live 8.8 Săn Voucher 50% Đêm', '62,50%', '325.000.000', '8.550.000', '1.050', '22', '38.000', '14.500', '08:45', '1.820', '18.500', '48,68%', '3.400', '5,68%'],
     ['SESSION-88-NOON', '⚡ Flash Live 8.8 Giờ Vàng Trưa 12H', '28,50%', '148.200.000', '6.200.000', '480', '18', '24.000', '9.200', '05:30', '940', '12.200', '50,83%', '1.650', '3,93%'],
     ['SESSION-REGULAR', '🌸 Live Skincare Routine Hàng Tuần', '9,00%', '46.800.000', '3.800.000', '120', '12', '12.500', '4.800', '04:15', '450', '4.800', '38,40%', '520', '2,50%'],
   ]);
 
-  const wsLiveConfirmed = createSheetWithRowOffset(1, g4LiveHeaders, [
+  // 14. Sheet Session Contribution (confi...
+  const wsLiveConfirmed = createCleanSheet(g4LiveHeaders, [
     ['SESSION-88-NIGHT', '🔥 Mega Live 8.8 Săn Voucher 50% Đêm', '61,20%', '247.860.000', '6.520.000', '810', '22', '38.000', '14.500', '08:45', '1.820', '18.500', '48,68%', '3.400', '4,38%'],
     ['SESSION-88-NOON', '⚡ Flash Live 8.8 Giờ Vàng Trưa 12H', '29,40%', '119.070.000', '4.960.000', '390', '18', '24.000', '9.200', '05:30', '940', '12.200', '50,83%', '1.650', '3,20%'],
     ['SESSION-REGULAR', '🌸 Live Skincare Routine Hàng Tuần', '9,40%', '38.070.000', '3.100.000', '110', '12', '12.500', '4.800', '04:15', '450', '4.800', '38,40%', '2,29%'],
   ]);
 
-  const wsLivePaid = createSheetWithRowOffset(1, g4LiveHeaders, [
+  // 15. Sheet Session Contribution (paid ...
+  const wsLivePaid = createCleanSheet(g4LiveHeaders, [
     ['SESSION-88-NIGHT', '🔥 Mega Live 8.8 Săn Voucher 50% Đêm', '60,50%', '208.725.000', '5.490.000', '690', '22', '38.000', '14.500', '08:45', '1.820', '18.500', '48,68%', '3.400', '3,73%'],
     ['SESSION-88-NOON', '⚡ Flash Live 8.8 Giờ Vàng Trưa 12H', '30,20%', '104.190.000', '4.340.000', '340', '18', '24.000', '9.200', '05:30', '940', '12.200', '50,83%', '1.650', '2,79%'],
     ['SESSION-REGULAR', '🌸 Live Skincare Routine Hàng Tuần', '9,30%', '32.085.000', '2.600.000', '90', '12', '12.500', '4.800', '04:15', '450', '4.800', '38,40%', '1,88%'],
   ]);
 
-  // GROUP 5: SHOPEE VIDEO CONTRIBUTION (Row 2 -> index 1)
+  // GROUP 5: SHOPEE VIDEO CONTRIBUTION (3 Sheets - 15 columns each - Row 1)
   const g5VideoHeaders = [
     'psd_label_video_id',
     'Video',
@@ -1632,25 +2162,28 @@ export function downloadSampleShopeeExcel() {
     'Người mua',
   ];
 
-  const wsVideoPlaced = createSheetWithRowOffset(1, g5VideoHeaders, [
+  // 16. Sheet Video Contribution (placed ...
+  const wsVideoPlaced = createCleanSheet(g5VideoHeaders, [
     ['VID_88_001', 'Hướng dẫn dùng Serum B5 phục hồi da chuẩn spa', '55,00%', '68.750.000', '2.290.000', '215', '4', '85.000', '62.000', '420', '3.800', '8.500', '10,00%', '2,53%', '200'],
     ['VID_88_002', 'Test độ kiềm dầu kem chống nắng Aqua dưới nắng gắt', '32,00%', '40.000.000', '1.600.000', '125', '3', '52.000', '38.000', '280', '2.100', '4.800', '9,23%', '2,60%', '120'],
     ['VID_88_003', 'Top 3 bước skincare da dầu mụn không lo bết dính', '13,00%', '16.250.000', '900.000', '50', '5', '23.000', '16.000', '120', '950', '1.900', '8,26%', '2,63%', '48'],
   ]);
 
-  const wsVideoConfirmed = createSheetWithRowOffset(1, g5VideoHeaders, [
+  // 17. Sheet Video Contribution (confirm...
+  const wsVideoConfirmed = createCleanSheet(g5VideoHeaders, [
     ['VID_88_001', 'Hướng dẫn dùng Serum B5 phục hồi da chuẩn spa', '54,50%', '56.680.000', '1.890.000', '170', '4', '85.000', '62.000', '420', '3.800', '8.500', '10,00%', '2,00%', '160'],
     ['VID_88_002', 'Test độ kiềm dầu kem chống nắng Aqua dưới nắng gắt', '32,50%', '33.800.000', '1.350.000', '100', '3', '52.000', '38.000', '280', '2.100', '4.800', '9,23%', '2,08%', '95'],
     ['VID_88_003', 'Top 3 bước skincare da dầu mụn không lo bết dính', '13,00%', '13.520.000', '750.000', '35', '5', '23.000', '16.000', '120', '950', '1.900', '8,26%', '1,84%', '34'],
   ]);
 
-  const wsVideoPaid = createSheetWithRowOffset(1, g5VideoHeaders, [
+  // 18. Sheet Video Contribution (paid or...
+  const wsVideoPaid = createCleanSheet(g5VideoHeaders, [
     ['VID_88_001', 'Hướng dẫn dùng Serum B5 phục hồi da chuẩn spa', '54,00%', '44.280.000', '1.476.000', '145', '4', '85.000', '62.000', '420', '3.800', '8.500', '10,00%', '1,71%', '135'],
     ['VID_88_002', 'Test độ kiềm dầu kem chống nắng Aqua dưới nắng gắt', '33,00%', '27.060.000', '1.082.000', '85', '3', '52.000', '38.000', '280', '2.100', '4.800', '9,23%', '1,77%', '80'],
     ['VID_88_003', 'Top 3 bước skincare da dầu mụn không lo bết dính', '13,00%', '10.660.000', '592.000', '30', '5', '23.000', '16.000', '120', '950', '1.900', '8,26%', '1,58%', '30'],
   ]);
 
-  // GROUP 6: AFFILIATE / KOC CONTRIBUTION (Row 2 -> index 1)
+  // GROUP 6: AFFILIATE / KOC CONTRIBUTION (3 Sheets - 11 columns each - Row 1)
   const g6AffiliateHeaders = [
     'Affiliate Username',
     'Tỷ lệ doanh số',
@@ -1665,19 +2198,22 @@ export function downloadSampleShopeeExcel() {
     'Người mua',
   ];
 
-  const wsAffiliatePlaced = createSheetWithRowOffset(1, g6AffiliateHeaders, [
+  // 19. Sheet Affiliate Contribution (pla...
+  const wsAffiliatePlaced = createCleanSheet(g6AffiliateHeaders, [
     ['lananh_beauty_review', '42,00%', '130.200.000', '330', '12', '98.000', '12.500', '12,76%', '2,64%', '394.545', '305'],
     ['huyenmy_skincare', '35,00%', '108.500.000', '270', '8', '75.000', '9.800', '13,07%', '2,76%', '401.851', '250'],
     ['quangdang_grooming', '23,00%', '71.300.000', '180', '6', '48.000', '6.100', '12,71%', '2,95%', '396.111', '165'],
   ]);
 
-  const wsAffiliateConfirmed = createSheetWithRowOffset(1, g6AffiliateHeaders, [
+  // 20. Sheet Affiliate Contribution (con...
+  const wsAffiliateConfirmed = createCleanSheet(g6AffiliateHeaders, [
     ['lananh_beauty_review', '42,10%', '125.458.000', '320', '12', '98.000', '12.500', '12,76%', '2,56%', '392.056', '295'],
     ['huyenmy_skincare', '34,90%', '104.002.000', '260', '8', '75.000', '9.800', '13,07%', '2,65%', '400.007', '240'],
     ['quangdang_grooming', '23,00%', '68.540.000', '170', '6', '48.000', '6.100', '12,71%', '2,79%', '403.176', '155'],
   ]);
 
-  const wsAffiliatePaid = createSheetWithRowOffset(1, g6AffiliateHeaders, [
+  // 21. Sheet Affiliate Contribution (pai...
+  const wsAffiliatePaid = createCleanSheet(g6AffiliateHeaders, [
     ['lananh_beauty_review', '42,20%', '123.224.000', '312', '12', '98.000', '12.500', '12,76%', '2,50%', '394.948', '290'],
     ['huyenmy_skincare', '34,80%', '101.616.000', '255', '8', '75.000', '9.800', '13,07%', '2,60%', '398.494', '238'],
     ['quangdang_grooming', '23,00%', '67.160.000', '168', '6', '48.000', '6.100', '12,71%', '2,75%', '399.761', '152'],

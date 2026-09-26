@@ -1,35 +1,10 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc } from 'firebase/firestore';
-import { getAuth, signInAnonymously } from 'firebase/auth';
-import configJson from '../../firebase-applet-config.json';
-
-const firebaseConfig = {
-  apiKey: configJson.apiKey,
-  authDomain: configJson.authDomain,
-  projectId: configJson.projectId,
-  storageBucket: configJson.storageBucket,
-  messagingSenderId: configJson.messagingSenderId,
-  appId: configJson.appId,
-  measurementId: configJson.measurementId,
-};
-
-// Initialize Firebase App
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-
-// Initialize Firestore
-export const db = getFirestore(app, configJson.firestoreDatabaseId || undefined);
-export const auth = getAuth(app);
-
-// Helper to ensure Firebase Auth session
-async function ensureAuth() {
-  try {
-    if (!auth.currentUser) {
-      await signInAnonymously(auth);
-    }
-  } catch (e) {
-    // Silent catch
-  }
-}
+/**
+ * Firebase Service Adapter -> On-Premise Local First Storage
+ * 
+ * IMPORTANT: To guarantee 100% On-Premise Data Isolation (Dữ liệu không rời máy trạm/trình duyệt),
+ * all operations have been redirected to the client-side LocalDatabaseService (IndexedDB + LocalStorage).
+ * No customer financial, order, or task data is uploaded to remote Firestore.
+ */
 
 export interface SavedReportDoc {
   id?: string;
@@ -56,118 +31,51 @@ export interface RoadmapTaskDoc {
   createdAt: string;
 }
 
-// 1. User Profile Operations
+import {
+  saveDatasetToLocal,
+  loadUserSavedDatasetsFromLocal,
+  deleteUserDatasetFromLocal,
+  saveRoadmapTasksToLocal,
+  loadUserRoadmapTasksFromLocal,
+  saveChatMessageToLocal,
+  loadUserChatHistoryFromLocal,
+  syncUserProfileToLocal,
+} from './localDatabaseService';
+
+// 1. User Profile Operations (Local-First)
 export async function syncUserProfileToFirebase(userId: string, profile: { email: string; displayName?: string; photoURL?: string }) {
-  try {
-    await ensureAuth();
-    const userRef = doc(db, 'users', userId);
-    await setDoc(userRef, {
-      ...profile,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    return true;
-  } catch (err) {
-    return false;
-  }
+  return syncUserProfileToLocal(userId, profile);
 }
 
-// 2. Save Full Dataset Report to Firestore
+// 2. Save Dataset Report to Local-First Storage
 export async function saveDatasetToFirestore(userId: string, report: Omit<SavedReportDoc, 'userId' | 'savedAt'>): Promise<string | null> {
   try {
-    await ensureAuth();
-    const colRef = collection(db, 'users', userId, 'datasets');
-    const docRef = await addDoc(colRef, {
-      ...report,
-      userId,
-      savedAt: new Date().toISOString(),
-    });
-    return docRef.id;
-  } catch (err) {
-    // Save to local storage as seamless fallback
-    try {
-      const localKey = `ecompulse_dataset_${userId}`;
-      localStorage.setItem(localKey, JSON.stringify({ ...report, userId, savedAt: new Date().toISOString() }));
-    } catch (_) {}
+    const id = await saveDatasetToLocal(userId, report);
+    return id;
+  } catch {
     return null;
   }
 }
 
-// 3. Load Saved Reports for User
+// 3. Load Saved Reports from Local-First Storage
 export async function loadUserSavedDatasets(userId: string): Promise<SavedReportDoc[]> {
-  try {
-    await ensureAuth();
-    const colRef = collection(db, 'users', userId, 'datasets');
-    const q = query(colRef, orderBy('savedAt', 'desc'), limit(20));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(docSnap => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-    } as SavedReportDoc));
-  } catch (err) {
-    return [];
-  }
+  return loadUserSavedDatasetsFromLocal(userId);
 }
 
-// 4. Roadmap Task Management in Firestore
+// 4. Roadmap Task Management in Local-First Storage
 export async function saveRoadmapTasksToFirestore(userId: string, tasks: Array<Omit<RoadmapTaskDoc, 'userId' | 'createdAt'>>) {
-  try {
-    await ensureAuth();
-    const colRef = collection(db, 'users', userId, 'tasks');
-    for (const task of tasks) {
-      await addDoc(colRef, {
-        ...task,
-        userId,
-        createdAt: new Date().toISOString(),
-      });
-    }
-    return true;
-  } catch (err) {
-    return false;
-  }
+  return saveRoadmapTasksToLocal(userId, tasks);
 }
 
 export async function loadUserRoadmapTasks(userId: string): Promise<RoadmapTaskDoc[]> {
-  try {
-    await ensureAuth();
-    const colRef = collection(db, 'users', userId, 'tasks');
-    const q = query(colRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(docSnap => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-    } as RoadmapTaskDoc));
-  } catch (err) {
-    return [];
-  }
+  return loadUserRoadmapTasksFromLocal(userId);
 }
 
-// 5. Chat History in Firestore
+// 5. Chat History in Local-First Storage
 export async function saveChatMessageToFirestore(userId: string, message: { role: 'user' | 'assistant'; content: string }) {
-  try {
-    await ensureAuth();
-    const colRef = collection(db, 'users', userId, 'chatHistory');
-    await addDoc(colRef, {
-      ...message,
-      userId,
-      timestamp: new Date().toISOString(),
-    });
-    return true;
-  } catch (err) {
-    return false;
-  }
+  return saveChatMessageToLocal(userId, message);
 }
 
 export async function loadUserChatHistory(userId: string): Promise<Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string }>> {
-  try {
-    await ensureAuth();
-    const colRef = collection(db, 'users', userId, 'chatHistory');
-    const q = query(colRef, orderBy('timestamp', 'asc'), limit(50));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-    } as any));
-  } catch (err) {
-    return [];
-  }
+  return loadUserChatHistoryFromLocal(userId);
 }

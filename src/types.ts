@@ -148,6 +148,19 @@ export interface ExecutiveKpis {
   aovGrowthMoM?: number;
   prevCancellationRate?: number;
   cancellationRateDelta?: number;
+  // 4 Core Store Operations & Health Metrics
+  totalActiveProducts?: number;     // Tổng sản phẩm đang bán (SKUs)
+  totalProductVariants?: number;    // Tổng phân loại hàng (Variants)
+  liveSessionsCount?: number;       // Số phiên live bán hàng mỗi tháng
+  liveTotalRevenue?: number;        // Tổng doanh thu từ Livestream
+  liveRevenuePerSession?: number;   // Doanh thu bình quân mỗi phiên live
+  liveOrdersCount?: number;         // Tổng số đơn từ Livestream
+  shopRating?: number;              // Đánh giá sao toàn cửa hàng (e.g. 4.9)
+  shopRatingCount?: number;         // Tổng lượt đánh giá sao (e.g. 2450)
+  shopPositiveRate?: number;        // Tỷ lệ phản hồi tích cực (e.g. 98.8%)
+  overallCtr?: number;              // Tỷ lệ nhấp chuột toàn cửa hàng (CTR %)
+  totalImpressions?: number;        // Tổng lượt xem/hiển thị
+  totalClicks?: number;             // Tổng lượt click
 }
 
 export interface ActionTodo {
@@ -247,6 +260,10 @@ export interface VideoContributionMetric {
 
 export interface AffiliateContributionMetric {
   username: string;
+  creatorName?: string;
+  avatarUrl?: string;
+  platform?: 'Shopee Video' | 'TikTok' | 'Facebook Reels' | 'YouTube Shorts' | string;
+  videosCount?: number;
   revenueShare: number;
   revenue: number;
   orders: number;
@@ -257,6 +274,43 @@ export interface AffiliateContributionMetric {
   conversionRate: number;
   aov: number;
   buyers: number;
+  commissionPaid?: number;
+  commissionRate?: number;
+  roi?: number;
+  performanceTier?: 'KOC Kim Cương' | 'KOC Tiềm Năng' | 'KOC Mới' | 'Cần Kích Hoạt';
+  aiRecommendation?: string;
+}
+
+export interface ProductGrowthMomentumItem {
+  id: string;
+  sku: string;
+  name: string;
+  category?: string;
+  taggedVideosCount: number;      // Tổng số video đã gắn giỏ hàng
+  videoPurchasesCount: number;     // Lượt mua từ video gắn giỏ
+  videoProductClicks: number;      // Lượt click vào giỏ hàng từ video
+  videoConversionRate: number;     // Tỷ lệ chuyển đổi từ video (%)
+  creatorsCount: number;           // Tổng số nhà sáng tạo lấy link
+  activeCreatorsCount: number;     // Số nhà sáng tạo đang tạo đơn
+  growthVelocityScore: number;     // Điểm tốc độ tăng trưởng (0-100)
+  growthStatus: 'viral_surge' | 'strong_growth' | 'moderate' | 'slow' | 'dormant';
+  growthStatusLabel: string;       // e.g. "BÙNG NỔ VIRAL 🚀", "TĂNG TRƯỞNG TỐT 🔥", "TĂNG TRƯỞNG CHẬM ⚠️", "ĐỨNG YÊN 🛑"
+  growthDeltaMoM: number;          // % tăng trưởng so với kỳ trước
+  aiRecommendation: string;        // Đề xuất chiến lược KOC/Video
+}
+
+export interface CreatorGrowthSummary {
+  totalTaggedVideos: number;
+  totalVideoPurchases: number;
+  totalVideoClicks: number;
+  videoConversionRate: number;
+  totalCreatorsWithLink: number;
+  activeCreatorsCount: number;
+  overallGrowthVelocity: string;
+  growthVelocityScore: number;
+  topPerformingSku: string;
+  totalKocRevenue: number;
+  totalKocCommission: number;
 }
 
 export interface ParsedStoreData {
@@ -269,6 +323,8 @@ export interface ParsedStoreData {
   liveSessions?: LiveSessionMetric[];
   videoMetrics?: VideoContributionMetric[];
   affiliates?: AffiliateContributionMetric[];
+  productGrowthMomentum?: ProductGrowthMomentumItem[];
+  creatorGrowthSummary?: CreatorGrowthSummary;
   orders: OrderItem[];
   kpis: ExecutiveKpis;
   funnel: {
@@ -306,6 +362,11 @@ export interface ParsedStoreData {
     wastedBudget: number;
   };
   retention: CustomerRetentionMetric;
+  /**
+   * KPI fields the parser could not read from the file and filled with an estimate
+   * for legacy screens. The shared analytics engine treats them as missing.
+   */
+  estimatedFields?: string[];
 }
 
 export interface ChatMessage {

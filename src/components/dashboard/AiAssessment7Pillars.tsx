@@ -117,66 +117,72 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
 
     // Calculations for Pillar 1: Funnel
     const placedRev = kpis.placedRevenue || 0;
+    const confirmedRev = kpis.confirmedRevenue || 0;
     const paidRev = kpis.paidRevenue || 0;
     const leakageVND = funnel.totalLeakageVND || Math.max(0, placedRev - paidRev);
     const leakagePercent = placedRev > 0 ? ((leakageVND / placedRev) * 100).toFixed(1) : '0';
     const completionRate = kpis.placedOrders > 0
       ? ((kpis.paidOrders / kpis.placedOrders) * 100).toFixed(1)
-      : (kpis.conversionRate || 81.3).toFixed(1);
+      : (placedRev > 0 ? ((paidRev / placedRev) * 100).toFixed(1) : '0.0');
     const funnelScore = Math.max(40, Math.min(95, Math.round(Number(completionRate) * 0.9)));
+    const dropStage1VND = Math.max(0, placedRev - confirmedRev);
+    const dropStage2VND = Math.max(0, confirmedRev - paidRev);
+    const dropStage1Pct = placedRev > 0 ? ((dropStage1VND / placedRev) * 100).toFixed(1) : '0.0';
+    const dropStage2Pct = confirmedRev > 0 ? ((dropStage2VND / confirmedRev) * 100).toFixed(1) : '0.0';
 
     // Calculations for Pillar 2: Daily Sales Trends
     const peakDay = daily.length > 0
       ? [...daily].sort((a, b) => b.revenue - a.revenue)[0]
-      : { revenue: paidRev * 0.25, orders: Math.round(kpis.paidOrders * 0.25), displayDate: 'Ngày Sale' };
+      : { revenue: 0, orders: 0, displayDate: 'Chưa ghi nhận' };
     const normalDays = daily.filter((d) => !d.isDoubleDigitCampaign);
     const avgNormalRevenue = normalDays.length > 0
       ? Math.round(normalDays.reduce((acc, d) => acc + d.revenue, 0) / normalDays.length)
-      : Math.round(paidRev / (daily.length || 30));
-    const campaignShare = campaign.campaignSharePercent || (paidRev > 0 ? Math.round((campaign.campaignRevenue / paidRev) * 100) : 35);
-    const aboveTargetDays = daily.filter((d) => d.revenue > avgNormalRevenue * 1.2).length;
+      : (daily.length > 0 ? Math.round(paidRev / daily.length) : 0);
+    const campaignShare = campaign.campaignSharePercent || (paidRev > 0 ? Math.round((campaign.campaignRevenue / paidRev) * 100) : 0);
+    const aboveTargetDays = daily.filter((d) => avgNormalRevenue > 0 && d.revenue > avgNormalRevenue * 1.2).length;
     const trendScore = campaignShare > 50 ? 68 : campaignShare > 30 ? 75 : 84;
 
     // Calculations for Pillar 3: Traffic & Channels
     const sortedChannelsByPaid = [...channels].sort((a, b) => b.paidRevenue - a.paidRevenue);
-    const topChannel = sortedChannelsByPaid[0] || { channelName: 'Thẻ sản phẩm', paidRevenue: paidRev * 0.45, retentionRate: 85 };
-    const topChannelShare = paidRev > 0 ? Math.round((topChannel.paidRevenue / paidRev) * 100) : 45;
-    const sortedChannelsByRetention = [...channels].sort((a, b) => b.retentionRate - a.retentionRate);
-    const bestRetentionCh = sortedChannelsByRetention[0] || { channelName: 'Tiếp thị liên kết', retentionRate: 94 };
-    const sortedChannelsByLeakage = [...channels].sort((a, b) => b.leakageAmount - a.leakageAmount);
-    const worstLeakageCh = sortedChannelsByLeakage[0] || { channelName: 'Tìm kiếm', leakageAmount: leakageVND * 0.4, retentionRate: 53 };
-    const channelScore = bestRetentionCh.retentionRate >= 85 ? 78 : 70;
+    const topChannel = sortedChannelsByPaid[0] || { channelName: 'Chưa có kênh', paidRevenue: 0, retentionRate: 0 };
+    const topChannelShare = paidRev > 0 ? Math.round((topChannel.paidRevenue / paidRev) * 100) : 0;
+    const sortedChannelsByRetention = [...channels].filter(c => c.placedRevenue > 0).sort((a, b) => b.retentionRate - a.retentionRate);
+    const bestRetentionCh = sortedChannelsByRetention[0] || topChannel;
+    const sortedChannelsByLeakage = [...channels].sort((a, b) => (b.leakageAmount || 0) - (a.leakageAmount || 0));
+    const worstLeakageCh = sortedChannelsByLeakage[0] || { channelName: 'Chưa có rò rỉ', leakageAmount: 0, retentionRate: 100 };
+    const channelScore = (bestRetentionCh.retentionRate || 0) >= 85 ? 78 : (bestRetentionCh.retentionRate || 0) >= 70 ? 72 : 65;
 
     // Calculations for Pillar 4: Shopee Ads
-    const totalAdsSpend = ads.reduce((acc, a) => acc + a.spend, 0);
-    const totalAdsPaidRev = ads.reduce((acc, a) => acc + a.paidRevenue, 0);
-    const totalAdsClicks = ads.reduce((acc, a) => acc + a.clicks, 0);
-    const totalAdsImpressions = ads.reduce((acc, a) => acc + a.impressions, 0);
-    const overallRoas = totalAdsSpend > 0 ? (totalAdsPaidRev / totalAdsSpend).toFixed(1) : '12.3';
-    const overallCir = totalAdsPaidRev > 0 ? ((totalAdsSpend / totalAdsPaidRev) * 100).toFixed(1) : '8.1';
-    const overallCtr = totalAdsImpressions > 0 ? ((totalAdsClicks / totalAdsImpressions) * 100).toFixed(2) : '3.45';
-    const adsScore = Number(overallRoas) >= 10 ? 88 : Number(overallRoas) >= 5 ? 75 : 60;
+    const totalAdsSpend = ads.reduce((acc, a) => acc + (a.spend || 0), 0) || (kpis.adSpend || 0);
+    const totalAdsPaidRev = ads.reduce((acc, a) => acc + (a.paidRevenue || 0), 0);
+    const totalAdsClicks = ads.reduce((acc, a) => acc + (a.clicks || 0), 0);
+    const totalAdsImpressions = ads.reduce((acc, a) => acc + (a.impressions || 0), 0);
+    const overallRoas = totalAdsSpend > 0 ? (totalAdsPaidRev / totalAdsSpend).toFixed(1) : (kpis.blendedRoas && kpis.blendedRoas > 0 ? kpis.blendedRoas.toFixed(1) : '0.0');
+    const overallCir = totalAdsPaidRev > 0 ? ((totalAdsSpend / totalAdsPaidRev) * 100).toFixed(1) : '0.0';
+    const overallCtr = totalAdsImpressions > 0 ? ((totalAdsClicks / totalAdsImpressions) * 100).toFixed(2) : '0.00';
+    const hasAds = totalAdsSpend > 0 || Number(overallRoas) > 0;
+    const adsScore = hasAds ? (Number(overallRoas) >= 10 ? 88 : Number(overallRoas) >= 5 ? 75 : 60) : 70;
 
     // Calculations for Pillar 5: Product Catalog / ABC
-    const topHeroProduct = abcProducts[0] || { name: 'Sản phẩm chủ lực A1', revenue: paidRev * 0.35, conversionRate: 6.8 };
+    const topHeroProduct = abcProducts[0] || { name: 'Chưa có SKU', revenue: 0, conversionRate: 0 };
     const zombieCount = abc.zombieCount || abcProducts.filter((p) => p.isZombie).length;
-    const classAShare = abc.classAShare || 82.4;
-    const productScore = classAShare > 85 ? 74 : 80;
+    const classAShare = abc.classAShare || (paidRev > 0 ? +((topHeroProduct.revenue / paidRev) * 100).toFixed(1) : 0);
+    const productScore = classAShare > 85 ? 74 : classAShare > 0 ? 80 : 65;
 
     // Calculations for Pillar 6: Customer Retention
-    const totalBuyers = retention.totalBuyers || Math.round(kpis.paidOrders * 0.95) || 380;
-    const newBuyers = retention.newBuyers || Math.round(totalBuyers * 0.777) || 295;
-    const returningBuyers = retention.returningBuyers || Math.max(1, totalBuyers - newBuyers) || 85;
-    const newBuyerPct = totalBuyers > 0 ? ((newBuyers / totalBuyers) * 100).toFixed(1) : '77.7';
-    const returningPct = totalBuyers > 0 ? ((returningBuyers / totalBuyers) * 100).toFixed(1) : '22.3';
-    const newAov = retention.newBuyerAov || Math.round(kpis.aov * 0.92);
-    const retAov = retention.returningBuyerAov || Math.round(kpis.aov * 1.25);
-    const aovDiffPct = newAov > 0 ? Math.round(((retAov - newAov) / newAov) * 100) : 35;
+    const totalBuyers = retention.totalBuyers || (kpis.paidOrders > 0 ? kpis.paidOrders : 0);
+    const newBuyers = retention.newBuyers || totalBuyers;
+    const returningBuyers = retention.returningBuyers || Math.max(0, totalBuyers - newBuyers);
+    const newBuyerPct = totalBuyers > 0 ? ((newBuyers / totalBuyers) * 100).toFixed(1) : '0.0';
+    const returningPct = totalBuyers > 0 ? ((returningBuyers / totalBuyers) * 100).toFixed(1) : '0.0';
+    const newAov = retention.newBuyerAov || (newBuyers > 0 && retention.newBuyerRevenue ? Math.round(retention.newBuyerRevenue / newBuyers) : kpis.aov);
+    const retAov = retention.returningBuyerAov || (returningBuyers > 0 && retention.returningBuyerRevenue ? Math.round(retention.returningBuyerRevenue / returningBuyers) : 0);
+    const aovDiffPct = newAov > 0 && retAov > 0 ? Math.round(((retAov - newAov) / newAov) * 100) : 0;
     const retentionScore = Number(returningPct) >= 30 ? 80 : Number(returningPct) >= 20 ? 68 : 55;
 
     // Calculations for Pillar 7: Risk Synthesis
     const criticalAlerts = (data.alerts || []).filter((a) => a.severity === 'critical');
-    const riskScore = Math.round((funnelScore + trendScore + channelScore + adsScore + productScore + retentionScore) / 6) - 5;
+    const riskScore = Math.round((funnelScore + trendScore + channelScore + adsScore + productScore + retentionScore) / 6) - (criticalAlerts.length > 0 ? 5 : 0);
 
     return [
       // 1. Phễu chuyển đổi đơn hàng
@@ -186,11 +192,11 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
         shortTitle: '1. Phễu chuyển đổi',
         icon: Activity,
         badge: {
-          text: `Rò rỉ ở bước Xác nhận & Thanh toán (${leakagePercent}%)`,
+          text: Number(leakagePercent) > 0 ? `Rò rỉ ở bước Xác nhận & Thanh toán (${leakagePercent}%)` : 'Phễu chuyển đổi tối ưu',
           type: Number(leakagePercent) > 20 ? 'warning' : 'info',
         },
         score: funnelScore,
-        overview: `Phễu chuyển đổi ghi nhận mức rơi rớt -${(Number(leakagePercent) * 0.65).toFixed(1)}% doanh số ở khâu xác nhận và tiếp tục rơi rớt -${(Number(leakagePercent) * 0.35).toFixed(1)}% ở khâu giao vận/thanh toán. Tổng thất thoát ước tính ${formatVND(leakageVND)}.`,
+        overview: `Phễu chuyển đổi ghi nhận mức rơi rớt -${dropStage1Pct}% doanh số ở khâu xác nhận và tiếp tục rơi rớt -${dropStage2Pct}% ở khâu giao vận/thanh toán. Tổng thất thoát ước tính ${formatVND(leakageVND)}.`,
         metrics: [
           { label: 'Doanh số đặt (Placed)', value: formatVND(placedRev) },
           { label: 'Doanh số thực nhận (Paid)', value: formatVND(paidRev), highlight: true, color: 'text-emerald-400' },
@@ -198,14 +204,14 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
           { label: 'Tỷ lệ hoàn tất đơn', value: `${completionRate}%` },
         ],
         strengths: [
-          `Tỷ lệ đặt hàng bước đầu ổn định với ${formatNumber(kpis.placedOrders)} đơn phát sinh trong chu kỳ.`,
-          `AOV bước thanh toán đạt chuẩn ngành hàng (~${formatVND(kpis.aov)}).`,
-          `Khả năng kích thích khách thêm vào giỏ và hoàn tất đặt bước 1 đạt hiệu quả cao.`,
+          `Tỷ lệ đặt hàng bước đầu với ${formatNumber(kpis.placedOrders)} đơn phát sinh trong chu kỳ.`,
+          `AOV bước thanh toán đạt ${formatVND(kpis.aov)}.`,
+          `Khả năng kích thích khách thêm vào giỏ và hoàn tất đặt bước 1 đạt hiệu quả tốt.`,
         ],
         weaknesses: [
-          `Thất thoát lớn nhất ở bước Chờ xác nhận đơn (-${(Number(leakagePercent) * 0.65).toFixed(1)}% doanh số).`,
-          `Rơi rớt COD do thời gian đóng gói và vận chuyển chậm ở các đơn liên tỉnh.`,
-          `Khách hàng thiếu thông tin cập nhật lộ trình đơn hàng dẫn đến tâm lý sốt ruột và hủy đơn.`,
+          dropStage1VND > 0 ? `Thất thoát ở bước Chờ xác nhận đơn (-${dropStage1Pct}% doanh số, tương đương -${formatVND(dropStage1VND)}).` : 'Cần duy trì tốc độ xác nhận đơn nhanh chóng.',
+          dropStage2VND > 0 ? `Rơi rớt ở bước giao vận/hoàn hàng (-${dropStage2Pct}% doanh số, tương đương -${formatVND(dropStage2VND)}).` : 'Khâu giao vận thanh toán hoạt động ổn định.',
+          'Khách hàng cần thông tin cập nhật lộ trình đơn hàng để tránh tâm lý sốt ruột và hủy đơn.',
         ],
         recommendations: [
           'Thiết lập kịch bản tin nhắn tự động xác nhận đơn COD trong 15 phút đầu sau khi đặt.',
@@ -221,11 +227,11 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
         shortTitle: '2. Xu hướng doanh số',
         icon: TrendingUp,
         badge: {
-          text: `Phụ thuộc ${campaignShare}% vào ngày Mega Sale`,
+          text: campaignShare > 0 ? `Phụ thuộc ${campaignShare}% vào ngày Mega Sale` : 'Doanh thu phân bổ đều',
           type: campaignShare > 40 ? 'warning' : 'success',
         },
         score: trendScore,
-        overview: `Doanh thu có sự biến thiên lớn theo lịch chiến dịch sàn. Các ngày Mega Sale (${campaign.campaignDaysCount || 3} ngày) mang về ${formatVND(campaign.campaignRevenue || paidRev * 0.38)} (${campaignShare}% tổng DT). Ngày thường doanh thu duy trì ở mức trung bình ${formatVND(avgNormalRevenue)}/ngày.`,
+        overview: `Doanh thu có sự biến thiên theo lịch chiến dịch sàn. Các ngày Mega Sale (${campaign.campaignDaysCount || 0} ngày) mang về ${formatVND(campaign.campaignRevenue || 0)} (${campaignShare}% tổng DT). Ngày thường doanh thu duy trì ở mức trung bình ${formatVND(avgNormalRevenue)}/ngày.`,
         metrics: [
           { label: 'Doanh số ngày đỉnh (Peak)', value: formatVND(peakDay.revenue), subtext: peakDay.displayDate },
           { label: 'Doanh số TB ngày thường', value: formatVND(avgNormalRevenue) },
@@ -233,12 +239,12 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
           { label: 'Số ngày vượt mục tiêu', value: `${aboveTargetDays} ngày` },
         ],
         strengths: [
-          `Khả năng bùng nổ doanh số rất mạnh trong các ngày chiến dịch (đỉnh cao gấp ${(peakDay.revenue / Math.max(1, avgNormalRevenue)).toFixed(1)}x ngày thường).`,
-          `Lượng đơn ngày Sale đạt ${formatNumber(peakDay.orders)} đơn với AOV tăng trưởng tốt.`,
+          peakDay.revenue > 0 ? `Khả năng bùng nổ doanh số trong các ngày chiến dịch (đỉnh cao gấp ${avgNormalRevenue > 0 ? (peakDay.revenue / avgNormalRevenue).toFixed(1) : 1}x ngày thường).` : 'Gian hàng đang tích lũy dữ liệu các ngày chiến dịch.',
+          `Lượng đơn ngày đỉnh đạt ${formatNumber(peakDay.orders)} đơn.`,
         ],
         weaknesses: [
-          `Doanh thu ngày thường trũng sâu, phụ thuộc quá mức vào các voucher trợ giá của sàn.`,
-          `Đội ngũ đóng gói và vận hành bị dồn tải đột biến trong 24-48 giờ sau ngày Sale.`,
+          campaignShare > 40 ? 'Doanh thu ngày thường trũng sâu, phụ thuộc đáng kể vào các ngày chiến dịch sàn.' : 'Cần tối ưu thêm các chương trình khuyến mãi ngày thường.',
+          'Đội ngũ đóng gói và vận hành cần chuẩn bị trước tránh dồn tải sau ngày Sale.',
         ],
         recommendations: [
           'Triển khai chương trình "Flash Sale giữa tuần" (Thứ 4 / Thứ 6 vui vẻ) để kéo đáy doanh số ngày thường.',
@@ -254,11 +260,11 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
         shortTitle: '3. Kênh & Lưu lượng',
         icon: Compass,
         badge: {
-          text: `Rò rỉ mạnh ở kênh ${worstLeakageCh.channelName} (giữ chân ${worstLeakageCh.retentionRate}%)`,
-          type: 'critical',
+          text: worstLeakageCh.leakageAmount > 0 ? `Rò rỉ ở kênh ${worstLeakageCh.channelName} (giữ chân ${worstLeakageCh.retentionRate}%)` : 'Hiệu quả kênh đồng đều',
+          type: worstLeakageCh.leakageAmount > 0 ? 'critical' : 'success',
         },
         score: channelScore,
-        overview: `Kênh ${topChannel.channelName} đóng góp lớn nhất (${topChannelShare}% doanh thu). Kênh ${bestRetentionCh.channelName} duy trì tỷ lệ giữ chân thực nhận xuất sắc (${bestRetentionCh.retentionRate}%). Tuy nhiên kênh ${worstLeakageCh.channelName} bị rò rỉ -${formatVND(worstLeakageCh.leakageAmount)}.`,
+        overview: `Kênh ${topChannel.channelName} đóng góp lớn nhất (${topChannelShare}% doanh thu). Kênh ${bestRetentionCh.channelName} duy trì tỷ lệ giữ chân thực nhận (${bestRetentionCh.retentionRate}%). ${worstLeakageCh.leakageAmount > 0 ? `Kênh ${worstLeakageCh.channelName} ghi nhận mức thất thoát -${formatVND(worstLeakageCh.leakageAmount)}.` : 'Các kênh đều có tỷ lệ hoàn tất tốt.'}`,
         metrics: [
           { label: `Kênh Top 1 (${topChannel.channelName})`, value: formatVND(topChannel.paidRevenue), highlight: true, color: 'text-emerald-400' },
           { label: `Giữ chân tốt nhất (${bestRetentionCh.channelName})`, value: `${bestRetentionCh.retentionRate}%` },
@@ -266,16 +272,16 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
           { label: 'Số kênh phát sinh đơn', value: `${channels.length} kênh` },
         ],
         strengths: [
-          `Kênh ${bestRetentionCh.channelName} có tỷ lệ đơn hoàn tất lên tới ${bestRetentionCh.retentionRate}%.`,
-          `Đã phát triển mạng lưới lưu lượng đa kênh từ Thẻ sản phẩm, Live, Video đến Tiếp thị liên kết.`,
+          `Kênh ${bestRetentionCh.channelName} có tỷ lệ đơn hoàn tất đạt ${bestRetentionCh.retentionRate}%.`,
+          `Mạng lưới lưu lượng đa kênh từ ${channels.length} nguồn khác nhau.`,
         ],
         weaknesses: [
-          `Kênh ${worstLeakageCh.channelName} có tỷ lệ rớt đơn cao do khách chốt đơn cảm xúc rồi hủy.`,
-          `Chưa tối ưu hóa kênh Chat và Live Stream để gia tăng tỷ lệ chốt đơn ngay tại buổi phát.`,
+          worstLeakageCh.leakageAmount > 0 ? `Kênh ${worstLeakageCh.channelName} có tỷ lệ rớt đơn cao nhất, thất thoát ${formatVND(worstLeakageCh.leakageAmount)}.` : 'Cần liên tục theo dõi chất lượng traffic các kênh.',
+          'Cần tối ưu hóa thêm trải nghiệm chốt đơn trên các kênh trực tiếp.',
         ],
         recommendations: [
-          `Tăng mức hoa hồng 3-5% cho các nhà sáng tạo nội dung / KOC ở kênh ${bestRetentionCh.channelName} để đẩy mạnh sản lượng.`,
-          `Thêm voucher độc quyền có thời hạn 30 phút trong Live Stream để thúc đẩy khách thanh toán ngay.`,
+          `Tăng cường hợp tác với các KOC/Affiliate ở kênh ${bestRetentionCh.channelName} để đẩy mạnh sản lượng.`,
+          `Thêm voucher độc quyền có thời hạn ngắn để thúc đẩy khách thanh toán ngay.`,
           `Chuẩn hóa bộ từ khóa tìm kiếm trên tiêu đề sản phẩm để thu hút lượt truy cập tự nhiên có chuyển đổi cao.`,
         ],
       },
@@ -287,36 +293,37 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
         shortTitle: '4. Shopee Ads',
         icon: Target,
         badge: {
-          text: `ROAS đạt ${overallRoas}x (CIR ${overallCir}%)`,
-          type: Number(overallRoas) >= 8 ? 'success' : 'warning',
+          text: hasAds ? `ROAS đạt ${overallRoas}x (CIR ${overallCir}%)` : 'Chưa ghi nhận chi phí Ads',
+          type: Number(overallRoas) >= 8 ? 'success' : hasAds ? 'warning' : 'info',
         },
         score: adsScore,
-        overview: `Hệ thống Shopee Ads hoạt động hiệu quả với tổng chi phí ${formatVND(totalAdsSpend || 4170000)}, mang về ${formatVND(totalAdsPaidRev || 51302716)} doanh thu, ROAS đạt ${overallRoas}x (vượt xa điểm hòa vốn ~4.5x).`,
+        overview: hasAds
+          ? `Hệ thống Ads ghi nhận tổng chi phí ${formatVND(totalAdsSpend)}, mang về ${formatVND(totalAdsPaidRev)} doanh thu thanh toán, ROAS đạt ${overallRoas}x.`
+          : 'Gian hàng hiện tại chưa phát sinh chi phí quảng cáo trực tiếp trong kỳ đối soát này.',
         metrics: [
-          { label: 'Tổng chi phí Ads (Spend)', value: formatVND(totalAdsSpend || 4170000) },
-          { label: 'Doanh thu từ Ads', value: formatVND(totalAdsPaidRev || paidRev), highlight: true, color: 'text-emerald-400' },
+          { label: 'Tổng chi phí Ads (Spend)', value: formatVND(totalAdsSpend) },
+          { label: 'Doanh thu từ Ads', value: formatVND(totalAdsPaidRev), highlight: true, color: 'text-emerald-400' },
           { label: 'ROAS trung bình', value: `${overallRoas}x`, highlight: true, color: 'text-cyan-400' },
           { label: 'CIR (Tỷ lệ CP/DT)', value: `${overallCir}%` },
         ],
         strengths: [
-          `Chỉ số ROAS ${overallRoas}x nằm trong nhóm hiệu quả hàng đầu phân khúc ngành hàng.`,
-          `CTR đạt chuẩn (${overallCtr}%) với ${formatNumber(totalAdsClicks || 3200)} lượt click chất lượng cao.`,
+          hasAds ? `Chỉ số ROAS ${overallRoas}x mang lại hiệu quả trực tiếp cho doanh số.` : 'Tiết kiệm 100% ngân sách quảng cáo, tập trung vào lưu lượng tự nhiên.',
+          totalAdsClicks > 0 ? `Ghi nhận ${formatNumber(totalAdsClicks)} lượt click chất lượng với CTR ${overallCtr}%.` : 'Có tiềm năng tăng trưởng mạnh khi triển khai quảng cáo có mục tiêu.',
         ],
         weaknesses: [
-          'Một số từ khóa mở rộng có chi phí cao nhưng đơn hàng chuyển đổi thực tế thấp.',
-          'Quảng cáo Khám phá chưa được phân bổ ngân sách tối ưu so với Quảng cáo Tìm kiếm.',
+          hasAds ? 'Cần rà soát các từ khóa chi phí cao nhưng đơn hàng chuyển đổi thấp.' : 'Chưa khai thác kênh quảng cáo tìm kiếm để gia tăng lượt hiển thị sản phẩm mới.',
         ],
         recommendations: [
           'Phủ định các từ khóa tìm kiếm không đúng tệp và giảm giá thầu cho từ khóa có CIR > 18%.',
-          'Tăng 20% ngân sách cho 5 từ khóa chính xác có ROAS > 15x trong các khung giờ vàng (12h - 14h, 20h - 23h).',
-          'Thực hiện A/B testing ảnh bìa sản phẩm để tăng tỷ lệ click (CTR) thêm 0.8% - 1.2%.',
+          'Tăng ngân sách cho các từ khóa chính xác có ROAS cao trong các khung giờ vàng (12h - 14h, 20h - 23h).',
+          'Thực hiện A/B testing ảnh bìa sản phẩm để tăng tỷ lệ click (CTR).',
         ],
       },
 
       // 5. Phân tích danh mục sản phẩm (ABC)
       {
         id: 5,
-        title: '5. Phân tích danh mục sản phẩm (ABC Analysis)',
+        title: '5. Phân tích danh mục sản phẩm',
         shortTitle: '5. Danh mục SKU',
         icon: Package,
         badge: {
@@ -324,20 +331,20 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
           type: zombieCount > 3 ? 'warning' : 'success',
         },
         score: productScore,
-        overview: `Danh mục tuân theo phân phối Pareto chuẩn: ${abc.classACount || 2} sản phẩm nhóm A tạo ra ${classAShare}% tổng doanh thu. Cần lưu ý ${zombieCount} sản phẩm nhóm C đang ở tình trạng Zombie (nhiều lượt xem nhưng không có đơn).`,
+        overview: `Danh mục phân phối: ${abc.classACount || 1} sản phẩm nhóm A tạo ra ${classAShare}% tổng doanh thu. Ghi nhận ${zombieCount} sản phẩm nhóm C ở tình trạng Zombie (nhiều lượt xem nhưng chưa có đơn).`,
         metrics: [
-          { label: 'Sản phẩm Nhóm A (Hero)', value: `${abc.classACount || 2} SKU (${classAShare}% DT)`, highlight: true, color: 'text-emerald-400' },
-          { label: 'Sản phẩm Nhóm B (Tiềm năng)', value: `${abc.classBCount || 3} SKU (${abc.classBShare || 12.5}% DT)` },
-          { label: 'Sản phẩm Nhóm C (Long-tail)', value: `${abc.classCCount || 6} SKU (${abc.classCShare || 5.1}% DT)` },
+          { label: 'Sản phẩm Nhóm A (Hero)', value: `${abc.classACount || 1} SKU (${classAShare}% DT)`, highlight: true, color: 'text-emerald-400' },
+          { label: 'Sản phẩm Nhóm B (Tiềm năng)', value: `${abc.classBCount || 0} SKU (${abc.classBShare || 0}% DT)` },
+          { label: 'Sản phẩm Nhóm C (Long-tail)', value: `${abc.classCCount || 0} SKU (${abc.classCShare || 0}% DT)` },
           { label: 'Sản phẩm Zombie / Tồn kho', value: `${zombieCount} SKU`, highlight: true, color: 'text-amber-400' },
         ],
         strengths: [
-          `Sản phẩm chủ lực (${topHeroProduct.name}) có vị thế dẫn đầu vững chắc và tỷ lệ chuyển đổi cao (~${topHeroProduct.conversionRate || 6.8}%).`,
-          `Cơ cấu sản phẩm nhóm A và B mang lại dòng tiền đều đặn cho gian hàng.`,
+          `Sản phẩm chủ lực (${topHeroProduct.name}) đóng góp ${formatVND(topHeroProduct.revenue)} doanh thu.`,
+          `Cơ cấu sản phẩm nhóm A tạo nền tảng doanh số vững chắc.`,
         ],
         weaknesses: [
-          `Độ rủi ro tập trung cao: Nếu sản phẩm nhóm A bị đứt hàng hoặc bị đổi thuật toán thì doanh thu sụt giảm mạnh.`,
-          `${zombieCount} sản phẩm Zombie tiêu tốn tài nguyên quản lý tồn kho và phí lưu kho.`,
+          classAShare > 80 ? `Độ phụ thuộc lớn vào nhóm A (${classAShare}% doanh số) - rủi ro khi đứt hàng.` : 'Cần tối ưu thêm các sản phẩm nhóm B lên nhóm A.',
+          zombieCount > 0 ? `${zombieCount} sản phẩm Zombie tiêu tốn tài nguyên hiển thị mà chưa sinh đơn.` : 'Danh mục sản phẩm hoạt động hiệu quả.',
         ],
         recommendations: [
           `Đảm bảo mức tồn kho tối thiểu 30 ngày cho các SKU nhóm A, tuyệt đối không để xảy ra tình trạng "Hết hàng".`,
@@ -353,29 +360,29 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
         shortTitle: '6. Khách hàng',
         icon: Users,
         badge: {
-          text: `Khách mới chiếm ${newBuyerPct}% • Tỷ lệ quay lại ${returningPct}%`,
+          text: `Khách mới ${newBuyerPct}% • Tỷ lệ quay lại ${returningPct}%`,
           type: Number(returningPct) < 25 ? 'warning' : 'success',
         },
         score: retentionScore,
-        overview: `Gian hàng ghi nhận ${formatNumber(totalBuyers)} người mua, trong đó tệp khách mới chiếm ${newBuyerPct}% (${formatNumber(newBuyers)} khách). Tỷ lệ khách hàng quay lại là ${returningPct}%, với giá trị đơn hàng (AOV) của khách cũ cao hơn khách mới +${aovDiffPct}%.`,
+        overview: `Gian hàng ghi nhận ${formatNumber(totalBuyers)} người mua, trong đó tệp khách mới chiếm ${newBuyerPct}% (${formatNumber(newBuyers)} khách). Tỷ lệ khách hàng quay lại là ${returningPct}% (${formatNumber(returningBuyers)} khách)${retAov > 0 ? `, AOV khách cũ ${formatVND(retAov)}` : ''}.`,
         metrics: [
           { label: 'Tổng số người mua', value: `${formatNumber(totalBuyers)} khách` },
           { label: 'Khách hàng mới (New)', value: `${newBuyerPct}% (${formatNumber(newBuyers)} khách)` },
           { label: 'Khách quay lại (Returning)', value: `${returningPct}% (${formatNumber(returningBuyers)} khách)`, highlight: true, color: 'text-cyan-400' },
-          { label: 'AOV Khách cũ vs Mới', value: `+${aovDiffPct}% (${formatVND(retAov)})`, highlight: true, color: 'text-emerald-400' },
+          { label: 'AOV Khách cũ vs Mới', value: retAov > 0 ? `+${aovDiffPct}% (${formatVND(retAov)})` : `${formatVND(newAov)}`, highlight: true, color: 'text-emerald-400' },
         ],
         strengths: [
-          `Tốc độ thu hút khách hàng mới rất ấn tượng với ${formatNumber(newBuyers)} người mua lần đầu.`,
-          `Khách hàng thân thiết có mức chi tiêu AOV vượt trội (${formatVND(retAov)} so với ${formatVND(newAov)} của khách mới).`,
+          `Thu hút thành công ${formatNumber(newBuyers)} khách hàng mới phát sinh đơn.`,
+          retAov > 0 ? `Khách hàng cũ chi tiêu với AOV ${formatVND(retAov)}.` : 'Tiềm năng phát triển tệp khách hàng trung thành.',
         ],
         weaknesses: [
-          `Tỷ lệ khách mua lặp lại (${returningPct}%) còn nhiều dư địa cải thiện đối với ngành hàng tiêu dùng/F&B.`,
-          `Chưa có chương trình tích điểm thưởng hoặc quà tặng tri ân tự động cho khách hàng trung thành.`,
+          Number(returningPct) < 20 ? `Tỷ lệ khách mua lặp lại (${returningPct}%) còn thấp, cần chiến lược CSKH sau bán.` : 'Cần tiếp tục chăm sóc tệp khách hàng hiện hữu.',
+          'Chưa có chương trình tích điểm thưởng hoặc quà tặng tri ân tự động cho khách hàng trung thành.',
         ],
         recommendations: [
           'Thiết lập kịch bản chăm sóc sau bán tự động qua Shopee Chat vào ngày thứ 7 sau khi giao hàng thành công.',
-          'Gửi tặng voucher độc quyền "Tri Ân Khách Cũ 12%" vào hộp thư của khách hàng trước các đợt Mega Sale.',
-          'Tạo thiệp cảm ơn in ấn tượng kẹp vào từng gói hàng hướng dẫn khách tham gia nhóm Zalo VIP / Fanpage.',
+          'Gửi tặng voucher độc quyền "Tri Ân Khách Cũ" vào hộp thư của khách hàng trước các đợt Mega Sale.',
+          'Tạo thiệp cảm ơn in ấn tượng kẹp vào từng gói hàng hướng dẫn khách tham gia kênh chăm sóc.',
         ],
       },
 
@@ -386,24 +393,24 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
         shortTitle: '7. Rủi ro & Điểm nghẽn',
         icon: ShieldAlert,
         badge: {
-          text: `3 Điểm nghẽn lớn cần khắc phục ngay`,
-          type: 'critical',
+          text: `${criticalAlerts.length > 0 ? `${criticalAlerts.length} Cảnh báo quan trọng` : 'Rủi ro trong tầm kiểm soát'}`,
+          type: criticalAlerts.length > 0 ? 'critical' : 'info',
         },
         score: Math.max(55, Math.min(85, riskScore)),
-        overview: `Tổng hợp đối soát số liệu cho thấy 3 điểm nghẽn rủi ro trọng điểm: (1) Thất thoát phễu ${leakagePercent}% (-${formatVND(leakageVND)}), (2) Phụ thuộc ${campaignShare}% vào ngày Mega Sale, và (3) Tỷ lệ giữ chân khách hàng cũ còn khiêm tốn (${returningPct}%).`,
+        overview: `Tổng hợp đối soát số liệu cho thấy các điểm nghẽn trọng điểm: (1) Thất thoát phễu ${leakagePercent}% (-${formatVND(leakageVND)}), (2) Phụ thuộc ${campaignShare}% vào ngày Mega Sale, và (3) Tỷ lệ giữ chân khách quay lại (${returningPct}%).`,
         metrics: [
           { label: 'Tổng thất thoát phễu', value: `-${formatVND(leakageVND)}`, highlight: true, color: 'text-rose-400' },
-          { label: 'Cảnh báo rủi ro cao', value: `${criticalAlerts.length || 3} cảnh báo`, highlight: true, color: 'text-amber-400' },
+          { label: 'Cảnh báo rủi ro cao', value: `${criticalAlerts.length} cảnh báo`, highlight: true, color: 'text-amber-400' },
           { label: 'Mức phụ thuộc chiến dịch', value: `${campaignShare}%` },
           { label: 'Tỷ lệ rớt đơn thanh toán', value: `${(100 - Number(completionRate)).toFixed(1)}%` },
         ],
         strengths: [
-          `Mô hình kinh doanh có tỷ suất sinh lời quảng cáo tốt (ROAS ${overallRoas}x) và cơ cấu sản phẩm Hero rõ ràng.`,
-          `Dữ liệu đã được phân tầng minh bạch giúp định vị chính xác vị trí cần can thiệp xử lý.`,
+          `Doanh thu thực nhận đạt ${formatVND(paidRev)} với cấu trúc sản phẩm Hero rõ ràng.`,
+          `Dữ liệu phân tầng minh bạch giúp định vị chính xác vị trí cần can thiệp xử lý.`,
         ],
         weaknesses: [
-          `Lượng tiền bị chôn chân và thất thoát ở khâu hủy đơn COD gây lãng phí chi phí đóng gói.`,
-          `Thiếu sự ổn định dòng tiền doanh thu vào các ngày thường trong tháng.`,
+          leakageVND > 0 ? `Thất thoát ở khâu xác nhận và thanh toán (-${formatVND(leakageVND)}).` : 'Cần duy trì chất lượng vận hành đơn hàng.',
+          'Cần ổn định dòng tiền doanh thu vào các ngày thường trong tháng.',
         ],
         recommendations: [
           'Ưu tiên hành động 1: Cài đặt chatbot xác nhận tự động địa chỉ đơn COD trong 15 phút đầu.',
@@ -421,14 +428,14 @@ export const AiAssessment7Pillars: React.FC<AiAssessment7PillarsProps> = ({
     const paidOrders = kpis.paidOrders || 0;
     const funnel = data.funnel;
     const leakageVND = funnel.totalLeakageVND || Math.max(0, (kpis.placedRevenue || 0) - paidRev);
-    const leakagePct = (kpis.placedRevenue || 0) > 0 ? ((leakageVND / (kpis.placedRevenue || 1)) * 100).toFixed(1) : '23.8';
+    const leakagePct = (kpis.placedRevenue || 0) > 0 ? ((leakageVND / (kpis.placedRevenue || 1)) * 100).toFixed(1) : '0.0';
     const ads = data.ads || [];
-    const totalAdsSpend = ads.reduce((acc, a) => acc + a.spend, 0);
-    const totalAdsPaidRev = ads.reduce((acc, a) => acc + a.paidRevenue, 0);
-    const adsRoas = totalAdsSpend > 0 ? (totalAdsPaidRev / totalAdsSpend).toFixed(1) : '12.3';
-    const newBuyerShare = data.retention ? ((data.retention.newBuyers / (data.retention.totalBuyers || 1)) * 100).toFixed(1) : '77.7';
+    const totalAdsSpend = ads.reduce((acc, a) => acc + (a.spend || 0), 0) || (kpis.adSpend || 0);
+    const totalAdsPaidRev = ads.reduce((acc, a) => acc + (a.paidRevenue || 0), 0);
+    const adsRoas = totalAdsSpend > 0 ? (totalAdsPaidRev / totalAdsSpend).toFixed(1) : (kpis.blendedRoas && kpis.blendedRoas > 0 ? kpis.blendedRoas.toFixed(1) : '0.0');
+    const newBuyerShare = data.retention && data.retention.totalBuyers > 0 ? ((data.retention.newBuyers / data.retention.totalBuyers) * 100).toFixed(1) : '0.0';
 
-    return `Đánh giá tổng thể gian hàng: Gian hàng đạt hiệu quả doanh thu thực nhận ${formatVND(paidRev)} (${formatNumber(paidOrders)} đơn), chỉ số ROAS quảng cáo rất tốt đạt ${adsRoas}x. Tuy nhiên, shop đang gặp 3 vấn đề lớn cần xử lý: (1) Thất thoát phễu ${leakagePct}% (${formatVND(leakageVND)}) do rò rỉ mạnh ở kênh Tìm kiếm (giữ chân chỉ ~53%), (2) Doanh thu phụ thuộc mạnh vào các ngày Sale đôi (đỉnh cao gấp 3-3.5 lần ngày thường), (3) Tỷ lệ khách mua mới áp đảo ${newBuyerShare}% nhưng tỷ lệ giữ chân khách quay lại còn thấp.`;
+    return `Đánh giá tổng thể gian hàng: Gian hàng đạt doanh thu thực nhận ${formatVND(paidRev)} (${formatNumber(paidOrders)} đơn)${totalAdsSpend > 0 ? `, ROAS quảng cáo đạt ${adsRoas}x` : ''}. Các trọng tâm cần tối ưu: (1) Thất thoát phễu ${leakagePct}% (${formatVND(leakageVND)}), (2) Phụ thuộc vào ngày chiến dịch, (3) Tỷ lệ khách mua mới chiếm ${newBuyerShare}% cần xây dựng phễu chăm sóc khách hàng quay lại.`;
   }, [data]);
 
   // Action: Copy All Text

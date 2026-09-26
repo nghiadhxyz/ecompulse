@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { ParsedStoreData, ChannelMetric } from '../../types';
 import { formatVND, formatCompactVND, formatNumber } from '../../utils/formatters';
-import { SHOPEE_DEFAULT_7_CHANNELS } from './P0AnalyticsDashboard';
 
 interface RevenueLeakagePieCardProps {
   data: ParsedStoreData;
@@ -52,47 +51,237 @@ export const RevenueLeakagePieCard: React.FC<RevenueLeakagePieCardProps> = ({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   // Key KPI values
-  const placedRev = data.kpis.placedRevenue || 67348702;
-  const confirmedRev = data.kpis.confirmedRevenue || 57006822;
-  const paidRev = data.kpis.paidRevenue || 51302716;
-  const totalLeakage = Math.max(0, placedRev - paidRev) || 16045986;
-  const leakagePercent = placedRev > 0 ? ((totalLeakage / placedRev) * 100).toFixed(1) : '23.8';
+  const placedRev = data.kpis?.placedRevenue || 0;
+  const confirmedRev = data.kpis?.confirmedRevenue || 0;
+  const paidRev = data.kpis?.paidRevenue || 0;
+  const totalOverviewLeakage = Math.max(0, placedRev - paidRev);
 
-  // 1. Channel Leakage Data calculation
-  const activeChannels: ChannelMetric[] =
+  // 1. Channel Leakage Data calculation: Canonical 7 Shopee Channels
+  const canonical7Buckets: Record<
+    'search' | 'recommendation' | 'affiliate' | 'other' | 'shop' | 'video' | 'live',
+    {
+      id: string;
+      name: string;
+      shortName: string;
+      color: string;
+      placedRevenue: number;
+      paidRevenue: number;
+      leakageAmount: number;
+      retentionRate: number;
+    }
+  > = {
+    search: {
+      id: 'search',
+      name: 'Tìm kiếm (trong Thẻ SP)',
+      shortName: 'Tìm kiếm',
+      color: '#f43f5e', // Rose 500
+      placedRevenue: 0,
+      paidRevenue: 0,
+      leakageAmount: 0,
+      retentionRate: 0,
+    },
+    recommendation: {
+      id: 'recommendation',
+      name: 'Đề xuất (trong Thẻ SP)',
+      shortName: 'Đề xuất',
+      color: '#38bdf8', // Sky 400
+      placedRevenue: 0,
+      paidRevenue: 0,
+      leakageAmount: 0,
+      retentionRate: 0,
+    },
+    affiliate: {
+      id: 'affiliate',
+      name: 'Tiếp thị liên kết',
+      shortName: 'Tiếp thị liên kết',
+      color: '#a855f7', // Purple 500
+      placedRevenue: 0,
+      paidRevenue: 0,
+      leakageAmount: 0,
+      retentionRate: 0,
+    },
+    other: {
+      id: 'other',
+      name: 'Khác (Thẻ SP)',
+      shortName: 'Khác',
+      color: '#94a3b8', // Slate 400
+      placedRevenue: 0,
+      paidRevenue: 0,
+      leakageAmount: 0,
+      retentionRate: 0,
+    },
+    shop: {
+      id: 'shop',
+      name: 'Cửa hàng (trong Thẻ SP)',
+      shortName: 'Cửa hàng',
+      color: '#34d399', // Emerald 400
+      placedRevenue: 0,
+      paidRevenue: 0,
+      leakageAmount: 0,
+      retentionRate: 0,
+    },
+    video: {
+      id: 'video',
+      name: 'Video',
+      shortName: 'Video',
+      color: '#fbbf24', // Amber 400
+      placedRevenue: 0,
+      paidRevenue: 0,
+      leakageAmount: 0,
+      retentionRate: 0,
+    },
+    live: {
+      id: 'live',
+      name: 'Live',
+      shortName: 'Live',
+      color: '#ec4899', // Pink 500
+      placedRevenue: 0,
+      paidRevenue: 0,
+      leakageAmount: 0,
+      retentionRate: 0,
+    },
+  };
+
+  // If dynamic data.channels has valid non-empty rows, aggregate into the 7 canonical channels
+  const hasDynamicChannels =
     data.channels &&
     data.channels.length > 0 &&
-    !data.channels.some((c) => c.channelName.startsWith('Kênh ') && c.placedRevenue === 0)
-      ? data.channels
-      : SHOPEE_DEFAULT_7_CHANNELS;
+    data.channels.some((c) => c.placedRevenue > 0 && !c.channelName.startsWith('Kênh '));
 
-  const rawChannelData = activeChannels.map((ch, idx) => {
-    const leak = ch.leakageAmount ?? Math.max(0, ch.placedRevenue - ch.paidRevenue);
-    return {
-      name: ch.channelName,
-      shortName: ch.channelName.split('(')[0].trim(),
-      value: leak,
-      placedRevenue: ch.placedRevenue,
-      paidRevenue: ch.paidRevenue,
-      color: CHANNEL_COLORS[idx % CHANNEL_COLORS.length],
-    };
-  });
+  if (hasDynamicChannels && data.channels) {
+    // Reset buckets to 0
+    Object.keys(canonical7Buckets).forEach((k) => {
+      const key = k as keyof typeof canonical7Buckets;
+      canonical7Buckets[key].placedRevenue = 0;
+      canonical7Buckets[key].paidRevenue = 0;
+      canonical7Buckets[key].leakageAmount = 0;
+    });
 
-  const totalCalculatedChannelLeak = rawChannelData.reduce((sum, item) => sum + item.value, 0) || totalLeakage;
+    data.channels.forEach((ch) => {
+      const name = String(ch.channelName || '').trim();
+      const lower = name.toLowerCase();
 
-  const channelPieData = rawChannelData
-    .filter((item) => item.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .map((item, idx) => ({
-      ...item,
-      percentage: totalCalculatedChannelLeak > 0 ? parseFloat(((item.value / totalCalculatedChannelLeak) * 100).toFixed(1)) : 0,
-      color: CHANNEL_COLORS[idx % CHANNEL_COLORS.length],
-    }));
+      // Skip invalid or date strings
+      if (
+        !name ||
+        /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(name) ||
+        /^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(name) ||
+        /^\d{4}-\d{2}-\d{2}/.test(name) ||
+        lower === 'nguồn lưu lượng' ||
+        lower === 'tổng' ||
+        lower === 'tổng cộng' ||
+        lower === 'ngày' ||
+        lower === 'date'
+      ) {
+        return;
+      }
+
+      const pRev = ch.placedRevenue || 0;
+      const pdRev = ch.paidRevenue || 0;
+      const leak = ch.leakageAmount ?? Math.max(0, pRev - pdRev);
+
+      if (
+        lower.includes('tìm kiếm') ||
+        lower.includes('search') ||
+        lower.includes('quảng cáo gmv') ||
+        lower.includes('quảng cáo tìm kiếm') ||
+        lower.includes('quảng cáo shopee') ||
+        lower.includes('quảng cáo')
+      ) {
+        canonical7Buckets.search.placedRevenue += pRev;
+        canonical7Buckets.search.paidRevenue += pdRev;
+        canonical7Buckets.search.leakageAmount += leak;
+      } else if (
+        lower.includes('đề xuất') ||
+        lower.includes('gợi ý') ||
+        lower.includes('recommendation')
+      ) {
+        canonical7Buckets.recommendation.placedRevenue += pRev;
+        canonical7Buckets.recommendation.paidRevenue += pdRev;
+        canonical7Buckets.recommendation.leakageAmount += leak;
+      } else if (
+        lower.includes('tiếp thị') ||
+        lower.includes('affiliate') ||
+        lower.includes('koc')
+      ) {
+        canonical7Buckets.affiliate.placedRevenue += pRev;
+        canonical7Buckets.affiliate.paidRevenue += pdRev;
+        canonical7Buckets.affiliate.leakageAmount += leak;
+      } else if (
+        lower.includes('cửa hàng') ||
+        lower.includes('shop') ||
+        lower.includes('trang chủ')
+      ) {
+        canonical7Buckets.shop.placedRevenue += pRev;
+        canonical7Buckets.shop.paidRevenue += pdRev;
+        canonical7Buckets.shop.leakageAmount += leak;
+      } else if (lower.includes('video') || lower.includes('clip')) {
+        canonical7Buckets.video.placedRevenue += pRev;
+        canonical7Buckets.video.paidRevenue += pdRev;
+        canonical7Buckets.video.leakageAmount += leak;
+      } else if (
+        lower.includes('live') ||
+        lower.includes('session') ||
+        lower.includes('phiên')
+      ) {
+        canonical7Buckets.live.placedRevenue += pRev;
+        canonical7Buckets.live.paidRevenue += pdRev;
+        canonical7Buckets.live.leakageAmount += leak;
+      } else {
+        canonical7Buckets.other.placedRevenue += pRev;
+        canonical7Buckets.other.paidRevenue += pdRev;
+        canonical7Buckets.other.leakageAmount += leak;
+      }
+    });
+
+    // Check if live or video has 0 in channels but exists in dedicated metrics
+    if (canonical7Buckets.live.placedRevenue === 0 && data.liveSessions && data.liveSessions.length > 0) {
+      const liveRev = data.liveSessions.reduce((sum, s) => sum + (s.revenue || 0), 0);
+      canonical7Buckets.live.placedRevenue = liveRev;
+      canonical7Buckets.live.paidRevenue = liveRev;
+      canonical7Buckets.live.leakageAmount = 0;
+    }
+    if (canonical7Buckets.video.placedRevenue === 0 && (data as any).videoContributions && (data as any).videoContributions.length > 0) {
+      const vidRev = (data as any).videoContributions.reduce((sum: number, v: any) => sum + (v.revenue || 0), 0);
+      canonical7Buckets.video.placedRevenue = vidRev;
+      canonical7Buckets.video.paidRevenue = vidRev;
+      canonical7Buckets.video.leakageAmount = 0;
+    }
+
+    // Recompute leakage and retention rates
+    Object.keys(canonical7Buckets).forEach((k) => {
+      const key = k as keyof typeof canonical7Buckets;
+      const b = canonical7Buckets[key];
+      b.leakageAmount = Math.max(0, b.placedRevenue - b.paidRevenue);
+      b.retentionRate = b.placedRevenue > 0 ? Math.round((b.paidRevenue / b.placedRevenue) * 100) : 0;
+    });
+  }
+
+  const raw7ChannelsList = Object.values(canonical7Buckets);
+  // Show channels with activity or all if none
+  const activeChannels = raw7ChannelsList.filter((c) => c.placedRevenue > 0 || c.leakageAmount > 0);
+  const channelsToDisplay = activeChannels.length > 0 ? activeChannels : raw7ChannelsList;
+
+  // Calculate TOTAL leakage of all channels in the pie chart
+  const totalCalculatedChannelLeak = channelsToDisplay.reduce((sum, item) => sum + item.leakageAmount, 0);
+
+  const channelPieData = channelsToDisplay
+    .map((item) => {
+      const pct = totalCalculatedChannelLeak > 0
+        ? parseFloat(((item.leakageAmount / totalCalculatedChannelLeak) * 100).toFixed(1))
+        : 0;
+      return {
+        ...item,
+        value: item.leakageAmount,
+        percentage: pct,
+      };
+    })
+    .sort((a, b) => b.value - a.value);
 
   // 2. Stage Leakage Data calculation
-  const stage1Leak = Math.max(0, placedRev - confirmedRev) || 10341880;
-  const stage2Leak = Math.max(0, confirmedRev - paidRev) || 5704106;
-  const totalStageLeak = stage1Leak + stage2Leak || totalLeakage;
+  const stage1Leak = Math.max(0, placedRev - confirmedRev);
+  const stage2Leak = Math.max(0, confirmedRev - paidRev);
+  const totalStageLeak = stage1Leak + stage2Leak || totalOverviewLeakage;
 
   const stagePieData = [
     {
@@ -100,23 +289,43 @@ export const RevenueLeakagePieCard: React.FC<RevenueLeakagePieCardProps> = ({
       shortName: 'Trước xác nhận',
       description: 'Khách hủy khi đang chờ xác nhận đơn, hủy áp mã, đổi ý',
       value: stage1Leak,
-      percentage: totalStageLeak > 0 ? parseFloat(((stage1Leak / totalStageLeak) * 100).toFixed(1)) : 64.5,
+      percentage: totalStageLeak > 0 ? parseFloat(((stage1Leak / totalStageLeak) * 100).toFixed(1)) : 0,
       color: STAGE_COLORS[0],
       icon: '⏱️',
+      retentionRate: placedRev > 0 ? Math.round((confirmedRev / placedRev) * 100) : 0,
     },
     {
       name: 'Hủy Sau Xác Nhận & Hoàn Hàng (Giai đoạn 2)',
       shortName: 'Sau xác nhận & Hoàn',
       description: 'Hủy khi đóng gói, giao không thành công (COD), trả hàng/hoàn tiền',
       value: stage2Leak,
-      percentage: totalStageLeak > 0 ? parseFloat(((stage2Leak / totalStageLeak) * 100).toFixed(1)) : 35.5,
+      percentage: totalStageLeak > 0 ? parseFloat(((stage2Leak / totalStageLeak) * 100).toFixed(1)) : 0,
       color: STAGE_COLORS[1],
       icon: '🚚',
+      retentionRate: confirmedRev > 0 ? Math.round((paidRev / confirmedRev) * 100) : 0,
     },
   ];
 
   const currentPieData = viewMode === 'channel' ? channelPieData : stagePieData;
-  const topLeakingItem = channelPieData[0] || { name: 'Tìm kiếm', percentage: 45.9, value: 7363479 };
+  const currentTotalLeak = viewMode === 'channel'
+    ? (totalCalculatedChannelLeak > 0 ? totalCalculatedChannelLeak : totalOverviewLeakage)
+    : (totalStageLeak > 0 ? totalStageLeak : totalOverviewLeakage);
+
+  // Calculate percentage of total placed revenue that was lost
+  const activePlacedRev = viewMode === 'channel'
+    ? (channelsToDisplay.reduce((sum, item) => sum + item.placedRevenue, 0) || placedRev)
+    : placedRev;
+
+  const currentLeakagePercent = activePlacedRev > 0
+    ? ((currentTotalLeak / activePlacedRev) * 100).toFixed(1)
+    : (placedRev > 0 ? ((totalOverviewLeakage / placedRev) * 100).toFixed(1) : '0.0');
+
+  const topLeakingItem = currentPieData[0] || {
+    name: 'Không có rò rỉ',
+    percentage: 0,
+    value: 0,
+    retentionRate: 100,
+  };
 
   return (
     <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-white/[0.12] shadow-2xl backdrop-blur-xl w-full">
@@ -131,11 +340,11 @@ export const RevenueLeakagePieCard: React.FC<RevenueLeakagePieCardProps> = ({
               <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 Biểu Đồ Cơ Cấu Thất Thoát Doanh Thu (Revenue Leakage Breakdown)
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-400/30">
-                  Thất thoát: {formatCompactVND(totalLeakage)} ({leakagePercent}%)
+                  Thất thoát: {formatCompactVND(currentTotalLeak)} ({currentLeakagePercent}%)
                 </span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Bóc tách chi tiết {formatVND(totalLeakage)} doanh số thất thoát theo từng kênh lưu lượng và phễu vận hành
+                Bóc tách chi tiết {formatVND(currentTotalLeak)} doanh số thất thoát theo từng kênh lưu lượng và phễu vận hành
               </p>
             </div>
           </div>
@@ -240,10 +449,10 @@ export const RevenueLeakagePieCard: React.FC<RevenueLeakagePieCardProps> = ({
                 Tổng Thất Thoát
               </span>
               <span className="text-lg sm:text-xl font-black text-rose-400 tracking-tight">
-                {formatCompactVND(totalLeakage)}
+                {formatCompactVND(currentTotalLeak)}
               </span>
               <span className="text-[11px] font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-400/20 mt-0.5">
-                {leakagePercent}% doanh số
+                {currentLeakagePercent}% doanh số
               </span>
             </div>
           </div>
@@ -274,11 +483,11 @@ export const RevenueLeakagePieCard: React.FC<RevenueLeakagePieCardProps> = ({
               <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                 {viewMode === 'channel' ? (
                   <>
-                    Kênh <strong>{topLeakingItem.name}</strong> gây thất thoát lớn nhất với <strong>{formatVND(topLeakingItem.value)}</strong> do tỷ lệ giữ chân chỉ đạt <strong>53%</strong>. Cần tối ưu thời gian xác nhận đơn và kịch bản CSKH gọi xác nhận đơn COD trong 15 phút đầu.
+                    Kênh <strong>{topLeakingItem.name}</strong> gây thất thoát lớn nhất với <strong>{formatVND(topLeakingItem.value)}</strong> ({topLeakingItem.percentage}% cơ cấu rò rỉ) do tỷ lệ giữ chân chỉ đạt <strong>{topLeakingItem.retentionRate ?? 0}%</strong>. Cần tối ưu thời gian xác nhận đơn và kịch bản CSKH gọi xác nhận đơn COD trong 15 phút đầu.
                   </>
                 ) : (
                   <>
-                    Giai đoạn <strong>Hủy trước xác nhận</strong> chiếm tới <strong>{stagePieData[0]?.percentage}%</strong> tổng thất thoát ({formatVND(stage1Leak)}). Đa số đơn hàng rơi vào tình trạng khách đổi ý do shop chậm đóng gói hoặc thiếu thông báo hành trình đơn.
+                    Giai đoạn <strong>{topLeakingItem.name}</strong> chiếm tới <strong>{topLeakingItem.percentage}%</strong> tổng thất thoát ({formatVND(topLeakingItem.value)}). Đa số đơn hàng rơi vào tình trạng khách đổi ý do shop chậm đóng gói hoặc thiếu thông báo hành trình đơn.
                   </>
                 )}
               </p>

@@ -18,12 +18,17 @@ import {
 import { ParsedStoreData } from '../types';
 import { formatVND, formatNumber } from '../utils/formatters';
 import { downloadSampleShopeeExcel } from '../utils/excelParser';
+import type { CanonicalDataset } from '../analytics';
+import { DataQualityPanel } from './data/DataQualityPanel';
 
 interface RawDataTabProps {
   data: ParsedStoreData;
+  /** Same data mapped to the canonical model; enables the data quality report. */
+  canonical?: CanonicalDataset | null;
+  language?: 'vi' | 'en';
 }
 
-export const RawDataTab: React.FC<RawDataTabProps> = ({ data }) => {
+export const RawDataTab: React.FC<RawDataTabProps> = ({ data, canonical, language = 'vi' }) => {
   const [activeSheet, setActiveSheet] = useState<string>(
     data.detectedSheets[0] || 'Đơn hàng đã đặt'
   );
@@ -88,6 +93,8 @@ export const RawDataTab: React.FC<RawDataTabProps> = ({ data }) => {
 
   return (
     <div className="space-y-6 pb-12">
+      {canonical && <DataQualityPanel dataset={canonical} language={language} />}
+
       {/* Top Banner */}
       <div className="glass-panel rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -103,7 +110,7 @@ export const RawDataTab: React.FC<RawDataTabProps> = ({ data }) => {
                 </span>
               </h3>
               <p className="text-xs text-slate-300/80 mt-0.5">
-                File nguồn: <span className="text-slate-100 font-medium">{data.fileName}</span> • Nhận diện cấu trúc header từng nhóm dòng (Row 1, Row 2, Row 3, Row 5)
+                File nguồn: <span className="text-slate-100 font-medium">{data.fileName}</span> • Tiêu đề cột chuẩn Dòng 1 (Row 1) tương thích 100% Shopee Export gốc & Tự động xử lý Metadata
               </p>
             </div>
           </div>

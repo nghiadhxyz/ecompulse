@@ -26,3 +26,17 @@ export function formatPercent(num: number | undefined | null): string {
   if (num === undefined || num === null || isNaN(num)) return '0%';
   return num.toFixed(1) + '%';
 }
+
+export function formatCompactNumber(num: number | undefined | null): string {
+  if (num === undefined || num === null || isNaN(num) || num === 0) return '0';
+  if (Math.abs(num) >= 1000000000) {
+    return (num / 1000000000).toFixed(2).replace('.', ',') + 'B';
+  }
+  if (Math.abs(num) >= 1000000) {
+    return (num / 1000000).toFixed(1).replace('.', ',') + 'M';
+  }
+  if (Math.abs(num) >= 1000) {
+    return (num / 1000).toFixed(1).replace('.', ',') + 'k';
+  }
+  return new Intl.NumberFormat('vi-VN').format(Math.round(num));
+}

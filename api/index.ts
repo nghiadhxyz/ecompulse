@@ -125,7 +125,7 @@ app.post('/api/ai/executive-summary', async (req, res) => {
       return res.json(fallbackResult);
     }
 
-    const prompt = `Bạn là Giám đốc Dữ liệu Thương mại điện tử (Senior E-commerce Data Architect & Chief Analyst) chuyên sâu về sàn Shopee, TikTok Shop, Lazada.
+    const prompt = `Bạn là Giám đốc Dữ liệu Thương mại điện tử (Senior E-commerce Data Architect & Chief Analyst) chuyên sâu về sàn Shopee, TikTok Shop.
 Hãy viết một bản Tóm tắt Điều hành (Executive Summary) ngắn gọn, cực kỳ sắc bén (3-4 câu) bằng ${language === 'vi' ? 'Tiếng Việt' : 'English'} dựa trên số liệu phân tích JSON thực tế sau đây:
 
 DỮ LIỆU CỬA HÀNG:
@@ -479,7 +479,7 @@ Bạn đang trò chuyện và hỗ trợ trực tiếp chủ shop/nhà bán hàn
 HƯỚNG DẪN TRẢ LỜI:
 1. TRỰC TIẾP & ĐÚNG TRỌNG TÂM: Trả lời chính xác những gì người dùng hỏi. Không rập khuôn một cấu trúc cố định cho mọi câu hỏi.
    - Nếu người dùng chào hỏi, hỏi bạn là ai, hỏi ngắn: Hãy trả lời tự nhiên, thân thiện và tóm tắt năng lực hỗ trợ.
-   - Nếu người dùng hỏi phân tích chuyên sâu (rò rỉ, SKU, ads, chi phí, chiến lược): Hãy phân tích sắc bén, trích dẫn số liệu cụ thể từ dữ liệu cửa hàng, đưa ra nhận định nguyên nhân và giải pháp hành động cụ thể.
+   - Nếu người dùng hỏi phân tích chuyên sâu (rò rỉ, SKU, ads, chi phí, chiến lược): Hãy phân tích sắc bén, chỉ trích dẫn số liệu có trong DỮ LIỆU CỬA HÀNG bên dưới (không bịa, không ước đoán số), nói rõ khi thiếu dữ liệu, dùng từ "liên quan / đi cùng / đóng góp / cần kiểm tra" thay vì khẳng định nguyên nhân, và đề xuất việc cần kiểm tra.
    - Nếu người dùng hỏi tính toán / giả lập / so sánh: Hãy tính toán logic, rõ ràng từng bước.
 2. DẪN CHỨNG SỐ LIỆU: Luôn in đậm (**số tiền VND**, **tỷ lệ %**, **tên SKU/kênh**, **chỉ số ROAS**) khi trích dẫn số liệu từ dữ liệu cửa hàng.
 3. VĂN PHONG: Chuyên nghiệp, nhạy bén kinh doanh, thực chiến, thấu hiểu bài toán tối ưu lợi nhuận và dòng tiền của người bán hàng trực tuyến.
@@ -539,6 +539,36 @@ ${JSON.stringify(analyticsData, null, 2)}`;
 app.post('/api/ai/chat', async (req, res) => {
   req.url = '/api/ai/chat-analyst';
   (app as any).handle(req, res);
+});
+
+
+// Dolphin Evidence Mode: rephrase a structured answer computed in the browser.
+// Receives aggregates only (no order rows); never computes or changes numbers.
+app.post('/api/ai/rephrase-evidence', async (req, res) => {
+  const { answer, language = 'vi', apiKey } = req.body || {};
+  if (!answer || typeof answer !== 'object' || typeof answer.insight !== 'string') {
+    return res.status(400).json({ ok: false, error: 'INVALID_ANSWER' });
+  }
+  const ai = getGeminiClient(apiKey || (req.headers['x-gemini-api-key'] as string));
+  if (!ai) return res.json({ ok: false, error: 'NO_API_KEY' });
+  const systemInstruction = [
+    language === 'vi' ? 'Bạn là Dolphin, trợ lý phân tích bán hàng. Trả lời bằng tiếng Việt.' : 'You are Dolphin, a sales analytics assistant. Answer in English.',
+    'Only rephrase the structured answer you are given into short, natural prose.',
+    'Do NOT add, remove or recalculate any number. Do NOT invent data.',
+    'Never claim causation: use "related to", "moved together with", "contributed", "worth checking" - never "caused by".',
+    'If "unavailable" is set, say clearly that there is not enough data.',
+    'Keep four parts: Insight, Evidence, Interpretation, Next check.',
+  ].join('\n');
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.7-flash',
+      contents: JSON.stringify(answer),
+      config: { systemInstruction, temperature: 0.2 },
+    });
+    res.json({ ok: true, text: response.text || '' });
+  } catch (error: any) {
+    res.json({ ok: false, error: String(error?.message || error).slice(0, 200) });
+  }
 });
 
 // Phase 2: AI Price & Promotion Simulator
