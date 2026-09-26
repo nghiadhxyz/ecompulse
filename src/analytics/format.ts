@@ -27,8 +27,9 @@ export function fmtMoneyCompact(v: number | null | undefined, lang: Lang = 'vi')
 /** Full amount: "8.200.000đ" (vi) / "8,200,000₫" (en). */
 export function fmtMoney(v: number | null | undefined, lang: Lang = 'vi'): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return DASH;
-  const s = new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US').format(Math.round(v));
-  return lang === 'vi' ? `${s}đ` : `${s}₫`;
+  const s = new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US').format(Math.abs(Math.round(v)));
+  const sign = Math.round(v) < 0 ? '−' : '';
+  return lang === 'vi' ? `${sign}${s}đ` : `${sign}${s}₫`;
 }
 
 export function fmtCount(v: number | null | undefined, lang: Lang = 'vi'): string {
@@ -39,7 +40,8 @@ export function fmtCount(v: number | null | undefined, lang: Lang = 'vi'): strin
 /** Ratio → "9,2%". */
 export function fmtRate(v: number | null | undefined, lang: Lang = 'vi', digits = 1): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return DASH;
-  return `${(v * 100).toFixed(digits).replace('.', lang === 'vi' ? ',' : '.')}%`;
+  // Typographic minus, consistent with money formatting.
+  return `${v < 0 ? '−' : ''}${(Math.abs(v) * 100).toFixed(digits).replace('.', lang === 'vi' ? ',' : '.')}%`;
 }
 
 /** Signed relative change → "↑ 11,2%" / "↓ 3%". */

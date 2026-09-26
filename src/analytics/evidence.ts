@@ -23,6 +23,8 @@ export interface EvidenceFilter {
   campaignId?: string;
   /** Exact order channel, e.g. "affiliate:koc_meobeo" or "video:VID-TT-02". */
   channel?: string;
+  /** Pseudonymous customer IDs (customer segments). */
+  customerIds?: string[];
 }
 
 export interface Evidence {
@@ -48,6 +50,7 @@ export function listEvidenceOrders(dataset: CanonicalDataset, filter: EvidenceFi
   const index = getDatasetIndex(dataset);
   const skuSet = filter.skus?.length ? new Set(filter.skus) : null;
   const statusSet = filter.statuses?.length ? new Set(filter.statuses) : null;
+  const customerSet = filter.customerIds?.length ? new Set(filter.customerIds) : null;
   const rows: EvidenceOrderRow[] = [];
   for (const order of dataset.orders) {
     if (!isInRange(order.orderDate, filter.range)) continue;
@@ -58,6 +61,7 @@ export function listEvidenceOrders(dataset: CanonicalDataset, filter: EvidenceFi
     if (filter.liveSessionId && order.liveSessionId !== filter.liveSessionId) continue;
     if (filter.campaignId && order.campaignId !== filter.campaignId) continue;
     if (filter.channel && order.channel !== filter.channel) continue;
+    if (customerSet && (!order.customerId || !customerSet.has(order.customerId))) continue;
     const all = index.linesByOrder.get(order.orderId) || [];
     const lines = skuSet ? all.filter((l) => skuSet.has(l.sku)) : all;
     if (skuSet && lines.length === 0) continue;

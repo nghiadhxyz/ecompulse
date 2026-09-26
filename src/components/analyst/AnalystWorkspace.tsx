@@ -39,6 +39,9 @@ import { ChangeImpactView } from './views/ChangeImpactView';
 import { MonthlyPlanningView } from './views/MonthlyPlanningView';
 import { ActionCenterView } from './views/ActionCenterView';
 import { ReportCenterView } from './views/ReportCenterView';
+import { CustomersView } from './views/CustomersView';
+import { WhatIfView } from './views/WhatIfView';
+import { AdvancedStatsView } from './views/AdvancedStatsView';
 import { PlanningProvider, usePlanningState } from '../workspace/usePlanning';
 
 interface Props {
@@ -72,7 +75,7 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
       { key: 'productsCombo', vi: 'Sản phẩm & Combo', en: 'Products & Combo' },
       { key: 'revenueProfit', vi: 'Doanh thu & Lợi nhuận', en: 'Revenue & Profit' },
       { key: 'orderHealth', vi: 'Sức khỏe đơn hàng', en: 'Order Health' },
-      { key: 'customers', vi: 'Khách hàng', en: 'Customers', phase: 7 },
+      { key: 'customers', vi: 'Khách hàng', en: 'Customers' },
     ],
   },
   {
@@ -92,7 +95,8 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
     items: [
       { key: 'rootCause', vi: 'Root Cause', en: 'Root Cause' },
       { key: 'anomaly', vi: 'Anomaly & Opportunity', en: 'Anomaly & Opportunity' },
-      { key: 'whatIf', vi: 'What-If (dashboard cổ điển)', en: 'What-If (classic)', classic: true },
+      { key: 'whatIf', vi: 'What-If', en: 'What-If' },
+      { key: 'stats', vi: 'Thống kê nâng cao', en: 'Advanced statistics' },
       { key: 'changeImpact', vi: 'Change Impact', en: 'Change Impact' },
     ],
   },
@@ -110,7 +114,7 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
   },
 ];
 
-const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'live', 'video', 'rootCause', 'anomaly', 'changeImpact', 'planning', 'actions', 'reports', 'mapping', 'dataQuality'];
+const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'live', 'video', 'rootCause', 'anomaly', 'changeImpact', 'planning', 'actions', 'reports', 'customers', 'whatIf', 'stats', 'mapping', 'dataQuality'];
 
 export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted, onOpenClassic }) => {
   const vi = lang === 'vi';
@@ -262,6 +266,9 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
             {view === 'planning' && <MonthlyPlanningView />}
             {view === 'actions' && <ActionCenterView />}
             {view === 'reports' && <ReportCenterView />}
+            {view === 'customers' && <CustomersView />}
+            {view === 'whatIf' && <WhatIfView />}
+            {view === 'stats' && <AdvancedStatsView />}
             {view === 'dataQuality' && <DataQualityPanel dataset={dataset} language={lang} />}
             {view === 'mapping' && <DataMapping />}
           </ViewErrorBoundary>

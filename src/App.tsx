@@ -1,11 +1,6 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { Header } from './components/Header';
 import { DualTrackSelector, AnalysisTrack } from './components/DualTrackSelector';
-import { InternalFinanceModule } from './components/internal-finance/InternalFinanceModule';
-import { KpiOverviewTab } from './components/KpiOverviewTab';
-import { DeepAnalyticsTab } from './components/DeepAnalyticsTab';
-import { AiActionCenterTab } from './components/AiActionCenterTab';
-import { RawDataTab } from './components/RawDataTab';
 import { UploadModal } from './components/UploadModal';
 import { EmptyStateUpload } from './components/EmptyStateUpload';
 import { EcommercePlatformSelector, EcommercePlatform } from './components/EcommercePlatformSelector';
@@ -15,8 +10,13 @@ import { ArrowLeft } from 'lucide-react';
 import { WorkspaceModeSelector } from './components/onboarding/WorkspaceModeSelector';
 import { getSavedWorkspaceMode, saveWorkspaceMode, WorkspaceMode } from './utils/workspacePreferences';
 import { canonicalFromParsedStoreData } from './analytics';
-// Seller Mode (engines + demo generator) loads on demand to keep the initial bundle small.
+// Workspaces and the classic dashboards load on demand to keep the initial bundle small.
 const SellerWorkspace = lazy(() => import('./components/seller/SellerWorkspace').then((m) => ({ default: m.SellerWorkspace })));
+const InternalFinanceModule = lazy(() => import('./components/internal-finance/InternalFinanceModule').then((m) => ({ default: m.InternalFinanceModule })));
+const KpiOverviewTab = lazy(() => import('./components/KpiOverviewTab').then((m) => ({ default: m.KpiOverviewTab })));
+const DeepAnalyticsTab = lazy(() => import('./components/DeepAnalyticsTab').then((m) => ({ default: m.DeepAnalyticsTab })));
+const AiActionCenterTab = lazy(() => import('./components/AiActionCenterTab').then((m) => ({ default: m.AiActionCenterTab })));
+const RawDataTab = lazy(() => import('./components/RawDataTab').then((m) => ({ default: m.RawDataTab })));
 const AnalystWorkspace = lazy(() => import('./components/analyst/AnalystWorkspace').then((m) => ({ default: m.AnalystWorkspace })));
 
 export default function App() {
@@ -209,7 +209,7 @@ export default function App() {
               )
             ) : (
               /* Step 3: Multi-Tab Analytics Dashboard */
-              <>
+              <Suspense fallback={<div className="text-sm text-slate-400 p-8 text-center">{language === 'vi' ? 'Đang tải…' : 'Loading…'}</div>}>
                 {activeTab === 'overview' && (
                   <KpiOverviewTab
                     data={currentData}
@@ -239,7 +239,7 @@ export default function App() {
                     language={language}
                   />
                 )}
-              </>
+              </Suspense>
             )}
           </>
         )}
@@ -248,10 +248,12 @@ export default function App() {
             TRACK 2: PHÂN TÍCH TÀI CHÍNH & VẬN HÀNH NỘI BỘ (P&L, COGS, PARETO SKU, TỪ ĐIỂN TMĐT)
         ========================================================================= */}
         {analysisTrack === 'internal_finance' && (
-          <InternalFinanceModule
-            onBackToPortal={() => setAnalysisTrack('portal')}
-            language={language}
-          />
+          <Suspense fallback={<div className="text-sm text-slate-400 p-8 text-center">{language === 'vi' ? 'Đang tải…' : 'Loading…'}</div>}>
+            <InternalFinanceModule
+              onBackToPortal={() => setAnalysisTrack('portal')}
+              language={language}
+            />
+          </Suspense>
         )}
       </main>
 

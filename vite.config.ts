@@ -6,6 +6,18 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        output: {
+          // Large libraries in their own cacheable chunks, loaded only by the views that use them.
+          manualChunks: {
+            recharts: ['recharts'],
+            xlsx: ['xlsx'],
+            markdown: ['react-markdown'],
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

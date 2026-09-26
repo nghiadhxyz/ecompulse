@@ -216,4 +216,15 @@ Nguyên tắc:
 **Kết quả Phase 6 (2026-09-26):** `tsc` ✅ · `npm test` 256/256 ✅ · build ✅ · Edge headless: thêm thay đổi, lưu kế hoạch 09 & 10/2025 (10.10 được tính ngày đôi), xuất .ics/.xlsx/.csv, cửa sổ in PDF, hành động từ cảnh báo + đo kết quả, dữ liệu còn sau khi tải lại trang, mobile không tràn, 0 lỗi console.
 
 ### Phase 7 — Advanced
-Customer/RFM (chỉ khi có customer id) · What-If dùng chi phí thật · thống kê nâng cao · code-split bundle
+- [x] Khách hàng (`customerEngine.ts`): chỉ bật khi ≥ 80% đơn có mã người mua (đã băm); khách mới/quay lại, mua lặp trong kỳ, GMV/khách, RFM 7 nhóm (xem đơn của nhóm), cohort theo tháng; ghi chú giới hạn lịch sử và mã theo từng sàn
+- [x] What-If (`whatIfEngine.ts`): trên waterfall lợi nhuận THẬT của kỳ/SKU; 6 đòn bẩy (giá, số đơn do người dùng giả định, voucher, giá vốn, Ads, phí sàn); không tự suy ra cầu theo giá; số đơn cần để giữ lợi nhuận; gắn nhãn "Mô phỏng / Ước tính"
+- [x] Thống kê nâng cao (`statsEngine.ts`, chỉ ở Analyst): kiểm định 2 tỷ lệ (hủy, trả, CVR), Welch cho GMV/đơn mỗi ngày, khoảng tin cậy 95%, p-value, tương quan Pearson theo ngày (nhãn "không phải nhân quả"), chỉ số theo thứ (bỏ ngày sale)
+- [x] Hiệu năng: lazy-load dashboard cổ điển + Tài chính nội bộ, tách chunk recharts/xlsx/markdown → bundle đầu từ 2,19 MB xuống 664 KB; engine chạy ~100 ms trên 16k đơn, có memo
+- [x] Định dạng: số âm dùng dấu trừ "−" thống nhất cho tiền và tỷ lệ
+
+**Kết quả Phase 7 (2026-09-26):** `tsc` ✅ · `npm test` 265/265 ✅ · build ✅ · Edge headless: Khách hàng/What-If/Thống kê trên demo, không còn mục "P5/P6/P7" bị khóa, Seller không có thuật ngữ thống kê, dashboard cổ điển vẫn tải (lazy), mobile không tràn, 0 lỗi console.
+
+### Còn lại / ghi chú
+- Importer đơn hàng dựng theo định dạng công khai của sàn — cần chỉnh khi có file thật của TikTok/Lazada.
+- `server.ts` và `api/index.ts` vẫn là hai bản route song song (đã thêm cùng route mới); câu trả lời "fallback" mẫu của server không còn được hiển thị ở client nhưng vẫn nằm trong code server.
+- Tải lại trang luôn về trang giới thiệu (hành vi có sẵn); dữ liệu, kế hoạch và hành động vẫn được giữ.

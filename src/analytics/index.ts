@@ -39,3 +39,6 @@ export * from './dolphinEvidence';
 export * from './changeImpact';
 export * from './planningEngine';
 export * from './reportEngine';
+export * from './customerEngine';
+export * from './whatIfEngine';
+export * from './statsEngine';
