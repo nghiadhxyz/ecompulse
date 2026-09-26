@@ -3,6 +3,7 @@ import { customerIntelligence, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { ShareBar, Th } from '../ui';
+import { CustomerTrendPanel } from '../../workspace/SummaryInsightPanels';
 
 export const CustomersView: React.FC = () => {
   const { lang, dataset, baseFilter, range, platforms, openEvidence, goTo } = useWorkspace();
@@ -11,9 +12,12 @@ export const CustomersView: React.FC = () => {
 
   if (!ci.available) {
     return (
-      <Section title={vi ? 'Khách hàng' : 'Customers'}>
-        <NotEnoughData lang={lang} reason={tr(lang, ci.unavailable!)} action={<button onClick={() => goTo('dataHub')} className="text-xs underline">Data Hub</button>} />
-      </Section>
+      <div className="space-y-4">
+        <CustomerTrendPanel />
+        <Section title={vi ? 'Phân nhóm RFM, cohort (cần mã người mua)' : 'RFM & cohorts (need buyer IDs)'}>
+          <NotEnoughData lang={lang} reason={tr(lang, ci.unavailable!)} action={<button onClick={() => goTo('dataHub')} className="text-xs underline">Data Hub</button>} />
+        </Section>
+      </div>
     );
   }
   const k = ci.inRange;

@@ -236,3 +236,28 @@ Nguyên tắc:
 - [x] Sửa lỗi: Thống kê nâng cao tính GMV/ngày = 0 khi thiếu dữ liệu (nay báo "Chưa đủ mẫu")
 - [x] "Xem dữ liệu" giải thích khi báo cáo tổng hợp không có danh sách đơn
 - Vẫn cần file đơn hàng: lợi nhuận, Root Cause theo SKU, lý do hủy, khách hàng/RFM, What-If, câu hỏi SKU tăng trưởng/lỗ/chi phí
+
+### Rà soát "Phân tích bán hàng" Shopee — t7-t8.xlsx (2026-09-26)
+**Quy tắc chung (mới):** báo cáo cho mỗi số liệu cả dòng tổng kỳ lẫn dòng theo ngày. Chọn **trọn kỳ** → dùng dòng tổng của sàn; chọn **một phần kỳ** → cộng dòng ngày (`analytics/periodRows.ts`, áp dụng trong `sliceDataset` cho Ads/traffic và trong `summaryEngine`). Lệch giữa cộng ngày và dòng tổng → cảnh báo (vd. chi phí Ads cộng ngày 4.371.748 ≠ dòng tổng 4.371.746). Tỷ lệ luôn tính lại từ tử số/mẫu số.
+- [x] A1 Ads là lớp chồng lên 4 kênh, không cộng vào tổng; hiển thị "% doanh số có ads hỗ trợ"
+- [x] A2 Số đơn lẻ giữ nguyên (391,5 · 127,92): bỏ `Math.round` ở tầng tính (engine mới + `excelParser` cũ), chỉ làm tròn khi hiển thị; trọn kỳ ra đúng 391,5 thay vì 391,51
+- [x] A3 Khối Ads "Khác" được nhập; "-" = không có dữ liệu (null), không phải 0; ROAS tự tính, chi phí null/0 → ROAS null. `toRate("4,90%") = 0,049`
+- [x] A4 Không dùng cột "Tỷ lệ doanh số"; tỷ trọng tính lại từ doanh số
+- [x] A5 Người mua / lượt truy cập: trọn kỳ dùng dòng tổng (453 · 7.362); một phần kỳ đổi nhãn "Lượt … (cộng theo ngày)" (trạng thái chưa đầy đủ). Bảng Top SP không cộng người mua qua nhiều kênh
+- [x] A6 Nhãn "Top 5" cho sản phẩm mỗi kênh, video, affiliate, phiên live
+- [x] Sửa lỗi: 5 phiên live chỉ có tổng kỳ bị xếp vào "Thứ 7" (ngày cuối kỳ); ghi chú mâu thuẫn về live của adapter cũ
+- [x] B1 % phụ thuộc trợ giá theo ngày/tuần (Tổng quan Seller + Executive Overview)
+- [x] B2 Doanh số tăng/giảm do kênh/nguồn nào: Executive Overview (so với kỳ so sánh), Change Impact (thay đổi toàn shop), Anomaly (ngày bị đánh dấu so với TB 14 ngày trước, bỏ ngày sale); bảng nguồn lọc theo một phần kỳ
+- [x] B3 Đặt → xác nhận → thanh toán theo kênh và nguồn (Traffic & Funnel)
+- [x] B4 Kênh Live theo thứ trong tuần từ dòng ngày (bỏ ngày sale); chỉ không làm được theo từng phiên và khung giờ
+- [x] B5 Khách mới / khách hiện tại theo ngày/tuần, tổng kỳ có người mua tiềm năng & tỉ lệ quay lại (Khách hàng); vẫn ghi rõ không có RFM
+- [x] B6 CTR theo lượt hiển thị/nhấp duy nhất ở bảng kênh/nguồn và Top 5 sản phẩm
+
+**Kết quả:** `tsc` ✅ · `npm test` 290/290 ✅ (thêm 17 test so khớp chính xác với t7-t8) · `npm run build` ✅.
+Dữ liệu đã lưu trong IndexedDB từ trước cần **nhập lại file** để có dòng tổng kỳ, khối Ads "Khác", trợ giá và các cột khách hàng.
+
+**Bổ sung sau xác nhận (2026-09-26):**
+- [x] Ngưỡng cảnh báo lệch: tiền ±2đ hoặc ±0,01% (lấy mức lớn hơn), số đơn ±0,05. Lượt truy cập, người mua, người mua hiện tại/tiềm năng không bao giờ cảnh báo. Với t7-t8 không còn cảnh báo (chênh 1–2đ và 0,01 đơn nằm trong ngưỡng)
+- [x] Phiên live chỉ có tổng kỳ → nhóm "Không rõ ngày" (`isUndatedSession`): loại khỏi thứ trong tuần, khung giờ, cảnh báo live theo ngày; nhãn không còn hiện "22/08"
+- [x] B4: dưới 3 ngày có doanh số live → "Chưa đủ dữ liệu"; thứ có dưới 2 ngày mẫu → "Chưa đủ dữ liệu"
+- [x] Test một phần kỳ 24/07–31/07 (CVR 119/2.530 = 4,70%) · `npm test` 297/297 ✅

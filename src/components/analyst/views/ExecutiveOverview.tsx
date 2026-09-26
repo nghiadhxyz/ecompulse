@@ -14,6 +14,7 @@ import {
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { KpiCard, NotEnoughData, Section, tr } from '../../seller/ui';
+import { SourceDriversPanel, SubsidyPanel } from '../../workspace/SummaryInsightPanels';
 import { BreakdownTable } from '../ui';
 
 const CURRENT_COLOR = '#3987e5';
@@ -30,6 +31,8 @@ const KPIS: { key: KpiKey; vi: string; en: string; goodWhenUp?: boolean }[] = [
   { key: 'cvr', vi: 'CVR', en: 'CVR' },
   { key: 'cancelRate', vi: 'Tỷ lệ hủy', en: 'Cancel rate', goodWhenUp: false },
   { key: 'refundRate', vi: 'Tỷ lệ trả/hoàn', en: 'Refund rate', goodWhenUp: false },
+  { key: 'visits', vi: 'Lượt truy cập', en: 'Visits' },
+  { key: 'buyers', vi: 'Người mua', en: 'Buyers' },
 ];
 
 function changeSentence(label: string, c: MetricComparison, lang: 'vi' | 'en'): string | null {
@@ -146,6 +149,8 @@ export const ExecutiveOverview: React.FC = () => {
           <p className="text-[11px] text-slate-500 mt-2">{vi ? 'Đây là phân rã đóng góp, không phải nguyên nhân. Đi sâu theo ngành/SKU để tìm yếu tố đi cùng.' : 'This is a contribution breakdown, not a cause.'}</p>
         </Section>
       )}
+      <SourceDriversPanel before={previousRange} after={range} title={vi ? 'Doanh số thay đổi do kênh / nguồn nào (so với kỳ so sánh)' : 'Which channel / source moved sales (vs comparison period)'} />
+      <SubsidyPanel />
     </div>
   );
 };

@@ -16,7 +16,7 @@ import { campaignCalendar, campaignResult, type CalendarEntry } from './campaign
 import { planProgress, type MonthlyPlan, type ActionItem, ACTION_STATUS_LABELS } from './planningEngine';
 import { addDays, comparableRange, endOfMonth, formatRangeVi, type DateRange } from './period';
 import type { MetricUnit } from './metric';
-import { fmtByUnit, fmtDay } from './format';
+import { fmtByUnit, fmtDay, sessionDateLabel } from './format';
 
 export type ReportType = 'daily' | 'weekly' | 'monthly' | 'campaign' | 'live' | 'planning';
 
@@ -206,7 +206,7 @@ export function buildReport(dataset: CanonicalDataset, type: ReportType, o: Repo
           {
             title: 'Xếp hạng phiên (GMV/giờ)',
             columns: ['Ngày', 'Giờ', 'Sàn', 'Người xem', 'Đơn', 'GMV', 'GMV/giờ', 'Chuyển đổi'],
-            rows: la.ranking.map((r) => [t(fmtDay(r.session.date)), t(r.session.startTime ?? ''), t(r.session.platform), n(r.session.viewers ?? null, 'count'), n(r.session.orders ?? null, 'count'), n(r.session.gmv ?? null, 'vnd'), n(r.gmvPerHour, 'vnd'), n(r.conversion, 'ratio')]),
+            rows: la.ranking.map((r) => [t(sessionDateLabel(r.session)), t(r.session.startTime ?? ''), t(r.session.platform), n(r.session.viewers ?? null, 'count'), n(r.session.orders ?? null, 'count'), n(r.session.gmv ?? null, 'vnd'), n(r.gmvPerHour, 'vnd'), n(r.conversion, 'ratio')]),
           },
           { title: 'Theo khung giờ', columns: ['Khung giờ', 'Số phiên', 'GMV/giờ', 'Chuyển đổi'], rows: la.byTimeSlot.map((g) => [t(g.label.vi), n(g.sessions, 'count'), n(g.gmvPerHour, 'vnd'), n(g.conversion, 'ratio')]) },
         ],

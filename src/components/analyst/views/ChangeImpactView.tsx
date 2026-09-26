@@ -15,6 +15,7 @@ import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, PrimaryButton, Section, tr } from '../../seller/ui';
 import { ChangeCell, Th } from '../ui';
 import { usePlanning } from '../../workspace/usePlanning';
+import { SourceDriversPanel } from '../../workspace/SummaryInsightPanels';
 
 export const inputCls = 'bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1.5 text-sm text-slate-100 [color-scheme:dark]';
 
@@ -187,6 +188,13 @@ export const ChangeImpactView: React.FC = () => {
             </>
           )}
         </Section>
+      )}
+      {event && w && !event.sku && (
+        <SourceDriversPanel
+          before={w.before}
+          after={w.after}
+          title={vi ? `Sau thay đổi: doanh số toàn shop tăng/giảm do kênh / nguồn nào (${w.usedDays} ngày trước/sau)` : `After the change: which channel / source moved shop sales`}
+        />
       )}
     </div>
   );

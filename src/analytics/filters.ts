@@ -1,5 +1,6 @@
 import type { CanonicalDataset, Order, OrderLine, Platform } from './model';
 import { isInRange, type DateRange } from './period';
+import { selectPeriodOrDaily } from './periodRows';
 
 export interface DatasetFilter {
   range: DateRange;
@@ -37,6 +38,8 @@ export interface DatasetSlice {
   dailyMetrics: CanonicalDataset['dailyMetrics'];
   traffic: CanonicalDataset['traffic'];
   ads: CanonicalDataset['ads'];
+  /** Daily ad rows only (no period totals) — for charts by day. */
+  adsDaily: CanonicalDataset['ads'];
   liveSessions: CanonicalDataset['liveSessions'];
   affiliates: CanonicalDataset['affiliates'];
   costs: CanonicalDataset['costs'];
@@ -120,6 +123,12 @@ export function sliceDataset(dataset: CanonicalDataset, filter: DatasetFilter): 
         (r.periodStart === undefined || r.periodStart >= range.start) &&
         platformMatch(filter, r.platform),
     );
+  // When a report gives both a period total and daily rows for the same item, the whole
+  // period uses the platform's total and a partial range uses the days (see periodRows.ts).
+  const periodOrDaily = <T extends { date: string; periodStart?: string; platform?: Platform }>(rows: T[], key: (r: T) => string) =>
+    selectPeriodOrDaily(inRange(rows), range, key);
+  const adKey = (a: CanonicalDataset['ads'][number]) => `${a.platform}|${a.campaignId ?? ''}|${a.adName ?? ''}|${a.sku ?? ''}`;
+  const adsScoped = (rows: CanonicalDataset['ads']) => productScoped(rows).filter((a) => !campaignSet || (!!a.campaignId && campaignSet.has(a.campaignId)));
   // Product-scoped rows (traffic, ads) follow the product filters; shop-level rows drop out.
   const productScoped = <T extends { sku?: string }>(rows: T[]) =>
     lineFiltered && !comboSet ? rows.filter((r) => r.sku && skuMatch(r.sku)) : comboSet ? rows.filter((r) => r.sku && comboSet.has(r.sku)) : rows;
@@ -131,8 +140,9 @@ export function sliceDataset(dataset: CanonicalDataset, filter: DatasetFilter): 
     orders,
     lines,
     dailyMetrics: lineFiltered || orderScoped ? [] : inRange(dataset.dailyMetrics),
-    traffic: orderScoped ? [] : productScoped(inRange(dataset.traffic)),
-    ads: productScoped(inRange(dataset.ads)).filter((a) => !campaignSet || (!!a.campaignId && campaignSet.has(a.campaignId))),
+    traffic: orderScoped ? [] : productScoped(periodOrDaily(dataset.traffic, (t) => `${t.platform}|${t.sku ?? ''}`)),
+    ads: adsScoped(periodOrDaily(dataset.ads, adKey)),
+    adsDaily: adsScoped(inRange(dataset.ads).filter((a) => a.periodStart === undefined)),
     liveSessions: inRange(dataset.liveSessions).filter((s) => !liveSet || liveSet.has(s.sessionId)),
     affiliates: lineFiltered || orderScoped ? [] : inRange(dataset.affiliates),
     costs: lineFiltered || orderScoped ? [] : inRange(dataset.costs),

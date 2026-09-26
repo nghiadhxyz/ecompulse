@@ -714,7 +714,7 @@ export const DeepAnalyticsTab: React.FC<DeepAnalyticsTabProps> = ({
                               <div className="mt-1 text-emerald-400 font-bold">
                                 Doanh thu Paid: {formatVND(d.revenue)}
                               </div>
-                              <div className="text-slate-300">Đơn hàng: {d.orders} đơn</div>
+                              <div className="text-slate-300">Đơn hàng: {formatNumber(d.orders)} đơn</div>
                             </div>
                           );
                         }
@@ -1207,7 +1207,7 @@ export const DeepAnalyticsTab: React.FC<DeepAnalyticsTabProps> = ({
                     </div>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-emerald-400 font-bold">{formatVND(v.revenue)}</span>
-                      <span className="text-slate-300">{v.orders} đơn • CVR {v.conversionRate}%</span>
+                      <span className="text-slate-300">{formatNumber(v.orders)} đơn • CVR {v.conversionRate}%</span>
                     </div>
                   </div>
                 ))}
@@ -1247,7 +1247,7 @@ export const DeepAnalyticsTab: React.FC<DeepAnalyticsTabProps> = ({
                     </div>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-purple-300 font-bold">CVR {v.conversionRate}%</span>
-                      <span className="text-slate-300">{formatVND(v.revenue)} • {v.orders} đơn</span>
+                      <span className="text-slate-300">{formatVND(v.revenue)} • {formatNumber(v.orders)} đơn</span>
                     </div>
                   </div>
                 ))}
@@ -1975,7 +1975,7 @@ export const DeepAnalyticsTab: React.FC<DeepAnalyticsTabProps> = ({
                       <div className="font-bold text-white truncate">{p.name}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">{p.sku}</div>
                       <div className="flex justify-between mt-2 pt-1 border-t border-white/[0.06] text-[11px]">
-                        <span className="text-slate-300">Đã bán: {p.orders} đơn</span>
+                        <span className="text-slate-300">Đã bán: {formatNumber(p.orders)} đơn</span>
                         <span className="text-rose-400 font-bold">
                           Thất thoát ước tính: {formatCompactVND(p.revenue * 0.18)}
                         </span>
@@ -2036,7 +2036,7 @@ export const DeepAnalyticsTab: React.FC<DeepAnalyticsTabProps> = ({
                         <span className="text-emerald-400">{formatVND(aff.revenue)}</span>
                       </div>
                       <div className="text-[11px] text-slate-300">
-                        {aff.orders} đơn • Đơn ảo/hủy COD thấp ({((1 - aff.conversionRate / 5) * 10).toFixed(1)}%)
+                        {formatNumber(aff.orders)} đơn • Đơn ảo/hủy COD thấp ({((1 - aff.conversionRate / 5) * 10).toFixed(1)}%)
                       </div>
                     </div>
                   ))}

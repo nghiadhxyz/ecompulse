@@ -20,7 +20,8 @@ export interface AdCampaignRow {
   name: string;
   platform: Platform;
   sku?: string;
-  spend: number;
+  /** Null when the report has no spend figure ("-"); ROAS etc. are then null too. */
+  spend: number | null;
   attributedRevenue: number | null;
   orders: number | null;
   roas: number | null;
@@ -79,7 +80,7 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
   }
 
   const build = (key: string, rows: AdPerformance[], name: string, platform: Platform, sku?: string): AdCampaignRow => {
-    const spend = rows.reduce((s, r) => s + (r.spend || 0), 0);
+    const spend = sumOrNull(rows, (r) => r.spend);
     const revenue = sumOrNull(rows, (r) => r.attributedRevenue);
     const orders = sumOrNull(rows, (r) => r.orders);
     const impressions = sumOrNull(rows, (r) => r.impressions);
@@ -100,16 +101,17 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
       spend,
       attributedRevenue: revenue,
       orders,
-      roas: revenue !== null ? roas(revenue, spend) : null,
+      // Computed here, never read from the report; null when spend is missing or 0.
+      roas: revenue !== null && spend !== null ? roas(revenue, spend) : null,
       impressions,
       clicks,
       ctr: clicks !== null && impressions !== null ? ctr(clicks, impressions) : null,
-      cpc: clicks !== null ? cpc(spend, clicks) : null,
+      cpc: clicks !== null && spend !== null ? cpc(spend, clicks) : null,
       cvr: orders !== null && clicks !== null ? adCvr(orders, clicks) : null,
-      cpa: orders !== null ? cpa(spend, orders) : null,
+      cpa: orders !== null && spend !== null ? cpa(spend, orders) : null,
       marginBeforeAds: margin,
       breakEvenRoas: breakEvenRoas(margin),
-      estimatedProfitAfterAds: revenue !== null ? profitAfterAds(revenue, spend, margin) : null,
+      estimatedProfitAfterAds: revenue !== null && spend !== null ? profitAfterAds(revenue, spend, margin) : null,
       marginIsPartial: margin !== null && (sku ? skuPartial(sku) : shopPartial),
       profitNote,
     };
@@ -120,7 +122,7 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
       const skus = new Set(list.map((a) => a.sku).filter(Boolean));
       return build(key, list, list[0].adName || list[0].campaignId || 'Ads', list[0].platform, skus.size === 1 ? [...skus][0] : undefined);
     })
-    .sort((a, b) => b.spend - a.spend);
+    .sort((a, b) => (b.spend ?? -1) - (a.spend ?? -1));
 
   const total = build('total', slice.ads, 'Tổng', 'other');
   // Shop-level profit after ads = sum of campaign estimates when every campaign has one.
@@ -150,6 +152,15 @@ export interface LiveSessionRow {
   ordersChange: number | null;
   /** More viewers than the previous session but fewer orders. */
   viewersUpOrdersDown: boolean;
+}
+
+/**
+ * A session known only as a total over the report period (Shopee "Phân tích bán hàng"):
+ * its `date` is the report's last day, not the day it aired. Such sessions belong to the
+ * "Không rõ ngày" group and are left out of every analysis by day, weekday or time slot.
+ */
+export function isUndatedSession(s: { periodStart?: string }): boolean {
+  return s.periodStart !== undefined;
 }
 
 export function liveSessions(dataset: CanonicalDataset, filter: DatasetFilter): LiveSessionRow[] {
@@ -193,5 +204,6 @@ export function liveSessions(dataset: CanonicalDataset, filter: DatasetFilter): 
         viewersUpOrdersDown: (viewersChange ?? 0) > 0.1 && (ordersChange ?? 0) < -0.1,
       };
     })
-    .sort((a, b) => b.session.date.localeCompare(a.session.date));
+    // Dated sessions newest first; undated ones last.
+    .sort((a, b) => Number(isUndatedSession(a.session)) - Number(isUndatedSession(b.session)) || b.session.date.localeCompare(a.session.date));
 }

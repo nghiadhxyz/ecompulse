@@ -37,6 +37,15 @@ export function fmtCount(v: number | null | undefined, lang: Lang = 'vi'): strin
   return new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 1 }).format(v);
 }
 
+/**
+ * Platform-attributed order counts, which can be fractional (Shopee splits an order between
+ * sources: 391,5 · 127,92). Never rounded to an integer; up to 2 decimals.
+ */
+export function fmtOrders(v: number | null | undefined, lang: Lang = 'vi'): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return DASH;
+  return new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 2 }).format(v);
+}
+
 /** Ratio → "9,2%". */
 export function fmtRate(v: number | null | undefined, lang: Lang = 'vi', digits = 1): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return DASH;
@@ -88,6 +97,7 @@ export function fmtDay(iso: string): string {
 
 /** Date label for a live session: its day, or the report period when the report has no date. */
 export function sessionDateLabel(s: { date: string; periodStart?: string; startTime?: string }, lang: Lang = 'vi'): string {
-  if (s.periodStart) return `${fmtDay(s.periodStart)}–${fmtDay(s.date)} (${lang === 'vi' ? 'cả kỳ, không rõ ngày' : 'period, no date'})`;
+  // Period-total sessions carry the report's last day as `date` — never show it as the day they aired.
+  if (s.periodStart) return lang === 'vi' ? `Không rõ ngày (tổng kỳ ${fmtDay(s.periodStart)}–${fmtDay(s.date)})` : `Unknown date (period ${fmtDay(s.periodStart)}–${fmtDay(s.date)})`;
   return `${fmtDay(s.date)}${s.startTime ? ` ${s.startTime}` : ''}`;
 }

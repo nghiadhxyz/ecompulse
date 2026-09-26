@@ -18,7 +18,7 @@ import { addDays, isInRange, type DateRange } from './period';
 import { campaignDates, normalDayStats } from './normalDays';
 import { orderHealth } from './orderHealthEngine';
 import { productPerformance } from './productEngine';
-import { adsSummary, liveSessions } from './adsLiveEngine';
+import { adsSummary, isUndatedSession, liveSessions } from './adsLiveEngine';
 import { assessDataQuality } from './dataQuality';
 import { fmtChange, fmtDay, fmtMoneyCompact, fmtMultiple, fmtRate } from './format';
 import type { Bilingual } from './metric';
@@ -430,7 +430,7 @@ export function detectAlerts(dataset: CanonicalDataset, options: AnomalyOptions)
     const baseAds = new Map(adsSummary(dataset, f(range(addDays(day, -20), addDays(day, -7)))).rows.map((r) => [r.key, r]));
     for (const r of recentAds.rows) {
       const b = baseAds.get(r.key);
-      if (!b || r.roas === null || !b.roas || r.spend < t.adsMinSpend) continue;
+      if (!b || r.roas === null || !b.roas || (r.spend ?? 0) < t.adsMinSpend) continue;
       const change = (r.roas - b.roas) / b.roas;
       if (change > -t.adsRoasDrop) continue;
       alerts.push({
@@ -455,7 +455,8 @@ export function detectAlerts(dataset: CanonicalDataset, options: AnomalyOptions)
 
   // ---- live: latest session per platform up to `day`
   if (dataset.liveSessions.length > 0) {
-    const rows = liveSessions(dataset, f(range(addDays(day, -6), day)));
+    // Sessions without an air date cannot be "the latest session" of any day.
+    const rows = liveSessions(dataset, f(range(addDays(day, -6), day))).filter((r) => !isUndatedSession(r.session));
     const latestByPlatform = new Map<Platform, (typeof rows)[number]>();
     for (const r of rows) if (!latestByPlatform.has(r.session.platform)) latestByPlatform.set(r.session.platform, r);
     for (const r of latestByPlatform.values()) {
@@ -482,7 +483,7 @@ export function detectAlerts(dataset: CanonicalDataset, options: AnomalyOptions)
         continue;
       }
       const prior = dataset.liveSessions
-        .filter((x) => x.platform === s.platform && x.date < s.date && x.orders !== undefined)
+        .filter((x) => x.platform === s.platform && !isUndatedSession(x) && x.date < s.date && x.orders !== undefined)
         .sort((a, b) => b.date.localeCompare(a.date))
         .slice(0, 3);
       if (prior.length === 3 && s.orders !== undefined) {

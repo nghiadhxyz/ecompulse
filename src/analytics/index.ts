@@ -43,3 +43,5 @@ export * from './customerEngine';
 export * from './whatIfEngine';
 export * from './statsEngine';
 export * from './summaryEngine';
+export * from './summaryInsights';
+export * from './periodRows';

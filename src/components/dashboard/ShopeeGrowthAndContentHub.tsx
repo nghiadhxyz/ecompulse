@@ -860,7 +860,7 @@ export const ShopeeGrowthAndContentHub: React.FC<ShopeeGrowthAndContentHubProps>
                   {formatNumber(liveOrders)} đơn
                 </div>
                 <span className="text-[10px] text-slate-400">
-                  {liveOrders > 0 ? `${liveOrders} đơn Live thành công` : '0 đơn Live'}
+                  {liveOrders > 0 ? `${formatNumber(liveOrders)} đơn Live thành công` : '0 đơn Live'}
                 </span>
               </div>
             </div>

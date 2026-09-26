@@ -7,9 +7,9 @@
  * parser estimated are listed in `estimatedFields` and ignored.
  */
 import type { ParsedStoreData, RawSheetTable } from '../../types';
-import { emptyDataset, type CanonicalDataset, type DailyMetric, type Order, type OrderLine, type Platform } from '../model';
+import { emptyDataset, type CanonicalDataset, type DailyMetric, type Order, type OrderLine, type Platform, type ShopPeriodTotal } from '../model';
 import { normalizeOrderStatus } from '../status';
-import { findHeader, normalizeHeader, toIsoDate, toNumber } from '../parse';
+import { findHeader, normalizeHeader, toIsoDate, toIsoPeriod, toNumber, toRate } from '../parse';
 
 export function platformFromString(value: string | null | undefined): Platform {
   const s = normalizeHeader(value);
@@ -38,9 +38,14 @@ function isSummaryRow(dateValue: unknown): boolean {
   return dateLike.length >= 2 || s.includes(' - ') || s.includes('tổng') || s.includes('total') || s.includes('toàn bộ');
 }
 
-/** Reads Shopee "Tổng quan" daily sheets (one row per day) into DailyMetric rows. */
-function dailyFromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platform: Platform): DailyMetric[] {
+/**
+ * Reads Shopee "Tổng quan" sheets (one row per day, plus one row for the whole period) into
+ * DailyMetric rows and ShopPeriodTotal rows. The period row is kept apart: distinct counts
+ * (buyers, visitors) exist only there, and the days never add up to them.
+ */
+function fromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platform: Platform): { daily: DailyMetric[]; totals: ShopPeriodTotal[] } {
   const byDate = new Map<string, DailyMetric>();
+  const totals: ShopPeriodTotal[] = [];
   const get = (date: string) => {
     let row = byDate.get(date);
     if (!row) {
@@ -50,7 +55,7 @@ function dailyFromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platf
     return row;
   };
 
-  // Placed sheet first so its cancel/refund/traffic columns win over the other two.
+  // Placed sheet first so its cancel/refund/traffic/buyer columns win over the other two.
   const order: OverviewKind[] = ['placed', 'paid', 'confirmed'];
   const sheets = Object.values(rawSheets)
     .map((s) => ({ sheet: s, kind: overviewKind(s) }))
@@ -62,6 +67,7 @@ function dailyFromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platf
     const col = {
       date: findHeader(h, ['Ngày', 'Date']),
       gmv: findHeader(h, ['Tổng doanh số (VND)', 'Tổng doanh số', 'Doanh số (VND)'], ['khong bao gom', 'huy', 'tra hang', 'moi don']),
+      noSubsidy: findHeader(h, ['Doanh số không bao gồm trợ giá bởi Shopee', 'không bao gồm trợ giá']),
       orders: findHeader(h, ['Tổng số đơn hàng', 'Số đơn hàng']),
       visits: findHeader(h, ['Số lượt truy cập', 'Lượt truy cập']),
       clicks: findHeader(h, ['Lượt nhấp vào sản phẩm']),
@@ -71,22 +77,54 @@ function dailyFromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platf
       refundedGmv: findHeader(h, ['Doanh số các đơn Trả hàng/Hoàn tiền', 'Doanh số đơn hoàn']),
       buyers: findHeader(h, ['số người mua'], ['moi', 'hientai', 'tiemnang']),
       newBuyers: findHeader(h, ['số người mua mới']),
+      existingBuyers: findHeader(h, ['số người mua hiện tại']),
+      potentialBuyers: findHeader(h, ['số người mua tiềm năng']),
+      repeatRate: findHeader(h, ['Tỉ lệ quay lại của người mua', 'Tỉ lệ quay lại', 'Tỷ lệ quay lại']),
     };
     if (!col.date) continue;
 
     for (const r of sheet.rows) {
       const rawDate = r[col.date];
+      const num = (c?: string) => (c ? toNumber(r[c]) : undefined);
+      const rate = (c?: string) => (c ? toRate(r[c]) : undefined);
+      const period = toIsoPeriod(rawDate);
+      if (period) {
+        totals.push({
+          platform,
+          start: period.start,
+          end: period.end,
+          stage: kind,
+          gmv: num(col.gmv),
+          noSubsidyGmv: num(col.noSubsidy),
+          orders: num(col.orders),
+          productClicks: num(col.clicks),
+          visits: num(col.visits),
+          cancelledOrders: num(col.cancelled),
+          cancelledGmv: num(col.cancelledGmv),
+          refundedOrders: num(col.refunded),
+          refundedGmv: num(col.refundedGmv),
+          buyers: num(col.buyers),
+          newBuyers: num(col.newBuyers),
+          existingBuyers: num(col.existingBuyers),
+          potentialBuyers: num(col.potentialBuyers),
+          repeatRate: rate(col.repeatRate),
+        });
+        continue;
+      }
       if (isSummaryRow(rawDate)) continue;
       const date = toIsoDate(rawDate);
       if (!date) continue;
       const row = get(date);
-      const num = (c?: string) => (c ? toNumber(r[c]) : undefined);
       if (kind === 'placed') {
         row.placedGmv = num(col.gmv);
         row.placedOrders = num(col.orders);
+        row.placedNoSubsidyGmv = num(col.noSubsidy);
       } else if (kind === 'paid') {
         row.paidGmv = num(col.gmv);
         row.paidOrders = num(col.orders);
+      } else {
+        row.confirmedGmv = num(col.gmv);
+        row.confirmedOrders = num(col.orders);
       }
       row.visits ??= num(col.visits);
       row.productClicks ??= num(col.clicks);
@@ -96,9 +134,12 @@ function dailyFromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platf
       row.refundedGmv ??= num(col.refundedGmv);
       row.buyers ??= num(col.buyers);
       row.newBuyers ??= num(col.newBuyers);
+      row.existingBuyers ??= num(col.existingBuyers);
+      row.potentialBuyers ??= num(col.potentialBuyers);
+      row.repeatRate ??= rate(col.repeatRate);
     }
   }
-  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  return { daily: Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date)), totals };
 }
 
 function dailyFromTimeline(data: ParsedStoreData, platform: Platform): DailyMetric[] {
@@ -156,8 +197,9 @@ export function canonicalFromParsedStoreData(data: ParsedStoreData, platformHint
   ds.orderLines = lines;
 
   if (orders.length === 0) {
-    const fromSheets = data.rawSheets ? dailyFromOverviewSheets(data.rawSheets, platform) : [];
-    ds.dailyMetrics = fromSheets.length > 0 ? fromSheets : dailyFromTimeline(data, platform);
+    const fromSheets = data.rawSheets ? fromOverviewSheets(data.rawSheets, platform) : { daily: [], totals: [] };
+    ds.dailyMetrics = fromSheets.daily.length > 0 ? fromSheets.daily : dailyFromTimeline(data, platform);
+    if (fromSheets.totals.length > 0) ds.periodTotals = fromSheets.totals;
   }
 
   const seen = new Set<string>();

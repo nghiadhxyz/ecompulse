@@ -37,7 +37,9 @@ describe.skipIf(!existsSync(WORKBOOK))('Shopee sample workbook (golden)', () => 
     expect(m.gmv.value).toBe(51_302_716);
     expect(m.validOrders.value).toBe(422);
     expect(m.cvr.value).toBeCloseTo(0.049, 3); // Shopee shows 4,90%
-    expect(m.visits.status).toBe('missing'); // unique visitors are not additive
+    // Unique visitors are not additive: the whole period uses Shopee's own total (daily sum is 9.622).
+    expect(m.visits.value).toBe(7362);
+    expect(m.buyers.value).toBe(453);
     expect(m.profit.status).toBe('missing'); // summary report has no COGS / order lines
   });
 });

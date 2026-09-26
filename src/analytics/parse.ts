@@ -48,6 +48,34 @@ export function toNumber(value: unknown): number | undefined {
 }
 
 /**
+ * Parses a rate into a ratio: "4,90%" → 0.049 · "10,60%" → 0.106 · 0.049 → 0.049.
+ * Numbers without a percent sign are read as ratios when ≤ 1, else as percentages
+ * (Excel stores %-formatted cells as fractions). "-" → undefined.
+ */
+export function toRate(value: unknown): number | undefined {
+  if (typeof value === 'string' && value.includes('%')) {
+    const n = toNumber(value);
+    return n === undefined ? undefined : n / 100;
+  }
+  const n = toNumber(value);
+  if (n === undefined) return undefined;
+  return Math.abs(n) <= 1 ? n : n / 100;
+}
+
+/**
+ * Report period cell → {start, end}: "24-07-2026-22-08-2026" (Shopee) or
+ * "01/08/2025 - 31/08/2025". Undefined for anything else.
+ */
+export function toIsoPeriod(value: unknown): { start: string; end: string } | undefined {
+  const s = String(value ?? '').trim();
+  const m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\s*[-–~]\s*(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/.exec(s);
+  if (!m) return undefined;
+  const start = validIso(m[3], m[2], m[1]);
+  const end = validIso(m[6], m[5], m[4]);
+  return start && end && start <= end ? { start, end } : undefined;
+}
+
+/**
  * Converts common marketplace date formats to YYYY-MM-DD:
  * ISO ("2025-08-01", "2025-08-01 10:22"), "01/08/2025", "01-08-2025", "01.08.2025",
  * "2025/08/01", Excel serials (45870) and Date objects. Day-first is assumed for

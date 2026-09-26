@@ -17,7 +17,7 @@ import { computeContribution } from './contributionEngine';
 import { compareValues, type Comparison } from './comparisonEngine';
 import { isCancelled, isReturnOrRefund } from './status';
 import { addDays, isInRange, toDayNumber, type DateRange } from './period';
-import { fmtDay } from './format';
+import { fmtDay, sessionDateLabel } from './format';
 
 export type BreakdownDimension =
   | 'platform'
@@ -107,7 +107,7 @@ export function dimensionMemberLabel(dataset: CanonicalDataset, dim: BreakdownDi
       return dataset.campaigns.find((c) => c.campaignId === key)?.name ?? dataset.ads.find((a) => a.campaignId === key)?.adName ?? key;
     case 'liveSession': {
       const s = dataset.liveSessions.find((x) => x.sessionId === key);
-      return s ? `${fmtDay(s.date)} · ${PLATFORM_LABELS[s.platform]}${s.title ? ` · ${s.title}` : ''}` : key;
+      return s ? `${sessionDateLabel(s)} · ${PLATFORM_LABELS[s.platform]}${s.title ? ` · ${s.title}` : ''}` : key;
     }
     case 'channel': {
       const channels: Record<string, { vi: string; en: string }> = {

@@ -91,8 +91,8 @@ export const KpiCard: React.FC<{
   const missing = metric.value === null;
   return (
     <div className={`rounded-2xl border p-3.5 sm:p-4 flex flex-col gap-1 min-w-0 ${emphasis ? 'border-sky-400/30 bg-sky-500/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
-      <div className="text-xs font-semibold text-slate-400 flex items-center gap-1">
-        {label}
+      <div className="text-xs font-semibold text-slate-400 flex items-center gap-1" title={metric.status === 'ok' ? (metric.notes || []).map((n) => n[lang]).join('\n') || undefined : undefined}>
+        {metric.label ? metric.label[lang] : label}
         {metric.status === 'partial' && (
           <span className="text-[10px] font-bold text-[#fab219]" title={(metric.notes || []).map((n) => n[lang]).join('\n')}>
             • {lang === 'vi' ? 'chưa đầy đủ' : 'partial'}
@@ -101,6 +101,7 @@ export const KpiCard: React.FC<{
       </div>
       <div className={`font-black tracking-tight truncate ${missing ? 'text-base text-slate-500' : 'text-xl sm:text-2xl text-white'}`}>{metricText(metric, lang)}</div>
       {missing && metric.notes?.[0] && <div className="text-[11px] text-slate-500 leading-snug">{metric.notes[0][lang]}</div>}
+      {!missing && metric.warning && <div className="text-[11px] text-[#fab219] leading-snug">⚠ {metric.warning[lang]}</div>}
       {!missing && cmp && (
         <div className="leading-snug">
           <DeltaChip cmp={cmp} lang={lang} goodWhenUp={goodWhenUp} />
@@ -125,10 +126,10 @@ export const Section: React.FC<{ title: string; subtitle?: string; right?: React
   </section>
 );
 
-export const NotEnoughData: React.FC<{ lang: Lang; reason: string; action?: React.ReactNode }> = ({ lang, reason, action }) => (
+export const NotEnoughData: React.FC<{ lang: Lang; reason: string; action?: React.ReactNode; title?: string }> = ({ lang, reason, action, title }) => (
   <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-4 text-center">
     <Database className="w-5 h-5 mx-auto text-slate-500" aria-hidden />
-    <div className="text-sm font-bold text-slate-300 mt-1.5">{lang === 'vi' ? 'Không đủ dữ liệu' : 'Not enough data'}</div>
+    <div className="text-sm font-bold text-slate-300 mt-1.5">{title ?? (lang === 'vi' ? 'Không đủ dữ liệu' : 'Not enough data')}</div>
     <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">{reason}</p>
     {action && <div className="mt-3">{action}</div>}
   </div>

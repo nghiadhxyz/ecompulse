@@ -16,6 +16,7 @@ import {
 } from '../../../analytics';
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, GhostButton, HelpTip, NotEnoughData, Section } from '../ui';
+import { ChannelWeekdayPanel } from '../../workspace/SummaryInsightPanels';
 
 export const AdsLiveView: React.FC = () => {
   const { lang, dataset, range, platforms, openEvidence, goTo } = useSeller();
@@ -126,7 +127,14 @@ export const AdsLiveView: React.FC = () => {
         )}
       </Section>
 
-      <Section title={vi ? 'Livestream' : 'Livestream'} subtitle={formatRangeVi(range)}>
+      <Section
+        title={vi ? 'Livestream' : 'Livestream'}
+        subtitle={
+          lives.length > 0 && lives.every((r) => r.session.periodStart !== undefined)
+            ? `${formatRangeVi(range)} · ${vi ? `Top ${lives.length} phiên theo báo cáo Shopee, không phải tất cả phiên` : `top ${lives.length} sessions from the Shopee report`}`
+            : formatRangeVi(range)
+        }
+      >
         {lives.length === 0 ? (
           <NotEnoughData lang={lang} reason={vi ? 'Chưa có dữ liệu phiên live có ngày diễn ra trong khoảng này.' : 'No dated live sessions in this range.'} />
         ) : (
@@ -176,6 +184,7 @@ export const AdsLiveView: React.FC = () => {
           </ul>
         )}
       </Section>
+      <ChannelWeekdayPanel channel="live" />
     </div>
   );
 };

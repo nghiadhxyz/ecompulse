@@ -85,16 +85,21 @@ export const VideoAffiliateView: React.FC = () => {
           </div>
         ))}
       </div>
+      {dataset.sources.some((s) => s.reportType === 'shopee_sales_analysis') && (
+        <p className="text-xs text-slate-300">
+          {vi ? 'Số theo video và affiliate từ báo cáo Phân tích bán hàng là Top 5 video và Top 5 affiliate — Shopee không liệt kê tất cả.' : 'Videos and affiliates from the Shopee sales report are the top 5 only.'}
+        </p>
+      )}
       {va.notes.map((n, i) => (
         <p key={i} className="text-xs text-[#fab219]">{tr(lang, n)}</p>
       ))}
       {va.creators.length > 0 && (
-        <Section title={vi ? 'Nhà sáng tạo / KOC' : 'Creators / KOC'} subtitle={`${formatRangeVi(range)} · ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}>
+        <Section title={dataset.sources.some((s) => s.reportType === 'shopee_sales_analysis') ? (vi ? 'Nhà sáng tạo / KOC (Top 5 affiliate)' : 'Creators / KOC (top 5)') : vi ? 'Nhà sáng tạo / KOC' : 'Creators / KOC'} subtitle={`${formatRangeVi(range)} · ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}>
           {table(va.creators, 'creator')}
         </Section>
       )}
       {va.videos.length > 0 && (
-        <Section title={vi ? 'Video' : 'Videos'} subtitle={vi ? 'Video của shop và video affiliate có mã nội dung' : 'Shop and affiliate videos with a content ID'}>
+        <Section title={dataset.sources.some((s) => s.reportType === 'shopee_sales_analysis') ? (vi ? 'Video (Top 5)' : 'Videos (top 5)') : vi ? 'Video' : 'Videos'} subtitle={vi ? 'Video của shop và video affiliate có mã nội dung' : 'Shop and affiliate videos with a content ID'}>
           {table(va.videos, 'video')}
         </Section>
       )}

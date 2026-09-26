@@ -69,11 +69,14 @@ export function mergeIntoWorkspace(base: CanonicalDataset | null, incoming: Cano
   ws.traffic = mergeKeyed(ws.traffic, incoming.traffic, (t) => `${t.periodStart ?? ''}|${t.date}|${t.platform}|${t.sku ?? ''}`);
   ws.salesSummaries = mergeKeyed(ws.salesSummaries ?? [], incoming.salesSummaries ?? [], (r) => `${r.platform}|${r.periodStart ?? ''}|${r.date}|${r.stage}|${r.dimension}|${r.channel}|${r.key}`);
   ws.dailyMetrics = mergeKeyed(ws.dailyMetrics, incoming.dailyMetrics, (d) => `${d.date}|${d.platform}`);
+  if (ws.periodTotals?.length || incoming.periodTotals?.length) {
+    ws.periodTotals = mergeKeyed(ws.periodTotals ?? [], incoming.periodTotals ?? [], (t) => `${t.platform}|${t.start}|${t.end}|${t.stage}`);
+  }
   ws.costs = [...ws.costs, ...incoming.costs];
   ws.settlements = [...ws.settlements, ...incoming.settlements];
   ws.changeEvents = mergeKeyed(ws.changeEvents, incoming.changeEvents, (c) => c.id);
   ws.sources = [...ws.sources, ...incoming.sources];
-  ws.importNotes = [...(ws.importNotes || []), ...(incoming.importNotes || [])];
+  ws.importNotes = mergeKeyed(ws.importNotes || [], incoming.importNotes || [], (n) => n.vi);
   ws.estimatedFields = Array.from(new Set([...(ws.estimatedFields || []), ...(incoming.estimatedFields || [])]));
   return ws;
 }

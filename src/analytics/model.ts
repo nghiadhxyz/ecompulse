@@ -124,7 +124,8 @@ export interface AdPerformance {
   adName?: string;
   adType?: string;
   sku?: string;
-  spend: number;
+  /** Undefined when the report shows "-" (no data), which is not the same as 0. */
+  spend?: number;
   impressions?: number;
   clicks?: number;
   orders?: number;
@@ -195,15 +196,53 @@ export interface DailyMetric {
   placedOrders?: number;
   paidGmv?: number;
   paidOrders?: number;
+  confirmedGmv?: number;
+  confirmedOrders?: number;
+  /** Placed-order sales excluding Shopee's subsidy ("Doanh số không bao gồm trợ giá bởi Shopee"). */
+  placedNoSubsidyGmv?: number;
   cancelledOrders?: number;
   cancelledGmv?: number;
   refundedOrders?: number;
   refundedGmv?: number;
   units?: number;
+  /** Distinct buyers of the day — not additive across days. */
   buyers?: number;
   newBuyers?: number;
+  /** Buyers who had bought before ("số người mua hiện tại"). */
+  existingBuyers?: number;
+  /** Visitors who have not bought yet ("số người mua tiềm năng") — distinct per day. */
+  potentialBuyers?: number;
+  /** Ratio (0.106 = 10,6%) as reported by the platform. */
+  repeatRate?: number;
+  /** Distinct visitors of the day — not additive across days. */
   visits?: number;
   productClicks?: number;
+}
+
+/**
+ * Shop-level totals for a whole report period, as the platform reports them (the
+ * "24-07-2026-22-08-2026" row of Shopee's overview sheets). Distinct counts (buyers,
+ * visitors) only exist here: daily rows cannot be summed into them.
+ */
+export interface ShopPeriodTotal {
+  platform: Platform;
+  start: string;
+  end: string;
+  stage: SummaryStage;
+  gmv?: number;
+  noSubsidyGmv?: number;
+  orders?: number;
+  productClicks?: number;
+  visits?: number;
+  cancelledOrders?: number;
+  cancelledGmv?: number;
+  refundedOrders?: number;
+  refundedGmv?: number;
+  buyers?: number;
+  newBuyers?: number;
+  existingBuyers?: number;
+  potentialBuyers?: number;
+  repeatRate?: number;
 }
 
 /** Order stage a summary report counts: placed, confirmed, or paid orders. */
@@ -237,6 +276,9 @@ export interface SalesSummaryRow {
   clicks?: number;
   /** Live / video / content views. */
   views?: number;
+  /** Distinct impressions / clicks ("… duy nhất") — not additive across days or channels. */
+  uniqueImpressions?: number;
+  uniqueClicks?: number;
 }
 
 export type CostType = 'packaging' | 'staff' | 'rent' | 'tools' | 'shipping' | 'marketing' | 'other';
@@ -317,6 +359,8 @@ export interface CanonicalDataset {
   changeEvents: ChangeEvent[];
   /** Summary-report sales by channel / source / product (optional). */
   salesSummaries?: SalesSummaryRow[];
+  /** Whole-period shop totals from summary reports (optional). */
+  periodTotals?: ShopPeriodTotal[];
   costSettings?: CostSettings;
   /** Field names the source reported only as estimates; engines treat them as missing. */
   estimatedFields?: string[];

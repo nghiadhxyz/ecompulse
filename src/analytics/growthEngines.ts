@@ -2,15 +2,17 @@
  * Growth engines: Ads Intelligence, Live Auditor, Video & Affiliate.
  * All built on the same slice / profit engine as the rest of the analytics.
  */
-import type { AffiliatePerformance, CanonicalDataset, LiveSession, Platform } from './model';
+import type { AdPerformance, AffiliatePerformance, CanonicalDataset, LiveSession, Platform } from './model';
 import { sliceDataset, type DatasetFilter } from './filters';
-import { adsSummary, liveSessions, type AdCampaignRow, type LiveSessionRow } from './adsLiveEngine';
+import { adsSummary, isUndatedSession, liveSessions, type AdCampaignRow, type LiveSessionRow } from './adsLiveEngine';
 import { computeProfitByGroup } from './profitEngine';
 import { liveFunnel, type Funnel } from './funnelEngine';
 import { compareValues, type Comparison } from './comparisonEngine';
 import { safeDivide, type Bilingual } from './metric';
 import { enumerateDays } from './period';
 import { weekdayIndex } from './campaignEngine';
+import { mismatchNote, moneyTolerance, ORDER_TOLERANCE, periodMismatches } from './periodRows';
+import { fmtMoney, fmtOrders } from './format';
 
 // ============================================================ ADS INTELLIGENCE
 
@@ -36,9 +38,11 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
   const campaigns = summary.rows.map((r) => ({
     ...r,
     efficiency: (r.roas === null || r.breakEvenRoas === null ? 'unknown' : r.roas >= r.breakEvenRoas ? 'profitable' : 'below_break_even') as AdEfficiency,
-    spendShare: totalSpend > 0 ? r.spend / totalSpend : null,
+    spendShare: totalSpend && r.spend !== null ? r.spend / totalSpend : null,
   }));
-  const dailyRows = slice.ads.filter((a) => a.periodStart === undefined);
+  // The chart by day always uses the daily rows, even when the totals above use the
+  // platform's period rows (full period selected).
+  const dailyRows = slice.adsDaily;
   const daily = enumerateDays(filter.range).map((date) => {
     const rows = dailyRows.filter((a) => a.date === date);
     const spend = rows.reduce((s, a) => s + (a.spend || 0), 0);
@@ -50,7 +54,7 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
   const platforms = Array.from(new Set(campaigns.map((c) => c.platform)));
   const byPlatform = platforms.map((platform) => {
     const rows = campaigns.filter((c) => c.platform === platform);
-    const spend = rows.reduce((s, c) => s + c.spend, 0);
+    const spend = rows.reduce((s, c) => s + (c.spend ?? 0), 0);
     const revKnown = rows.every((c) => c.attributedRevenue !== null);
     const revenue = revKnown ? rows.reduce((s, c) => s + (c.attributedRevenue ?? 0), 0) : null;
     const profitKnown = rows.every((c) => c.estimatedProfitAfterAds !== null);
@@ -62,7 +66,8 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
       profitAfterAds: profitKnown ? rows.reduce((s, c) => s + (c.estimatedProfitAfterAds ?? 0), 0) : null,
     };
   });
-  const periodRows = slice.ads.length - dailyRows.length;
+  const periodUsed = slice.ads.filter((a) => a.periodStart !== undefined);
+  const periodRows = periodUsed.filter((p) => !dailyRows.some((d) => d.campaignId === p.campaignId && d.platform === p.platform)).length;
   const notes: Bilingual[] = [];
   if (periodRows > 0) {
     notes.push({
@@ -70,13 +75,27 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
       en: `${periodRows} ad rows are period totals — included in campaign totals, not in the daily chart.`,
     });
   }
+  const adKey = (a: { platform: string; campaignId?: string; adName?: string; sku?: string }) => `${a.platform}|${a.campaignId ?? ''}|${a.adName ?? ''}|${a.sku ?? ''}`;
+  const scopedAds = dataset.ads.filter((a) => !filter.platforms?.length || filter.platforms.includes(a.platform));
+  const mm = periodMismatches<AdPerformance>(scopedAds, filter.range, adKey, [
+    { key: 'spend', pick: (a) => a.spend, tolerance: moneyTolerance },
+    { key: 'attributedRevenue', pick: (a) => a.attributedRevenue, tolerance: moneyTolerance },
+    { key: 'orders', pick: (a) => a.orders, tolerance: ORDER_TOLERANCE },
+  ]);
+  const FIELD_VI: Record<string, string> = { spend: 'chi phí', attributedRevenue: 'doanh số', orders: 'số đơn' };
+  const mmNote = mismatchNote(mm, (m) => {
+    const name = m.group.split('|')[2] || m.group.split('|')[1];
+    const f = m.field === 'orders' ? fmtOrders : (v: number) => fmtMoney(v);
+    return `${name} — ${FIELD_VI[m.field]} cộng ngày ${f(m.dailySum)}, dòng tổng ${f(m.periodValue)}`;
+  });
+  if (mmNote) notes.push(mmNote);
   return {
     available: summary.available,
     campaigns,
     totals: summary.totals,
     daily,
     byPlatform,
-    spendBelowBreakEven: campaigns.filter((c) => c.efficiency === 'below_break_even').reduce((s, c) => s + c.spend, 0),
+    spendBelowBreakEven: campaigns.filter((c) => c.efficiency === 'below_break_even').reduce((s, c) => s + (c.spend ?? 0), 0),
     periodRowsExcludedFromDaily: periodRows,
     notes,
   };
@@ -100,6 +119,8 @@ export interface LiveAudit {
   ranking: LiveSessionRow[];
   byTimeSlot: LiveGroupStats[];
   byWeekday: LiveGroupStats[];
+  /** Sessions without an air date ("Không rõ ngày") — never placed on a day or weekday. */
+  undated: LiveGroupStats | null;
   byDuration: LiveGroupStats[];
   funnel: Funnel;
   totals: { sessions: number; hours: number | null; gmv: number; orders: number; gmvPerHour: number | null };
@@ -156,9 +177,13 @@ export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): Liv
   const sessions = liveSessions(dataset, filter);
   const ranking = [...sessions].filter((r) => r.gmvPerHour !== null).sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0));
   const hourOf = (s: LiveSession) => (s.startTime ? Number(s.startTime.slice(0, 2)) : null);
-  const withTime = sessions.filter((r) => hourOf(r.session) !== null);
+  const withTime = sessions.filter((r) => !isUndatedSession(r.session) && hourOf(r.session) !== null);
   const byTimeSlot = SLOTS.map((slot) => groupStats(slot.key, slot.label, withTime.filter((r) => hourOf(r.session)! >= slot.from && hourOf(r.session)! < slot.to))).filter((g) => g.sessions > 0);
-  const byWeekday = WEEKDAYS.map((label, i) => groupStats(String(i), label, sessions.filter((r) => weekdayIndex(r.session.date) === i))).filter((g) => g.sessions > 0);
+  // Period-total sessions carry the report's last day as `date`, not the day they aired.
+  const dated = sessions.filter((r) => !isUndatedSession(r.session));
+  const undatedRows = sessions.filter((r) => isUndatedSession(r.session));
+  const undated = undatedRows.length ? groupStats('undated', { vi: 'Không rõ ngày', en: 'Unknown date' }, undatedRows) : null;
+  const byWeekday = WEEKDAYS.map((label, i) => groupStats(String(i), label, dated.filter((r) => weekdayIndex(r.session.date) === i))).filter((g) => g.sessions > 0);
   const byDuration = DURATIONS.map((d) =>
     groupStats(d.key, d.label, sessions.filter((r) => r.session.durationMinutes !== undefined && r.session.durationMinutes >= d.from && r.session.durationMinutes < d.to)),
   ).filter((g) => g.sessions > 0);
@@ -166,6 +191,12 @@ export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): Liv
   const hours = withHours.length ? withHours.reduce((s, r) => s + (r.durationHours || 0), 0) : null;
   const gmv = sessions.reduce((s, r) => s + (r.session.gmv || 0), 0);
   const notes: Bilingual[] = [];
+  if (dated.length < sessions.length) {
+    notes.push({
+      vi: `${sessions.length - dated.length} phiên chỉ có số tổng cả kỳ, không có ngày diễn ra — xếp vào nhóm "Không rõ ngày", không xếp được theo ngày, thứ hay khung giờ.`,
+      en: `${sessions.length - dated.length} sessions are period totals without a date — not grouped by weekday.`,
+    });
+  }
   if (sessions.length > 0 && withTime.length < sessions.length) {
     notes.push({ vi: `${sessions.length - withTime.length} phiên không có giờ bắt đầu — không xếp được vào khung giờ.`, en: `${sessions.length - withTime.length} sessions have no start time.` });
   }
@@ -177,6 +208,7 @@ export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): Liv
     ranking,
     byTimeSlot,
     byWeekday,
+    undated,
     byDuration,
     funnel: liveFunnel(dataset, filter.range, filter.platforms),
     totals: { sessions: sessions.length, hours, gmv, orders: sessions.reduce((s, r) => s + (r.session.orders || 0), 0), gmvPerHour: hours ? withHours.reduce((s, r) => s + (r.session.gmv || 0), 0) / hours : null },

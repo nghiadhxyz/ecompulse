@@ -23,6 +23,16 @@ export interface MetricResult {
   notes?: Bilingual[];
   /** Canonical fields that would make the metric computable/complete. */
   requires?: string[];
+  /**
+   * Replaces the metric's usual name when the value means something narrower, e.g.
+   * "Lượt người mua (cộng theo ngày)" instead of "Người mua" for a sum of daily distinct counts.
+   */
+  label?: Bilingual;
+  /**
+   * Shown next to the value even when the metric is ok — e.g. the platform's period total
+   * differs from the sum of its daily rows.
+   */
+  warning?: Bilingual;
 }
 
 export function ok(value: number, unit: MetricUnit): MetricResult {
@@ -74,6 +84,8 @@ export function ratioMetric(
   }
   const value = safeDivide(numerator.value, denominator.value);
   if (value === null) return missing(unit, zeroDenominatorNote);
+  const warning = numerator.warning ?? denominator.warning;
+  if (warning && numerator.status !== 'partial' && denominator.status !== 'partial') return { ...ok(value, unit), warning };
   if (numerator.status === 'partial' || denominator.status === 'partial') {
     return partial(value, unit, [...(numerator.notes || []), ...(denominator.notes || [])], [
       ...(numerator.requires || []),

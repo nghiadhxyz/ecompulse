@@ -118,9 +118,18 @@ describe('ParsedStoreData adapter', () => {
       { date: '2025-09-01', platform: 'shopee', placedGmv: 1_000_000, placedOrders: 10, paidGmv: 800_000, paidOrders: 8, visits: 400, productClicks: 300, cancelledOrders: 2, cancelledGmv: undefined, refundedOrders: undefined, refundedGmv: undefined, buyers: 9, newBuyers: 4 },
       { date: '2025-09-02', platform: 'shopee', placedGmv: 500_000, placedOrders: 5, paidGmv: 500_000, paidOrders: 5, visits: 100, productClicks: 200, cancelledOrders: 0, cancelledGmv: undefined, refundedOrders: undefined, refundedGmv: undefined, buyers: undefined, newBuyers: undefined },
     ]);
+    // The period row is kept apart as the platform's total, not as a day.
+    expect(ds.periodTotals).toEqual([{ platform: 'shopee', start: '2025-09-01', end: '2025-09-02', stage: 'placed', gmv: 999, orders: 9, cancelledOrders: 99 }]);
+    // Part of the period → daily rows, rates recomputed from sums.
+    const day = computeKpis(ds, { range: { start: '2025-09-01', end: '2025-09-01' } }).metrics;
+    expect(day.cancelRate.value).toBeCloseTo(2 / 10, 10);
+    expect(day.cvr.value).toBeCloseTo(10 / 300, 10);
+    // Whole period → the platform's total, with a warning that the days add up differently.
     const m = computeKpis(ds, { range: { start: '2025-09-01', end: '2025-09-02' } }).metrics;
-    expect(m.cancelRate.value).toBeCloseTo(2 / 15, 10);
-    expect(m.cvr.value).toBeCloseTo(15 / 500, 10);
+    expect(m.orders.value).toBe(9);
+    expect(m.orders.warning?.vi).toContain('Cộng các ngày = 15, dòng tổng của sàn = 9');
+    expect(m.cancelRate.warning).toBeDefined();
+    expect(m.cancelRate.value).toBeCloseTo(99 / 9, 10);
   });
 
   it('maps legacy order rows to orders + lines and ignores fabricated ads', () => {

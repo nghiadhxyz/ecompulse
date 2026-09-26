@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Lightbulb, CalendarDays } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { anomalyScan, findOpportunities, fmtByUnit, fmtChange, fmtDay, fmtRate, formatRangeVi, type ScanMetric } from '../../../analytics';
+import { addDays, anomalyScan, findOpportunities, fmtByUnit, fmtChange, fmtDay, fmtRate, formatRangeVi, type ScanMetric } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { Th } from '../ui';
+import { SourceDriversPanel } from '../../workspace/SummaryInsightPanels';
 
 const CURRENT_COLOR = '#3987e5';
 const BASELINE_COLOR = '#8b93a3';
@@ -30,6 +31,15 @@ export const AnomalyOpportunityView: React.FC = () => {
   const scan = useMemo(() => anomalyScan(dataset, baseFilter, metric), [dataset, baseFilter, metric]);
   const opps = useMemo(() => findOpportunities(dataset, baseFilter, previousRange), [dataset, baseFilter, previousRange]);
   const fmt = (v: number | null) => fmtByUnit(v, spec.unit, lang);
+  // Source breakdown of a flagged day vs the 14 days before it (sale days left out of the baseline).
+  const hasSources = (dataset.salesSummaries ?? []).some((r) => r.dimension === 'source' && r.periodStart === undefined);
+  const [driverDay, setDriverDay] = useState<string | null>(null);
+  const flaggedDay = scan.flagged.find((p) => p.date === driverDay)?.date ?? (scan.flagged.find((p) => !p.saleDay) ?? scan.flagged[0])?.date ?? null;
+  const saleDays = useMemo(() => new Set(scan.points.filter((p) => p.saleDay && p.date !== flaggedDay).map((p) => p.date)), [scan, flaggedDay]);
+  const driverWindows = useMemo(
+    () => (flaggedDay ? { before: { start: addDays(flaggedDay, -14), end: addDays(flaggedDay, -1) }, after: { start: flaggedDay, end: flaggedDay } } : null),
+    [flaggedDay],
+  );
 
   const chart = scan.points.map((p) => ({ date: p.date, label: fmtDay(p.date), value: p.value, baseline: p.baseline }));
   const unexpected = scan.flagged.filter((p) => !p.saleDay);
@@ -116,7 +126,16 @@ export const AnomalyOpportunityView: React.FC = () => {
                             <span className="inline-flex items-center gap-1 text-[#fab219]"><AlertTriangle className="w-3 h-3" aria-hidden /> {vi ? 'Cần kiểm tra' : 'Check'}</span>
                           )}
                         </td>
-                        <td className="px-2.5 py-1.5 text-right">
+                        <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
+                          {hasSources && (
+                            <button
+                              onClick={() => setDriverDay(p.date)}
+                              aria-pressed={flaggedDay === p.date}
+                              className={`mr-1.5 px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${flaggedDay === p.date ? 'bg-white/15 border-white/30 text-white' : 'border-white/10 text-slate-400'}`}
+                            >
+                              {vi ? 'Theo nguồn' : 'By source'}
+                            </button>
+                          )}
                           <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${vi ? spec.vi : spec.en} · ${fmtDay(p.date)}`, filter: { range: { start: p.date, end: p.date }, platforms, cancelledOnly: metric === 'cancelRate' || undefined } })} />
                         </td>
                       </tr>
@@ -131,6 +150,15 @@ export const AnomalyOpportunityView: React.FC = () => {
           </>
         )}
       </Section>
+
+      {hasSources && driverWindows && (
+        <SourceDriversPanel
+          before={driverWindows.before}
+          after={driverWindows.after}
+          excludeDates={saleDays}
+          title={vi ? `Ngày ${fmtDay(flaggedDay!)}: doanh số lệch do kênh / nguồn nào (so với TB 14 ngày trước)` : `${fmtDay(flaggedDay!)}: which channel / source moved sales (vs prior 14-day average)`}
+        />
+      )}
 
       <Section title={vi ? 'Cơ hội' : 'Opportunities'} subtitle={vi ? `${formatRangeVi(range)} so với ${formatRangeVi(previousRange)} · SKU có ít nhất 20 đơn` : `${formatRangeVi(range)} vs ${formatRangeVi(previousRange)} · SKUs with ≥ 20 orders`}>
         {opps.length === 0 ? (

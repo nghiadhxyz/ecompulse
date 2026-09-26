@@ -1020,7 +1020,8 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
     cancelledOrders = placedOrders - paidOrders;
   }
 
-  const aov = paidOrders > 0 ? Math.round(paidRev / paidOrders) : 0;
+  // Not rounded here — the UI rounds when displaying (formatVND).
+  const aov = paidOrders > 0 ? paidRev / paidOrders : 0;
   const conversionRate = placedOrders > 0 ? +((paidOrders / placedOrders) * 100).toFixed(2) : 0;
   const cancellationRate = placedOrders > 0 ? +(((placedOrders - paidOrders) / placedOrders) * 100).toFixed(2) : 0;
 
@@ -1121,7 +1122,8 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
         sections[currentSec].push({
           name,
           revenue: revIdx >= 0 ? cleanNumber(row[revIdx]) : 0,
-          orders: ordIdx >= 0 ? Math.round(cleanNumber(row[ordIdx])) : 0,
+          // Shopee splits an order between sources (391,50 · 127,92): keep the fraction.
+          orders: ordIdx >= 0 ? cleanNumber(row[ordIdx]) : 0,
         });
       }
     }
@@ -1223,7 +1225,7 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
       canonicalChannels.forEach((ch) => {
         const retentionRate = ch.placedRevenue > 0 ? +((ch.paidRevenue / ch.placedRevenue) * 100).toFixed(1) : 0;
         const leakageAmount = Math.max(0, ch.placedRevenue - ch.paidRevenue);
-        const aov = ch.paidOrders > 0 ? Math.round(ch.paidRevenue / ch.paidOrders) : (ch.placedOrders > 0 ? Math.round(ch.placedRevenue / ch.placedOrders) : 0);
+        const aov = ch.paidOrders > 0 ? ch.paidRevenue / ch.paidOrders : ch.placedOrders > 0 ? ch.placedRevenue / ch.placedOrders : 0;
         let leakageStatus: 'safe' | 'warning' | 'critical' = 'safe';
         let status = 'TỐT';
         if (retentionRate < 60) {
@@ -1396,7 +1398,7 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
 
         const retentionRate = plRev > 0 ? +((pRev / plRev) * 100).toFixed(1) : 0;
         const leakageAmount = Math.max(0, plRev - pRev);
-        const aov = pOrders > 0 ? Math.round(pRev / pOrders) : (plOrders > 0 ? Math.round(plRev / plOrders) : 0);
+        const aov = pOrders > 0 ? pRev / pOrders : plOrders > 0 ? plRev / plOrders : 0;
 
         let leakageStatus: 'safe' | 'warning' | 'critical' = 'safe';
         let status = 'TỐT';

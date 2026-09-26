@@ -97,8 +97,10 @@ describe('KPI engine — order grain', () => {
     ];
     const k = computeKpis(ds, { range: SEPT_1_2 }).metrics;
     expect(k.cvr.value).toBeCloseTo(4 / 80, 10);
-    // unique visitors are not summed across days
-    expect(k.visits.status).toBe('missing');
+    // unique visitors summed across days are labelled as such, never shown as distinct visitors
+    expect(k.visits.status).toBe('partial');
+    expect(k.visits.value).toBe(65);
+    expect(k.visits.label?.vi).toBe('Lượt truy cập (cộng theo ngày)');
     expect(computeKpis(ds, { range: { start: '2025-09-01', end: '2025-09-01' } }).metrics.visits.value).toBe(40);
   });
 
@@ -173,8 +175,11 @@ describe('KPI engine — daily grain (summary reports)', () => {
     expect(m.cvr.value).toBeCloseTo(30 / 500, 10);
   });
 
-  it('does not sum distinct buyers across days', () => {
-    expect(m.buyers.status).toBe('missing');
+  it('does not present summed daily buyers as distinct buyers', () => {
+    expect(m.buyers.status).toBe('partial');
+    expect(m.buyers.value).toBe(22);
+    expect(m.buyers.label?.vi).toBe('Lượt người mua (cộng theo ngày)');
+    expect(m.buyers.notes?.[0].vi).toContain('không phải số người mua khác nhau');
     expect(computeKpis(ds, { range: { start: '2025-09-01', end: '2025-09-01' } }).metrics.buyers.value).toBe(7);
   });
 

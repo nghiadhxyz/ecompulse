@@ -532,7 +532,7 @@ export const P0AnalyticsDashboard: React.FC<P0AnalyticsDashboardProps> = ({
                         {ch.channelName}
                       </div>
                       <div className="text-[11px] text-slate-400 mt-0.5">
-                        {ch.paidOrders} / {ch.placedOrders} đơn hoàn tất
+                        {formatNumber(ch.paidOrders)} / {formatNumber(ch.placedOrders)} đơn hoàn tất
                       </div>
                     </td>
                     <td className="py-3.5 px-3.5 text-right text-slate-200 font-medium">

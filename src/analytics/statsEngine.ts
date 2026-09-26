@@ -149,7 +149,7 @@ export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, 
   const adsByDay = new Map<string, number>();
   for (const a of dataset.ads) {
     if (a.periodStart || (filter.platforms?.length && !filter.platforms.includes(a.platform))) continue;
-    if (a.date >= filter.range.start && a.date <= filter.range.end) adsByDay.set(a.date, (adsByDay.get(a.date) ?? 0) + a.spend);
+    if (a.date >= filter.range.start && a.date <= filter.range.end) adsByDay.set(a.date, (adsByDay.get(a.date) ?? 0) + (a.spend ?? 0));
   }
   const series: { key: string; label: Bilingual; values: (number | null)[] }[] = [
     { key: 'gmv', label: { vi: 'GMV', en: 'GMV' }, values: days.map((d) => byDay.get(d)?.current.gmv ?? 0) },

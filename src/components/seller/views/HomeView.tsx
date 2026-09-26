@@ -19,6 +19,7 @@ import {
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, GhostButton, HelpTip, KpiCard, NotEnoughData, Section, SeverityBadge, SourceBadge, tr } from '../ui';
 import { SummaryChannelsPanel } from '../../workspace/SummaryPanels';
+import { SubsidyPanel } from '../../workspace/SummaryInsightPanels';
 
 const BAR_COLOR = '#3987e5';
 
@@ -158,6 +159,7 @@ export const HomeView: React.FC = () => {
       </div>
 
       <SummaryChannelsPanel />
+      <SubsidyPanel />
 
       <ProfitSection profit={cmp.current.profit} />
     </div>

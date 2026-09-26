@@ -4,6 +4,7 @@ import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { ChangeCell, Th } from '../ui';
 import { FunnelView } from './TrafficFunnel';
+import { ChannelWeekdayPanel } from '../../workspace/SummaryInsightPanels';
 
 const label = (r: LiveSessionRow) => `${sessionDateLabel(r.session)} · ${PLATFORM_LABELS[r.session.platform]}`;
 
@@ -16,15 +17,19 @@ export const LiveAuditor: React.FC = () => {
 
   if (la.sessions.length === 0) {
     return (
-      <Section title="Live Session Auditor">
-        <NotEnoughData
-          lang={lang}
-          reason={vi ? 'Chưa có dữ liệu phiên live trong khoảng này. Nhập báo cáo Livestream của Shopee / TikTok ở Data Hub.' : 'No live sessions. Import a live report in the Data Hub.'}
-          action={<GhostButton onClick={() => goTo('dataHub')}>Data Hub</GhostButton>}
-        />
-      </Section>
+      <div className="space-y-4">
+        <Section title="Live Session Auditor">
+          <NotEnoughData
+            lang={lang}
+            reason={vi ? 'Chưa có dữ liệu phiên live trong khoảng này (phiên live của báo cáo Phân tích bán hàng chỉ có tổng cả kỳ — chọn trọn kỳ). Nhập báo cáo Livestream của Shopee / TikTok ở Data Hub.' : 'No live sessions in this range. Import a live report in the Data Hub.'}
+            action={<GhostButton onClick={() => goTo('dataHub')}>Data Hub</GhostButton>}
+          />
+        </Section>
+        <ChannelWeekdayPanel channel="live" />
+      </div>
     );
   }
+  const topListOnly = la.sessions.every((s) => s.session.periodStart !== undefined);
   const b = la.sessions.find((s) => s.session.sessionId === bId) ?? la.sessions[0];
   // Default A = the previous session of B on the same platform (when it is in range).
   const defaultA = (b.previous && la.sessions.find((s) => s.session.sessionId === b.previous!.sessionId)) || la.sessions.find((s) => s !== b);
@@ -81,9 +86,15 @@ export const LiveAuditor: React.FC = () => {
           </div>
         ))}
       </div>
+      {topListOnly && (
+        <p className="text-xs text-slate-300">
+          {vi ? `Top ${la.sessions.length} phiên live theo báo cáo Shopee — Shopee chỉ liệt kê Top 5, không phải tất cả phiên live.` : `Top ${la.sessions.length} live sessions from the Shopee report — not all sessions.`}
+        </p>
+      )}
       {la.notes.map((n, i) => (
         <p key={i} className="text-xs text-[#fab219]">{tr(lang, n)}</p>
       ))}
+      <ChannelWeekdayPanel channel="live" />
 
       <Section title={vi ? 'Xếp hạng phiên theo GMV/giờ' : 'Sessions ranked by GMV/hour'} subtitle={`${formatRangeVi(range)} · ${vi ? 'đã chuẩn hóa theo thời lượng' : 'normalized by duration'}`}>
         <div className="overflow-x-auto rounded-xl border border-white/10">
@@ -194,7 +205,7 @@ export const LiveAuditor: React.FC = () => {
         <Section title={vi ? 'Hiệu quả theo nhóm' : 'Performance by group'} subtitle={vi ? 'Cột "Phiên" là cỡ mẫu — nhóm ít phiên chỉ mang tính tham khảo' : '"Sess." is the sample size'}>
           <div className="space-y-4">
             {la.byTimeSlot.length > 0 && groupTable(vi ? 'Khung giờ bắt đầu' : 'Start time slot', la.byTimeSlot)}
-            {groupTable(vi ? 'Thứ trong tuần' : 'Weekday', la.byWeekday)}
+            {groupTable(vi ? 'Thứ trong tuần' : 'Weekday', la.undated ? [...la.byWeekday, la.undated] : la.byWeekday)}
             {la.byDuration.length > 0 && groupTable(vi ? 'Thời lượng' : 'Duration', la.byDuration)}
           </div>
         </Section>

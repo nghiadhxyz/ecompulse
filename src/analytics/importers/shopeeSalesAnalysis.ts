@@ -121,21 +121,13 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
       let col: (n: string) => number = () => -1;
       let current: { source: string; isChannelTotal: boolean } | null = null;
       let count = 0;
-      // Channel totals from the header row of period sheets (Doanh thu từ thẻ sản phẩm / Livestream / Video / đối tác liên kết).
+      // Ads revenue for the period comes from the header row ("Doanh thu từ quảng cáo Shopee");
+      // it overlaps the four channels and is never added to them. The four channel totals are
+      // read from their own rows below, with orders and traffic.
       if (stageRow && period) {
-        const h = headerIndex(rows[0]);
-        const totals: [SummaryChannel, string][] = [
-          ['product_card', 'Doanh thu từ thẻ sản phẩm'],
-          ['live', 'Doanh thu từ Livestream của người bán'],
-          ['video', 'Doanh thu từ Video của người bán'],
-          ['affiliate', 'Doanh thu từ đối tác liên kết'],
-          ['ads', 'Doanh thu từ quảng cáo Shopee'],
-        ];
-        for (const [ch, name] of totals) {
-          const i = h(name);
-          const v = i >= 0 ? num(rows[1][i]) : undefined;
-          if (v !== undefined) summaries.push({ platform, date: period.end, periodStart: period.start, stage, dimension: 'channel', channel: ch, key: ch, gmv: v });
-        }
+        const i = headerIndex(rows[0])('Doanh thu từ quảng cáo Shopee');
+        const v = i >= 0 ? num(rows[1][i]) : undefined;
+        if (v !== undefined) summaries.push({ platform, date: period.end, periodStart: period.start, stage, dimension: 'channel', channel: 'ads', key: 'ads', gmv: v });
       }
       for (const r of rows) {
         const a = str(r[0]);
@@ -158,6 +150,8 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
         const viewsI = [col('Lượt xem Livestream'), col('Lượt xem Video'), col('Lượt xem nội dung')].find((i) => i >= 0) ?? -1;
         const clicksI = col('Lượt nhấp vào sản phẩm');
         const spendI = col('Chi phí quảng cáo');
+        const uImprI = [col('Lượt hiển thị sản phẩm duy nhất'), col('Người xem Livestream'), col('Người xem Video'), col('Người xem nội dung')].find((i) => i >= 0) ?? -1;
+        const uClickI = col('Lượt nhấp sản phẩm duy nhất');
         const metrics = {
           gmv: num(r[gmvI]),
           orders: num(r[ordersI]),
@@ -166,14 +160,17 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
           impressions: imprI >= 0 ? num(r[imprI]) : undefined,
           views: viewsI >= 0 ? num(r[viewsI]) : undefined,
           clicks: clicksI >= 0 ? num(r[clicksI]) : undefined,
+          uniqueImpressions: uImprI >= 0 ? num(r[uImprI]) : undefined,
+          uniqueClicks: uClickI >= 0 ? num(r[uClickI]) : undefined,
         };
         if (DAY_RE.test(a)) {
           if (!current) continue;
           const date = toIsoDate(a);
           if (!date) continue;
           if (channel === 'ads') {
+            // "-" stays undefined (no data), which is not 0. The "Khác" block is kept too.
             const spend = spendI >= 0 ? num(r[spendI]) : undefined;
-            if (stage === 'placed' && spend !== undefined && current.source !== 'Khác') {
+            if (stage === 'placed') {
               ads.push({ date, platform, campaignId: `shopee-ads:${current.source}`, adName: current.source, adType: current.source, spend, impressions: metrics.impressions, orders: metrics.orders, attributedRevenue: metrics.gmv });
             }
             continue;
@@ -188,15 +185,23 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
         if (!daily && period) {
           if (channel === 'ads') {
             const spend = spendI >= 0 ? num(r[spendI]) : undefined;
-            if (stage === 'placed' && spend !== undefined && a !== 'Khác') {
+            if (stage === 'placed') {
               ads.push({ date: period.end, periodStart: period.start, platform, campaignId: `shopee-ads:${a}`, adName: a, adType: a, spend, impressions: metrics.impressions, orders: metrics.orders, attributedRevenue: metrics.gmv });
             }
             continue;
           }
-          if (!isChannelTotal) {
-            summaries.push({ platform, date: period.end, periodStart: period.start, stage, dimension: 'source', channel, key: a, label: a, ...metrics });
-            count++;
-          }
+          summaries.push({
+            platform,
+            date: period.end,
+            periodStart: period.start,
+            stage,
+            dimension: isChannelTotal ? 'channel' : 'source',
+            channel,
+            key: isChannelTotal ? channel : a,
+            label: a,
+            ...metrics,
+          });
+          count++;
         }
       }
       push(daily ? 'sources_daily' : 'sources_period', count, stage);
@@ -240,6 +245,8 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
           buyers: num(r[col('Người mua')]),
           impressions: num(r[col('Lượt hiển thị sản phẩm')]),
           clicks: num(r[col('Lượt nhấp vào sản phẩm')]),
+          uniqueImpressions: num(r[col('Lượt hiển thị sản phẩm duy nhất')]),
+          uniqueClicks: num(r[col('Lượt nhấp sản phẩm duy nhất')]),
         });
         count++;
       }
@@ -328,19 +335,19 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
     push('skipped', 0);
   }
 
-  // Period totals and daily rows describe the same sales: keep daily rows when both exist,
-  // otherwise a full-period range would count everything twice.
-  const dailyKeys = new Set(summaries.filter((r) => !r.periodStart).map((r) => `${r.stage}|${r.dimension}|${r.channel}|${r.key}`));
-  const dailyAds = new Set(ads.filter((a) => !a.periodStart).map((a) => a.campaignId));
-  ds.salesSummaries = summaries.filter((r) => !r.periodStart || !dailyKeys.has(`${r.stage}|${r.dimension}|${r.channel}|${r.key}`));
-  ds.ads = ads.filter((a) => !a.periodStart || !dailyAds.has(a.campaignId));
+  // Period totals and daily rows describe the same sales. Both are kept: engines use the
+  // period row when the whole period is selected and the daily rows otherwise (periodRows.ts),
+  // so nothing is counted twice and the platform's own totals are not re-derived by summing
+  // rounded days.
+  ds.salesSummaries = summaries;
+  ds.ads = ads;
   ds.liveSessions = [...live.values()];
   ds.affiliates = [...content.values()];
   ds.products = [...products.values()];
   ds.sources = [{ fileName: input.fileName, platform, reportType: 'shopee_sales_analysis', importedAt: new Date().toISOString(), rowCount: summaries.length + ads.length }];
   const notes: { vi: string; en: string }[] = [];
-  if (products.size) notes.push({ vi: 'Báo cáo Phân tích bán hàng của Shopee chỉ liệt kê vài sản phẩm, video, affiliate đứng đầu mỗi kênh — số theo sản phẩm là một phần, không phải toàn bộ.', en: 'Shopee lists only the top products / videos / affiliates per channel.' });
-  if (live.size) notes.push({ vi: 'Phiên live trong báo cáo này không có ngày giờ — chỉ xem được khi chọn trọn kỳ báo cáo.', en: 'Live sessions have no date; visible only for the full report period.' });
+  if (products.size) notes.push({ vi: 'Báo cáo Phân tích bán hàng của Shopee chỉ có Top 5 sản phẩm mỗi kênh, Top 5 video, Top 5 affiliate và Top 5 phiên live — không phải toàn bộ.', en: 'Shopee lists only the top 5 products per channel, top 5 videos, affiliates and live sessions.' });
+  if (live.size) notes.push({ vi: 'Phiên live không có ngày giờ — số theo phiên chỉ xem được khi chọn trọn kỳ, không xếp được theo khung giờ. Doanh số kênh Live theo từng ngày vẫn có (phân tích theo thứ ở mức kênh).', en: 'Live sessions have no date/time: per-session figures need the full period; daily Live channel sales are available.' });
   ds.importNotes = notes;
   return { dataset: ds, period, sheets: info };
 }

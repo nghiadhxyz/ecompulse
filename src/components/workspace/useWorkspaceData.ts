@@ -125,7 +125,10 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
       try {
         // The classic parser handles Shopee's 21-sheet summary layout.
         const parsed = await parseShopeeExcelFile(file);
-        const daily = mergeIntoWorkspace(importedRef.current, canonicalFromParsedStoreData(parsed, 'shopee'));
+        // The classic adapter's notes ("live sessions have no date and are unused"…) describe
+        // what IT could not read; the sales-analysis importer below reads those sheets and
+        // brings its own notes, so the adapter's would contradict them.
+        const daily = mergeIntoWorkspace(importedRef.current, { ...canonicalFromParsedStoreData(parsed, 'shopee'), importNotes: [] });
         await storeImported(mergeIntoWorkspace(daily, outcome.extra.dataset));
         return { type: 'legacy_summary', ok: true, sheets: outcome.extra.sheets, period: outcome.extra.period };
       } catch (e) {

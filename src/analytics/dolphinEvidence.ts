@@ -341,7 +341,7 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
       const avg = rows.reduce((s, r) => s + (r.session.orders ?? 0), 0) / rows.reduce((s, r) => s + (r.session.viewers ?? 0), 0);
       const low = rows.slice(0, 3);
       return answer(intent, question, {
-        insight: { vi: `Các phiên live chuyển đổi thấp nhất (đơn/người xem): ${low.map((r) => `${sessionDateLabel(r.session)} (${fmtRate(r.conversion, 'vi', 2)})`).join(', ')} — trung bình ${fmtRate(avg, 'vi', 2)}.`, en: `Lowest-converting sessions: ${low.map((r) => fmtDay(r.session.date)).join(', ')}.` },
+        insight: { vi: `Các phiên live chuyển đổi thấp nhất (đơn/người xem): ${low.map((r) => `${sessionDateLabel(r.session)} (${fmtRate(r.conversion, 'vi', 2)})`).join(', ')} — trung bình ${fmtRate(avg, 'vi', 2)}.`, en: `Lowest-converting sessions: ${low.map((r) => sessionDateLabel(r.session, 'en')).join(', ')}.` },
         evidence: low.map((r) => ({
           label: { vi: `Live ${sessionDateLabel(r.session)}`, en: `Live ${sessionDateLabel(r.session, 'en')}` },
           unit: 'ratio' as const,
@@ -354,7 +354,7 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
         interpretation: low.some((r) => r.viewersUpOrdersDown)
           ? { vi: 'Có phiên người xem tăng nhưng đơn giảm so với phiên trước — lượng người xem không đi cùng khả năng chốt đơn.', en: 'Some sessions had more viewers but fewer orders.' }
           : { vi: 'Chuyển đổi thấp đi cùng các phiên này; so sánh sản phẩm ghim, giá deal và thời lượng với phiên tốt nhất.', en: 'Compare these with the best sessions.' },
-        nextChecks: [{ vi: `So sánh với phiên tốt nhất (${la.ranking[0] ? fmtDay(la.ranking[0].session.date) : '—'}) ở trang Livestream.`, en: 'Compare with the best session in Livestream.' }],
+        nextChecks: [{ vi: `So sánh với phiên tốt nhất (${la.ranking[0] ? sessionDateLabel(la.ranking[0].session) : '—'}) ở trang Livestream.`, en: 'Compare with the best session in Livestream.' }],
       });
     }
 
