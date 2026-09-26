@@ -1,5 +1,7 @@
 import React from 'react';
 import { CalendarDays, GitCompare } from 'lucide-react';
+import { OrderStagePicker } from '../workspace/OrderStagePicker';
+import type { SummaryStage } from '../../analytics';
 import { formatRangeVi, PLATFORM_LABELS, type ComparisonMode, type DateRange, type Lang, type PeriodPreset, type Platform } from '../../analytics';
 
 export type AnalystCompare = ComparisonMode | 'custom' | 'auto';
@@ -42,6 +44,9 @@ interface Props {
   categories: string[];
   onCategories: (c: string[]) => void;
   availableCategories: string[];
+  /** Order stage picker, shown for summary reports only. */
+  stage?: SummaryStage;
+  onStage?: (s: SummaryStage) => void;
 }
 
 const dateInput = 'bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-xs text-slate-100 [color-scheme:dark]';
@@ -119,6 +124,7 @@ export const AnalystFilterBar: React.FC<Props> = (p) => {
             <button onClick={() => p.onPlatforms([])} className="text-[11px] text-sky-300 ml-1">{vi ? 'Tất cả' : 'All'}</button>
           )}
         </div>
+        {p.stage && p.onStage && <OrderStagePicker stage={p.stage} onChange={p.onStage} lang={p.lang} compact />}
         {p.availableCategories.length > 0 && (
           <div className="flex flex-wrap items-center gap-1" role="group" aria-label={vi ? 'Ngành hàng' : 'Categories'}>
             <span className="text-[11px] text-slate-500 mr-1">{vi ? 'Ngành' : 'Category'}</span>

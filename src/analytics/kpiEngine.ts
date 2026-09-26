@@ -330,6 +330,7 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
   const cancelled = pick(totals, (t) => t.cancelledOrders, (d) => day(d).cancelledOrders, 'count', 'daily.cancelledOrders');
   const refundedOrders = pick(totals, (t) => t.refundedOrders, (d) => day(d).refundedOrders, 'count', 'daily.refundedOrders');
   const refundedGmv = pick(totals, (t) => t.refundedGmv, (d) => day(d).refundedGmv, 'vnd', 'daily.refundedGmv');
+  const cancelledGmv = pick(totals, (t) => t.cancelledGmv, (d) => day(d).cancelledGmv, 'vnd', 'daily.cancelledGmv');
   // Placed-order sales and "tiền về" (paid) are also offered on their own, always labelled.
   const placedGmv = pick(placedTotals, (t) => t.gmv, (d) => d.placedGmv, 'vnd', 'daily.placedGmv');
   const paidGmv = pick(paidTotals, (t) => t.gmv, (d) => d.paidGmv, 'vnd', 'daily.paidGmv');
@@ -354,18 +355,20 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
   const gmv: MetricResult =
     gmvRaw.value !== null ? { ...gmvRaw, notes: [{ vi: `Doanh số ${basis.vi.toLowerCase()} của sàn.`, en: `Platform sales, ${basis.en.toLowerCase()}.` }] } : gmvRaw;
 
+  // Sales still kept: the stage's sales minus its cancelled sales and its refunds — all three
+  // from the same stage (and from the period row or the days, never mixed).
   const netRevenue: MetricResult =
-    gmvRaw.value !== null && refundedGmv.value !== null
+    gmvRaw.value !== null && cancelledGmv.value !== null && refundedGmv.value !== null
       ? {
-          ...partial(gmvRaw.value - refundedGmv.value, 'vnd', [
+          ...partial(gmvRaw.value - cancelledGmv.value - refundedGmv.value, 'vnd', [
             {
-              vi: `Doanh số ${basis.vi.toLowerCase()} ${fmtVnd(gmvRaw.value)} − tiền hoàn của cùng các đơn đó ${fmtVnd(refundedGmv.value)}. Chưa trừ voucher shop chịu (báo cáo tổng hợp không có).`,
-              en: 'Sales − refunds of the same orders. Seller vouchers not deducted (not in summary report).',
+              vi: `Doanh số ${basis.vi.toLowerCase()} ${fmtVnd(gmvRaw.value)} − doanh số hủy ${fmtVnd(cancelledGmv.value)} − tiền hoàn ${fmtVnd(refundedGmv.value)} (cùng mức đơn). Chưa trừ voucher shop chịu (báo cáo tổng hợp không có).`,
+              en: 'Sales − cancelled sales − refunds, same order stage. Seller vouchers not deducted (not in summary report).',
             },
           ]),
-          warning: gmvRaw.warning ?? refundedGmv.warning,
+          warning: gmvRaw.warning ?? cancelledGmv.warning ?? refundedGmv.warning,
         }
-      : missing('vnd', ORDER_LEVEL, ['orderLines.sellerDiscount', 'daily.refundedGmv']);
+      : missing('vnd', ORDER_LEVEL, ['orderLines.sellerDiscount', 'daily.cancelledGmv', 'daily.refundedGmv']);
 
   // Recomputed from numerator and denominator — never the platform's rate or an average of days.
   // The platform's own figure is only compared, so a report that disagrees with itself is visible.

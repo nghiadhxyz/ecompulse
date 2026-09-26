@@ -1,5 +1,7 @@
 import React from 'react';
 import { CalendarDays } from 'lucide-react';
+import { OrderStagePicker } from '../workspace/OrderStagePicker';
+import type { SummaryStage } from '../../analytics';
 import { formatRangeVi, fmtDay, PLATFORM_LABELS, type DateRange, type Lang, type PeriodPreset, type Platform } from '../../analytics';
 
 const PRESETS: { key: PeriodPreset; vi: string; en: string }[] = [
@@ -22,10 +24,13 @@ interface FilterBarProps {
   previousRange: DateRange;
   platform: Platform | 'all';
   onPlatform: (p: Platform | 'all') => void;
+  /** Order stage picker, shown for summary reports only. */
+  stage?: SummaryStage;
+  onStage?: (s: SummaryStage) => void;
   availablePlatforms: Platform[];
 }
 
-export const FilterBar: React.FC<FilterBarProps> = ({ lang, preset, onPreset, custom, onCustom, bounds, range, previousRange, platform, onPlatform, availablePlatforms }) => {
+export const FilterBar: React.FC<FilterBarProps> = ({ lang, preset, onPreset, custom, onCustom, bounds, range, previousRange, platform, onPlatform, availablePlatforms, stage, onStage }) => {
   const vi = lang === 'vi';
   const platformOptions: (Platform | 'all')[] = ['all', 'shopee', 'tiktok', 'lazada'];
   return (
@@ -88,6 +93,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ lang, preset, onPreset, cu
               </button>
             );
           })}
+          {stage && onStage && <OrderStagePicker stage={stage} onChange={onStage} lang={lang} />}
         </div>
         <div className="text-[11px] text-slate-400">
           <span className="text-slate-200 font-semibold">{formatRangeVi(range)}</span>

@@ -16,6 +16,7 @@ import {
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
+import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
 import { ChangeCell, Th } from '../ui';
 
 const BAR = '#3987e5';
@@ -70,6 +71,7 @@ export const CampaignCalendar: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       {perf.warnings.map((w, i) => (
         <p key={i} className="text-xs text-[#fab219] rounded-xl border border-[#fab219]/30 bg-[#fab219]/[0.06] px-3 py-2">{tr(lang, w)}</p>
       ))}

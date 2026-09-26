@@ -3,6 +3,7 @@ import { CheckCircle2, HelpCircle, MinusCircle } from 'lucide-react';
 import { advancedStats, fmtByUnit, formatRangeVi, type TestResult } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { Section, tr } from '../../seller/ui';
+import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
 import { Th } from '../ui';
 
 const VERDICT = {
@@ -21,6 +22,7 @@ export const AdvancedStatsView: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       <Section title={vi ? 'Kiểm định khác biệt giữa hai kỳ' : 'Period difference tests'} subtitle={`${formatRangeVi(range)} ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}>
         <div className="overflow-x-auto rounded-xl border border-white/10">
           <table className="w-full text-xs">

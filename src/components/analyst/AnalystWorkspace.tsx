@@ -42,6 +42,7 @@ import { ReportCenterView } from './views/ReportCenterView';
 import { CustomersView } from './views/CustomersView';
 import { WhatIfView } from './views/WhatIfView';
 import { AdvancedStatsView } from './views/AdvancedStatsView';
+import { DEFAULT_STAGE, type SummaryStage } from '../../analytics';
 import { PlanningProvider, usePlanningState } from '../workspace/usePlanning';
 
 interface Props {
@@ -127,6 +128,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
   const [compare, setCompare] = useState<AnalystCompare>('auto');
   const [customCompare, setCustomCompare] = useState<DateRange | null>(null);
   const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [stage, setStage] = useState<SummaryStage>(DEFAULT_STAGE);
   const [categories, setCategories] = useState<string[]>([]);
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
   const planning = usePlanningState(dataset, ws.sourceKind === 'demo' ? 'demo' : 'imported', bounds?.end ?? null);
@@ -140,8 +142,8 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
   }, [bounds, preset, custom, compare, customCompare]);
 
   const baseFilter: DatasetFilter | null = useMemo(
-    () => (resolved ? { range: resolved.range, platforms: platforms.length ? platforms : undefined, categories: categories.length ? categories : undefined } : null),
-    [resolved, platforms, categories],
+    () => (resolved ? { range: resolved.range, platforms: platforms.length ? platforms : undefined, categories: categories.length ? categories : undefined, stage } : null),
+    [resolved, platforms, categories, stage],
   );
 
   // Seller views reused here navigate with seller names — map them to Analyst modules.
@@ -204,6 +206,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
       compareMode: resolved.mode,
       previousRange: resolved.previousRange,
       platforms: baseFilter.platforms,
+      stage,
       baseFilter,
       openEvidence: setEvidence,
       goTo,
@@ -246,6 +249,8 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
               categories={categories}
               onCategories={setCategories}
               availableCategories={availableCategories}
+              stage={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0 ? stage : undefined}
+              onStage={setStage}
             />
           )}
           <ViewErrorBoundary lang={lang} key={view}>

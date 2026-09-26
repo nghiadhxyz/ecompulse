@@ -3,7 +3,7 @@
  * same dataset and period; they differ only in which views they show.
  */
 import React, { createContext, useContext } from 'react';
-import type { CanonicalDataset, ComparisonMode, DatasetFilter, DateRange, Evidence, EvidenceFilter, Lang, PeriodPreset, Platform } from '../../analytics';
+import type { CanonicalDataset, ComparisonMode, DatasetFilter, DateRange, Evidence, EvidenceFilter, Lang, PeriodPreset, Platform, SummaryStage } from '../../analytics';
 
 export type SellerView = 'home' | 'products' | 'orders' | 'adsLive' | 'dolphin' | 'data' | 'settings';
 
@@ -51,7 +51,9 @@ export interface SellerContextValue {
   compareMode: ComparisonMode;
   previousRange: DateRange;
   platforms?: Platform[];
-  /** Range + platforms + (Analyst) category filters — pass to engines as-is. */
+  /** Order stage for summary reports (placed by default) — already inside baseFilter. */
+  stage: SummaryStage;
+  /** Range + platforms + stage + (Analyst) category filters — pass to engines as-is. */
   baseFilter: DatasetFilter;
   openEvidence: (req: EvidenceRequest) => void;
   goTo: (view: WorkspaceView, focus?: Partial<DatasetFilter>) => void;

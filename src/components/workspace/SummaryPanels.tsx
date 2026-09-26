@@ -4,7 +4,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { channelMix, fmtCount, fmtMoneyCompact, fmtOrders, fmtRate, formatRangeVi, summaryProducts, SUMMARY_CHANNEL_LABELS, SUMMARY_TOP_N, type SummaryChannel, type SummaryStage } from '../../analytics';
+import { channelMix, fmtCount, fmtMoneyCompact, fmtOrders, fmtRate, formatRangeVi, STAGE_BASIS, summaryProducts, SUMMARY_CHANNEL_LABELS, SUMMARY_TOP_N, type SummaryChannel, type SummaryStage } from '../../analytics';
 import { useWorkspace } from '../seller/SellerContext';
 import { NotEnoughData, Section, tr } from '../seller/ui';
 import { ShareBar, Th } from '../analyst/ui';
@@ -36,9 +36,9 @@ export const SummaryNotes: React.FC<{ notes: { vi: string; en: string }[]; lang:
 );
 
 export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) => {
-  const { lang, dataset, range, platforms } = useWorkspace();
+  // Follows the app-wide order stage picker (placed by default).
+  const { lang, dataset, range, platforms, stage } = useWorkspace();
   const vi = lang === 'vi';
-  const [stage, setStage] = useState<SummaryStage>('placed');
   const [open, setOpen] = useState<string | null>(null);
   const mix = useMemo(() => channelMix(dataset, { range, platforms }, stage), [dataset, range, platforms, stage]);
   if (!(dataset.salesSummaries?.length)) return null;
@@ -51,7 +51,7 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
       : 'Part of the period: sums of daily unique counts';
 
   return (
-    <Section title={title ?? (vi ? 'Doanh thu đến từ đâu' : 'Where revenue comes from')} subtitle={vi ? `Theo kênh và nguồn truy cập · ${formatRangeVi(range)}` : `By channel and traffic source · ${formatRangeVi(range)}`} right={<StagePicker stage={stage} onChange={setStage} vi={vi} />}>
+    <Section title={title ?? (vi ? 'Doanh thu đến từ đâu' : 'Where revenue comes from')} subtitle={vi ? `Theo kênh và nguồn truy cập · ${formatRangeVi(range)}` : `By channel and traffic source · ${formatRangeVi(range)}`} right={<span className="text-[11px] text-slate-400">{STAGE_BASIS[stage][lang]}</span>}>
       {!mix.available ? (
         <NotEnoughData lang={lang} reason={tr(lang, mix.notes[0] ?? { vi: 'Không có số liệu theo kênh trong khoảng này.', en: 'No channel data in this range.' })} />
       ) : (

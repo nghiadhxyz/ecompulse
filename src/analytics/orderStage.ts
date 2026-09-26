@@ -60,3 +60,17 @@ export const CROSS_PERIOD_NOTE: Bilingual = {
   vi: 'Khác kỳ đếm: đơn thanh toán tính theo ngày tiền về nên không phải tập con của đơn đặt cùng kỳ.',
   en: 'Different counting periods: paid orders are counted when paid, not a subset of placed orders.',
 };
+
+/**
+ * Day-based analyses (anomalies, campaigns and calendar, statistics, the daily brief) always
+ * count placed orders, whatever the stage picker says: paid orders land on the payment day,
+ * not the day the sale happened.
+ */
+export function placedOnly<T extends { stage?: SummaryStage }>(filter: T): T {
+  return { ...filter, stage: 'placed' };
+}
+
+export const PLACED_ONLY_NOTE: Bilingual = {
+  vi: 'Trang này luôn dùng đơn đặt để đúng ngày phát sinh.',
+  en: 'This page always uses placed orders, so sales fall on the day they happened.',
+};

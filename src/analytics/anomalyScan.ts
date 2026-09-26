@@ -18,6 +18,7 @@ import { computeKpis } from './kpiEngine';
 import { campaignCalendar, dayTypeOf } from './campaignEngine';
 import { addDays, enumerateDays, type DateRange } from './period';
 import { fmtChange, fmtRate } from './format';
+import { placedOnly } from './orderStage';
 import type { Bilingual } from './metric';
 
 export type ScanMetric = 'gmv' | 'orders' | 'cancelRate' | 'profit';
@@ -65,7 +66,8 @@ function dayValue(rows: Map<string, BreakdownRow>, date: string, metric: ScanMet
   }
 }
 
-export function anomalyScan(dataset: CanonicalDataset, filter: DatasetFilter, metric: ScanMetric): AnomalyScanResult {
+export function anomalyScan(dataset: CanonicalDataset, requested: DatasetFilter, metric: ScanMetric): AnomalyScanResult {
+  const filter = placedOnly(requested);
   const notes: Bilingual[] = [];
   if (dataset.orders.length === 0 && dataset.dailyMetrics.length === 0) return { metric, points: [], flagged: [], notes: [{ vi: 'Cần dữ liệu doanh thu theo ngày hoặc file xuất đơn hàng.', en: 'Daily sales or an order export is required.' }] };
   if (metric === 'profit' && dataset.orders.length === 0) {

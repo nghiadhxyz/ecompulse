@@ -18,6 +18,9 @@ import { mergeIntoWorkspace } from '../workspace';
 import { buildDailyBrief } from '../dailyBrief';
 import { questionUnavailable } from '../dolphinEvidence';
 import { funnel } from '../funnelEngine';
+import { anomalyScan } from '../anomalyScan';
+import { calendarPerformance } from '../campaignEngine';
+import { advancedStats } from '../statsEngine';
 import { stageFunnel } from '../summaryInsights';
 import { orderHealth } from '../orderHealthEngine';
 
@@ -45,14 +48,14 @@ describe.skipIf(!existsSync(NEW_WORKBOOK))('Shopee workbook with inconsistent ro
     expect(m.paidGmv.value).toBe(50_505_501);
     expect(m.paidGmv.basis?.vi).toBe('Đơn đã thanh toán');
 
-    // (2) Net revenue deducts refunds of the same orders as GMV.
+    // (2) Net revenue deducts cancelled sales and refunds of the same orders as GMV.
     expect(m.gmv.value).toBe(78_626_020);
-    expect(m.netRevenue.value).toBe(78_626_020 - 780_572);
+    expect(m.netRevenue.value).toBe(55_423_617); // 78.626.020 − 22.421.831 − 780.572
     expect(m.aov.value).toBeCloseTo(78_626_020 / 519, 6);
     expect(m.refundRate.value).toBeCloseTo(7 / 519, 10);
     const paid = computeKpis(ds, { range, stage: 'paid' }).metrics;
     expect(paid.gmv.value).toBe(50_505_501);
-    expect(paid.netRevenue.value).toBe(50_505_501 - 321_918);
+    expect(paid.netRevenue.value).toBe(47_517_323); // 50.505.501 − 2.666.260 − 321.918
     expect(paid.refundRate.value).toBeCloseTo(4 / 422, 10);
 
     // (3) CVR is recomputed (519 / 10.601) and the file's 5,97% is flagged.
@@ -71,7 +74,22 @@ describe.skipIf(!existsSync(NEW_WORKBOOK))('Shopee workbook with inconsistent ro
     // (6) The platform table uses the same period total as the GMV card.
     const byPlatform = breakdown(ds, { range }, 'platform');
     expect(byPlatform.rows[0].current.gmv).toBe(78_626_020);
-    expect(byPlatform.rows[0].current.netRevenue).toBe(78_626_020 - 780_572);
+    expect(byPlatform.rows[0].current.netRevenue).toBe(55_423_617);
+  });
+
+  it('day-based pages always use placed orders: anomalies 02, 03, 05, 06/08; 08/08 is a sale day', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const scan = anomalyScan(ds, { range }, 'gmv');
+    expect(scan.flagged.filter((p) => !p.saleDay).map((p) => p.date)).toEqual(['2026-08-02', '2026-08-03', '2026-08-05', '2026-08-06']);
+    expect(scan.points.find((p) => p.date === '2026-08-08')!.saleDay).toBe(true);
+    expect(scan.points.find((p) => p.date === '2026-08-12')!.flagged).toBe(false);
+    // The stage picker does not move them.
+    const paid = { range, stage: 'paid' as const };
+    expect(anomalyScan(ds, paid, 'gmv').flagged).toEqual(scan.flagged);
+    expect(calendarPerformance(ds, paid).byWeekday).toEqual(calendarPerformance(ds, { range }).byWeekday);
+    const prev = { start: '2026-06-24', end: '2026-07-23' };
+    expect(advancedStats(ds, paid, prev).correlations).toEqual(advancedStats(ds, { range }, prev).correlations);
   });
 
   it('0.2 — paid orders are not a subset of placed orders', async () => {

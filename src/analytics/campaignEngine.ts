@@ -15,6 +15,7 @@ import { compareValues, type Comparison } from './comparisonEngine';
 import { adsSummary } from './adsLiveEngine';
 import { orderHealth, type ReasonRow } from './orderHealthEngine';
 import { addDays, enumerateDays, isInRange, rangeLength, toDayNumber, type DateRange } from './period';
+import { placedOnly } from './orderStage';
 import type { Bilingual } from './metric';
 
 export type DayType = 'mega_sale' | 'double_day' | 'payday' | 'weekend' | 'weekday';
@@ -152,7 +153,8 @@ export interface CalendarPerformance {
   warnings: Bilingual[];
 }
 
-export function calendarPerformance(dataset: CanonicalDataset, filter: DatasetFilter): CalendarPerformance {
+export function calendarPerformance(dataset: CanonicalDataset, requested: DatasetFilter): CalendarPerformance {
+  const filter = placedOnly(requested);
   const range = filter.range;
   const days = enumerateDays(range);
   const calendar = campaignCalendar(dataset, range);

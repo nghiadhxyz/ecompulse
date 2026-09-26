@@ -326,13 +326,14 @@ function dailyMemberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<s
   const keyOf = (d: DatasetSlice['dailyMetrics'][number]) =>
     dim === 'day' ? d.date : dim === 'week' ? weekStart(d.date) : dim === 'month' ? d.date.slice(0, 7) : d.platform;
   const stage = stageOf(slice.filter);
-  const acc = new Map<string, { gmv: number; refunded: number | null; placed: number; cancelled: number; returned: number; clicks: number | null; units: number }>();
+  const acc = new Map<string, { gmv: number; refunded: number | null; cancelledGmv: number | null; placed: number; cancelled: number; returned: number; clicks: number | null; units: number }>();
   for (const d of slice.dailyMetrics) {
     const k = keyOf(d);
     const s = stageDay(d, stage);
-    const a = acc.get(k) ?? { gmv: 0, refunded: 0, placed: 0, cancelled: 0, returned: 0, clicks: null, units: 0 };
+    const a = acc.get(k) ?? { gmv: 0, refunded: 0, cancelledGmv: 0, placed: 0, cancelled: 0, returned: 0, clicks: null, units: 0 };
     a.gmv += s.gmv ?? 0;
     a.refunded = a.refunded === null || s.refundedGmv === undefined ? null : a.refunded + s.refundedGmv;
+    a.cancelledGmv = a.cancelledGmv === null || s.cancelledGmv === undefined ? null : a.cancelledGmv + s.cancelledGmv;
     a.placed += s.orders ?? 0;
     a.cancelled += s.cancelledOrders ?? 0;
     a.returned += s.refundedOrders ?? 0;
@@ -344,7 +345,7 @@ function dailyMemberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<s
   for (const [k, a] of acc) {
     out.set(k, {
       gmv: a.gmv,
-      netRevenue: a.refunded === null ? null : a.gmv - a.refunded,
+      netRevenue: a.refunded === null || a.cancelledGmv === null ? null : a.gmv - a.cancelledGmv - a.refunded,
       profit: null,
       margin: null,
       profitComplete: false,

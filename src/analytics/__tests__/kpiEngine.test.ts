@@ -161,8 +161,8 @@ describe('KPI engine — edge cases', () => {
 describe('KPI engine — daily grain (summary reports)', () => {
   const ds = dataset([], [], {
     dailyMetrics: [
-      { date: '2025-09-01', platform: 'shopee', placedGmv: 1000, placedOrders: 10, paidOrders: 8, paidGmv: 800, cancelledOrders: 2, refundedOrders: 1, refundedGmv: 100, paidRefundedOrders: 1, paidRefundedGmv: 40, visits: 150, productClicks: 200, buyers: 7 },
-      { date: '2025-09-02', platform: 'shopee', placedGmv: 2000, placedOrders: 20, paidOrders: 16, paidGmv: 1600, cancelledOrders: 3, refundedOrders: 0, refundedGmv: 0, paidRefundedOrders: 0, paidRefundedGmv: 0, visits: 250, productClicks: 300, buyers: 15 },
+      { date: '2025-09-01', platform: 'shopee', placedGmv: 1000, placedOrders: 10, paidOrders: 8, paidGmv: 800, cancelledOrders: 2, cancelledGmv: 200, paidCancelledGmv: 50, refundedOrders: 1, refundedGmv: 100, paidRefundedOrders: 1, paidRefundedGmv: 40, visits: 150, productClicks: 200, buyers: 7 },
+      { date: '2025-09-02', platform: 'shopee', placedGmv: 2000, placedOrders: 20, paidOrders: 16, paidGmv: 1600, cancelledOrders: 3, cancelledGmv: 300, paidCancelledGmv: 0, refundedOrders: 0, refundedGmv: 0, paidRefundedOrders: 0, paidRefundedGmv: 0, visits: 250, productClicks: 300, buyers: 15 },
     ],
   });
   const m = computeKpis(ds, { range: SEPT_1_2 }).metrics;
@@ -177,7 +177,7 @@ describe('KPI engine — daily grain (summary reports)', () => {
 
   it('counts one order stage everywhere — placed by default', () => {
     for (const k of ['gmv', 'netRevenue', 'orders', 'aov', 'cancelRate', 'refundRate', 'cvr'] as const) expect(m[k].basis?.vi).toBe('Đơn đặt');
-    expect(m.netRevenue.value).toBe(3000 - 100); // placed sales − refunds of placed orders
+    expect(m.netRevenue.value).toBe(3000 - 500 - 100); // placed sales − cancelled − refunded, all placed
     expect(m.refundRate.value).toBeCloseTo(1 / 30, 10);
     // "Tiền về" stays available, labelled.
     expect(m.paidGmv.value).toBe(2400);
@@ -190,7 +190,7 @@ describe('KPI engine — daily grain (summary reports)', () => {
     expect(p.gmv.value).toBe(2400);
     expect(p.orders.value).toBe(24);
     expect(p.aov.value).toBe(100);
-    expect(p.netRevenue.value).toBe(2400 - 40); // refunds of paid orders, not of placed (100)
+    expect(p.netRevenue.value).toBe(2400 - 50 - 40); // paid sales − paid cancellations − paid refunds
     expect(p.refundRate.value).toBeCloseTo(1 / 24, 10);
     for (const k of ['gmv', 'netRevenue', 'orders', 'aov', 'refundRate'] as const) expect(p[k].basis?.vi).toBe('Đơn đã thanh toán');
   });

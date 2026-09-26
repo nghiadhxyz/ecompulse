@@ -9,9 +9,9 @@ import { GhostButton, Section } from '../seller/ui';
 import { Th } from '../analyst/ui';
 
 export const DailyOrderHealthPanel: React.FC = () => {
-  const { lang, dataset, range, platforms, goTo } = useWorkspace();
+  const { lang, dataset, range, platforms, stage, goTo } = useWorkspace();
   const vi = lang === 'vi';
-  const h = useMemo(() => orderHealth(dataset, { range, platforms }), [dataset, range, platforms]);
+  const h = useMemo(() => orderHealth(dataset, { range, platforms, stage }), [dataset, range, platforms, stage]);
   const days = h.byDate.filter((d) => d.placed > 0);
   const maxRate = Math.max(0.0001, ...days.map((d) => d.cancelRate ?? 0));
   const placed = h.lifecycle.total;

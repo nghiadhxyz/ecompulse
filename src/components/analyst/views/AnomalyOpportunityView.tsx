@@ -5,6 +5,7 @@ import { addDays, anomalyScan, findOpportunities, fmtByUnit, fmtChange, fmtDay, 
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { Th } from '../ui';
+import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
 import { SourceDriversPanel } from '../../workspace/SummaryInsightPanels';
 
 const CURRENT_COLOR = '#3987e5';
@@ -46,6 +47,7 @@ export const AnomalyOpportunityView: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       <Section
         title={vi ? 'Phát hiện bất thường' : 'Anomaly scan'}
         subtitle={vi ? `${formatRangeVi(range)} · mỗi ngày so với trung vị 14 ngày thường trước đó (không tính ngày sale)` : `${formatRangeVi(range)} · each day vs the median of the previous 14 normal days`}

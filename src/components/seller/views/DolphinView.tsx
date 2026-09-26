@@ -5,6 +5,7 @@ import { usePlanning } from '../../workspace/usePlanning';
 import { addDays, buildDailyBrief, fmtDay, fmtMoneyCompact, type AlertSeverity, type BriefItem } from '../../../analytics';
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, KpiCard, NotEnoughData, Section, SeverityBadge, SEVERITY_STYLE, tr } from '../ui';
+import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
 import dolphinAvatar from '../../../assets/images/dolphin_ai_avatar_1787721342181.jpg';
 
 const FILTERS: (AlertSeverity | 'all')[] = ['all', 'critical', 'warning', 'opportunity', 'info'];
@@ -49,6 +50,7 @@ export const DolphinView: React.FC = () => {
   const b = brief.revenueBaseline;
   return (
     <div className="space-y-4">
+      <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       <DolphinAsk />
 
       <Section

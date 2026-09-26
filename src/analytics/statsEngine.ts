@@ -13,6 +13,7 @@ import type { DatasetFilter } from './filters';
 import { breakdown, type BreakdownRow } from './breakdownEngine';
 import { campaignCalendar, dayTypeOf, weekdayIndex } from './campaignEngine';
 import { enumerateDays, type DateRange } from './period';
+import { placedOnly } from './orderStage';
 import type { Bilingual, MetricUnit } from './metric';
 
 /** Standard normal CDF (Abramowitz–Stegun 7.1.26). */
@@ -108,7 +109,8 @@ const WD: Bilingual[] = [
   { vi: 'Chủ nhật', en: 'Sun' },
 ];
 
-export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, previousRange: DateRange): AdvancedStats {
+export function advancedStats(dataset: CanonicalDataset, requested: DatasetFilter, previousRange: DateRange): AdvancedStats {
+  const filter = placedOnly(requested);
   const cur = breakdown(dataset, filter, 'day').rows;
   const prev = breakdown(dataset, { ...filter, range: previousRange }, 'day').rows;
   const sum = (rows: BreakdownRow[], f: (r: BreakdownRow) => number | null) => rows.reduce((s, r) => s + (f(r) ?? 0), 0);

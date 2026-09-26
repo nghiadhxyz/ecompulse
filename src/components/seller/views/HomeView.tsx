@@ -35,10 +35,10 @@ function sumComparison(a: MetricComparison, b: MetricComparison): MetricComparis
 }
 
 export const HomeView: React.FC = () => {
-  const { lang, dataset, range, previousRange, compareMode, platforms, asOf, openEvidence, goTo } = useSeller();
+  const { lang, dataset, range, previousRange, compareMode, platforms, stage, asOf, openEvidence, goTo } = useSeller();
   const vi = lang === 'vi';
-  const cmp = useMemo(() => comparePeriods(dataset, { range, platforms }, compareMode), [dataset, range, platforms, compareMode]);
-  const series = useMemo(() => dailySeries(dataset, { range, platforms }), [dataset, range, platforms]);
+  const cmp = useMemo(() => comparePeriods(dataset, { range, platforms, stage }, compareMode), [dataset, range, platforms, stage, compareMode]);
+  const series = useMemo(() => dailySeries(dataset, { range, platforms, stage }), [dataset, range, platforms, stage]);
   const alertDay = addDays(asOf, -1);
   const alerts = useMemo(() => detectAlerts(dataset, { day: alertDay, platforms }), [dataset, alertDay, platforms]);
 

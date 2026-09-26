@@ -6,9 +6,9 @@ import { DailyOrderHealthPanel } from '../../workspace/DailyOrderHealthPanel';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, SeverityBadge, tr } from '../ui';
 
 export const OrdersView: React.FC = () => {
-  const { lang, dataset, range, platforms, asOf, openEvidence, goTo } = useSeller();
+  const { lang, dataset, range, platforms, stage, asOf, openEvidence, goTo } = useSeller();
   const vi = lang === 'vi';
-  const health = useMemo(() => orderHealth(dataset, { range, platforms }), [dataset, range, platforms]);
+  const health = useMemo(() => orderHealth(dataset, { range, platforms, stage }), [dataset, range, platforms, stage]);
   const spikes = useMemo(
     () => detectAlerts(dataset, { day: addDays(asOf, -1), platforms }).filter((a) => a.type === 'sku_cancel_spike' || a.type === 'sku_refund_spike' || a.type === 'cancel_spike'),
     [dataset, asOf, platforms],
