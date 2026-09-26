@@ -21,6 +21,20 @@ import { fmtChange, fmtDay, fmtMoneyCompact, fmtMultiple, fmtRate } from './form
 import { safeDivide, type Bilingual } from './metric';
 import type { Evidence } from './evidence';
 import type { AlertThresholds, SmartAlert } from './anomalyEngine';
+import { sourceChecks, type SourceId } from './canonicalSources';
+import { byGap, compareCopies, describeMismatch, type MismatchItem } from './mismatch';
+
+const SOURCE_SHORT: Record<SourceId, Bilingual> = {
+  period_row: { vi: 'dòng tổng', en: 'period row' },
+  daily_sum: { vi: 'cộng ngày', en: 'sum of days' },
+  channel_row: { vi: 'dòng kênh', en: 'channel row' },
+  ad_rows: { vi: 'tổng dòng quảng cáo', en: 'ad rows' },
+  ad_row: { vi: 'dòng quảng cáo', en: 'ad row' },
+  traffic_header: { vi: 'đầu sheet kênh', en: 'channel sheet header' },
+  product_header: { vi: 'đầu sheet sản phẩm', en: 'product sheet header' },
+  daily_sheet_total: { vi: 'dòng tổng không ngày', en: 'undated total' },
+  live_sessions: { vi: 'cộng các phiên', en: 'sum of sessions' },
+};
 
 /** Fewer orders than this and a rate (cancel, refund…) is not called good or bad. */
 export const MIN_RATE_ORDERS = 30;
@@ -298,25 +312,30 @@ function dataQualityAlerts(dataset: CanonicalDataset, day: string, platforms?: P
   const period = totals[0];
   if (!period) return out;
   const whole = computeKpis(dataset, { range: { start: period.start, end: period.end }, platforms });
-  const labels: [keyof typeof whole.metrics, Bilingual][] = [
-    ['placedGmv', { vi: 'Doanh số đơn đặt', en: 'Placed sales' }],
-    ['gmv', { vi: 'Doanh số đơn đã thanh toán', en: 'Paid sales' }],
-    ['orders', { vi: 'Số đơn đặt', en: 'Placed orders' }],
-    ['validOrders', { vi: 'Số đơn đã thanh toán', en: 'Paid orders' }],
-  ];
-  const mismatches = labels.filter(([k]) => whole.metrics[k].warning).map(([k, l]) => ({ label: l, warning: whole.metrics[k].warning! }));
+  // Every figure of this period whose copies in the file disagree beyond rounding, largest first.
+  const items = sourceChecks(dataset, platforms)
+    .filter((c) => c.period.start === period.start && c.period.end === period.end && c.mismatch)
+    .flatMap((c) =>
+      c.others
+        .filter((o) => !o.withinTolerance)
+        .map((o) => compareCopies(c.id + o.source, c.label, c.unit, { label: SOURCE_SHORT[c.canonical.source], value: c.canonical.value }, { label: SOURCE_SHORT[o.source], value: o.value })),
+    )
+    .filter((m): m is MismatchItem => m !== null)
+    .sort(byGap);
   const periodText = `${fmtDay(period.start)}–${fmtDay(period.end)}`;
-  if (mismatches.length > 0) {
+  if (items.length > 0) {
+    const top = items.slice(0, 3).map(describeMismatch);
+    const more = items.length > 3 ? { vi: ` Và ${items.length - 3} chỗ khác — xem Chất lượng dữ liệu.`, en: ` And ${items.length - 3} more — see Data Quality.` } : { vi: '', en: '' };
     out.push({
       id: `period_mismatch-${period.start}-${period.end}`,
       type: 'data_period_mismatch',
       severity: 'info',
-      title: { vi: `File tự mâu thuẫn: cộng ngày lệch dòng tổng kỳ ${periodText}`, en: `Daily rows disagree with the period total (${periodText})` },
+      title: { vi: `Dữ liệu không khớp trong file (kỳ ${periodText})`, en: `Data does not match within the file (${periodText})` },
       message: {
-        vi: mismatches.map((m) => `${m.label.vi}: ${m.warning.vi}`).join(' '),
-        en: mismatches.map((m) => `${m.label.en}: ${m.warning.en}`).join(' '),
+        vi: top.map((t) => t.vi).join('; ') + '.' + more.vi,
+        en: top.map((t) => t.en).join('; ') + '.' + more.en,
       },
-      check: { vi: 'Xuất lại báo cáo từ Kênh người bán; số theo ngày và số cả kỳ đang không cùng một bộ dữ liệu.', en: 'Re-export the report; the daily and period figures do not come from the same data.' },
+      check: { vi: 'Xuất lại báo cáo từ Kênh người bán; các bảng trong file đang không cùng một bộ dữ liệu.', en: 'Re-export the report; the tables of the file do not come from the same data.' },
       evidence: [],
     });
   }

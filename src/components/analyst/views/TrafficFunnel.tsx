@@ -6,6 +6,9 @@ import {
   fmtCount,
   fmtPp,
   fmtRate,
+  fmtShare,
+  isOverFull,
+  OVER_FULL_NOTE,
   formatRangeVi,
   funnel,
   FUNNEL_LABELS,
@@ -39,7 +42,7 @@ export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map
               <div className={`flex items-center gap-2 pl-3 text-[11px] ${leak ? 'text-[#fab219] font-bold' : 'text-slate-400'}`}>
                 <ArrowDown className="w-3 h-3" aria-hidden />
                 <span>
-                  {fmtRate(step.rate, lang, 2)} {vi ? 'chuyển tiếp' : 'convert'}
+                  <span title={isOverFull(step.rate) ? tr(lang, OVER_FULL_NOTE) : undefined}>{fmtShare(step.rate, lang, 2)}</span> {vi ? 'chuyển tiếp' : 'convert'}
                   {step.skipped.length > 0 && ` (${vi ? 'bỏ qua' : 'skips'} ${step.skipped.map((x) => tr(lang, FUNNEL_LABELS[x])).join(', ')})`}
                   {pp !== undefined && pp !== null && <span className={pp >= 0 ? 'text-[#4ade80]' : 'text-[#f08080]'}> · {fmtPp(pp, lang)} {vi ? 'so với kỳ trước' : 'vs prev'}</span>}
                   {leak && (
@@ -163,7 +166,7 @@ export const TrafficFunnel: React.FC = () => {
                   <td className="px-2.5 py-2 text-right">{fmtCount(f.stages.orders, lang)}</td>
                   <td className="px-2.5 py-2 text-right">{fmtCount(f.stages.paid, lang)}</td>
                   <td className="px-2.5 py-2 text-right">{fmtCount(f.stages.completed, lang)}</td>
-                  <td className="px-2.5 py-2 text-right">{fmtRate(f.stages.clicks && f.stages.orders !== null ? f.stages.orders / f.stages.clicks : null, lang, 2)}</td>
+                  <td className="px-2.5 py-2 text-right">{fmtShare(f.stages.clicks && f.stages.orders !== null ? f.stages.orders / f.stages.clicks : null, lang, 2)}</td>
                   <td className="px-2.5 py-2 text-slate-300 whitespace-nowrap">
                     {f.biggestLeak ? `${tr(lang, FUNNEL_LABELS[f.biggestLeak.from])} → ${tr(lang, FUNNEL_LABELS[f.biggestLeak.to])} (${fmtRate(f.biggestLeak.rate, lang, 1)})` : '—'}
                   </td>

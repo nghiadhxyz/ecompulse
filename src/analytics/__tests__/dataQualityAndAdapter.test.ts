@@ -129,7 +129,9 @@ describe('ParsedStoreData adapter', () => {
     // Whole period → the platform's total, with a warning that the days add up differently.
     const m = computeKpis(ds, { range: { start: '2025-09-01', end: '2025-09-02' } }).metrics;
     expect(m.orders.value).toBe(9);
-    expect(m.orders.warning?.vi).toContain('Cộng các ngày = 15, dòng tổng của sàn = 9');
+    expect(m.orders.warning?.vi).toContain('Dữ liệu không khớp: dòng tổng 9 · cộng ngày 15');
+    expect(m.orders.mismatch).toMatchObject({ used: { value: 9 }, other: { value: 15 } });
+    expect(m.orders.warning?.vi).not.toContain('làm tròn');
     expect(m.cancelRate.warning).toBeDefined();
     expect(m.cancelRate.value).toBeCloseTo(99 / 9, 10);
   });

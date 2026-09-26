@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { CONTENT_KIND_LABELS, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi, PLATFORM_LABELS, videoAffiliate, type ContentRow } from '../../../analytics';
+import { CONTENT_KIND_LABELS, fmtShare, isOverFull, OVER_FULL_NOTE, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi, PLATFORM_LABELS, videoAffiliate, type ContentRow } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { ChangeCell, Th } from '../ui';
@@ -29,7 +29,7 @@ export const VideoAffiliateView: React.FC = () => {
             <Th left>{kind === 'creator' ? (vi ? 'Nhà sáng tạo' : 'Creator') : 'Video'}</Th>
             <Th>{vi ? 'Lượt xem' : 'Views'}</Th>
             <Th>{vi ? 'Nhấp SP' : 'Clicks'}</Th>
-            <Th>CTR</Th>
+            <Th title={vi ? 'Lượt nhấp sản phẩm ÷ lượt xem' : 'Product clicks ÷ views'}>{vi ? 'Nhấp / lượt xem' : 'Clicks / views'}</Th>
             <Th>{vi ? 'Đơn' : 'Orders'}</Th>
             <Th>CVR</Th>
             <Th>GMV</Th>
@@ -52,9 +52,9 @@ export const VideoAffiliateView: React.FC = () => {
                 </td>
                 <td className="px-2.5 py-1.5 text-right">{fmtCount(r.views, lang)}</td>
                 <td className="px-2.5 py-1.5 text-right">{fmtCount(r.clicks, lang)}</td>
-                <td className="px-2.5 py-1.5 text-right">{fmtRate(r.ctr, lang, 2)}</td>
+                <td className="px-2.5 py-1.5 text-right" title={isOverFull(r.ctr) ? tr(lang, OVER_FULL_NOTE) : undefined}>{fmtShare(r.ctr, lang, 2)}</td>
                 <td className="px-2.5 py-1.5 text-right">{fmtCount(r.orders, lang)}</td>
-                <td className="px-2.5 py-1.5 text-right">{fmtRate(r.cvr, lang, 2)}</td>
+                <td className="px-2.5 py-1.5 text-right" title={isOverFull(r.cvr) ? tr(lang, OVER_FULL_NOTE) : undefined}>{fmtShare(r.cvr, lang, 2)}</td>
                 <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.gmv, lang)}</td>
                 <td className="px-2.5 py-1.5 text-right whitespace-nowrap"><ChangeCell c={r.gmvChange} lang={lang} /></td>
                 {kind === 'creator' && <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.commission, lang)}</td>}

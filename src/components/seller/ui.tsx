@@ -102,7 +102,11 @@ export const KpiCard: React.FC<{
       </div>
       <div className={`font-black tracking-tight truncate ${missing ? 'text-base text-slate-500' : 'text-xl sm:text-2xl text-white'}`}>{metricText(metric, lang)}</div>
       {missing && metric.notes?.[0] && <div className="text-[11px] text-slate-500 leading-snug">{metric.notes[0][lang]}</div>}
-      {!missing && metric.warning && <div className="text-[11px] text-[#fab219] leading-snug">⚠ {metric.warning[lang]}</div>}
+      {!missing && metric.warning && (
+        <div className={`text-[11px] leading-snug ${metric.mismatch ? 'text-[#f08080] font-semibold' : 'text-[#fab219]'}`} role={metric.mismatch ? 'alert' : undefined}>
+          ⚠ {metric.warning[lang]}
+        </div>
+      )}
       {!missing && cmp && (
         <div className="leading-snug">
           <DeltaChip cmp={cmp} lang={lang} goodWhenUp={goodWhenUp} />

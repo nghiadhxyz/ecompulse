@@ -25,6 +25,7 @@ import { hasAny, missing, ok, partial, ratioMetric, sum, type Bilingual, type Me
 import { computeProfit, type ProfitResult } from './profitEngine';
 import { moneyTolerance, ORDER_TOLERANCE } from './periodRows';
 import { stageDay, stageOf, STAGE_BASIS } from './orderStage';
+import { compareCopies, DAILY_SUM_LABEL, FILE_RATE_LABEL, fmtMismatchValue, PERIOD_ROW_LABEL, RECOMPUTED_LABEL } from './mismatch';
 
 export type DataGrain = 'order' | 'daily' | 'none';
 
@@ -188,13 +189,15 @@ function fromPeriodTotals(
   const daily = sum(slice.dailyMetrics, dailyPick);
   // Only additive figures come here (sales, orders, cancellations, clicks) — never distinct
   // counts such as visitors or buyers, whose days are not meant to add up.
-  if (Math.abs(daily - value) <= (unit === 'vnd' ? moneyTolerance(value) : ORDER_TOLERANCE)) return ok(value, unit);
-  const fmt = (v: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(v);
+  const mismatch = compareCopies('period-vs-days', { vi: 'Số liệu', en: 'Figure' }, unit, { label: PERIOD_ROW_LABEL, value }, { label: DAILY_SUM_LABEL, value: daily });
+  if (!mismatch) return ok(value, unit);
+  const fmt = (v: number) => fmtMismatchValue(v, unit);
   return {
     ...ok(value, unit),
+    mismatch,
     warning: {
-      vi: `Cộng các ngày = ${fmt(daily)}, dòng tổng của sàn = ${fmt(value)} (lệch ${fmt(daily - value)}) — đang dùng dòng tổng.`,
-      en: `Daily rows add up to ${fmt(daily)} but the platform's total is ${fmt(value)} — using the total.`,
+      vi: `Dữ liệu không khớp: dòng tổng ${fmt(value)} · cộng ngày ${fmt(daily)} (lệch ${fmt(Math.abs(daily - value))}). Thẻ dùng dòng tổng, biểu đồ theo ngày dùng cộng ngày.`,
+      en: `Data does not match: period row ${fmt(value)} vs sum of days ${fmt(daily)}. The card uses the period row, daily charts the days.`,
     },
   };
 }
@@ -371,6 +374,7 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
             },
           ]),
           warning: gmvRaw.warning ?? cancelledGmv.warning ?? refundedGmv.warning,
+          mismatch: gmvRaw.mismatch ?? cancelledGmv.mismatch ?? refundedGmv.mismatch,
         }
       : missing('vnd', ORDER_LEVEL, ['orderLines.sellerDiscount', 'daily.cancelledGmv', 'daily.refundedGmv']);
 
@@ -383,14 +387,15 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
     const count = (v: number | null) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(v ?? 0);
     const gap = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Math.abs(cvr.value - reportedCvr) * 100);
     cvr.warning = {
-      vi: `File ghi CVR ${pct(reportedCvr)}, tính lại ${basis.vi} ÷ Lượt nhấp sản phẩm = ${count(orders.value)} ÷ ${count(clicks.value)} = ${pct(cvr.value)} (lệch ${gap} điểm %). Đang dùng số tính lại.`,
-      en: `The file states CVR ${pct(reportedCvr)} but orders ÷ product clicks = ${pct(cvr.value)}. Using the recomputed value.`,
+      vi: `Dữ liệu không khớp: file ghi CVR ${pct(reportedCvr)}, tính lại ${basis.vi} ÷ Lượt nhấp sản phẩm = ${count(orders.value)} ÷ ${count(clicks.value)} = ${pct(cvr.value)} (lệch ${gap} điểm %). Đang dùng số tính lại.`,
+      en: `Data does not match: the file states CVR ${pct(reportedCvr)} but orders ÷ product clicks = ${pct(cvr.value)}. Using the recomputed value.`,
     };
+    cvr.mismatch = compareCopies('cvr', { vi: 'CVR', en: 'CVR' }, 'ratio', { label: RECOMPUTED_LABEL, value: cvr.value }, { label: FILE_RATE_LABEL, value: reportedCvr }) ?? undefined;
   }
 
   // Valid orders = orders of the stage that were not cancelled.
   const validOrders: MetricResult =
-    orders.value !== null && cancelled.value !== null ? { ...ok(orders.value - cancelled.value, 'count'), warning: orders.warning ?? cancelled.warning } : orders;
+    orders.value !== null && cancelled.value !== null ? { ...ok(orders.value - cancelled.value, 'count'), warning: orders.warning ?? cancelled.warning, mismatch: orders.mismatch ?? cancelled.mismatch } : orders;
 
   const metrics: Record<KpiKey, MetricResult> = {
     gmv,

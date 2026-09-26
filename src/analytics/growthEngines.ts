@@ -11,7 +11,8 @@ import { compareValues, type Comparison } from './comparisonEngine';
 import { safeDivide, type Bilingual } from './metric';
 import { enumerateDays } from './period';
 import { weekdayIndex } from './campaignEngine';
-import { mismatchNote, moneyTolerance, ORDER_TOLERANCE, periodMismatches } from './periodRows';
+import { moneyTolerance, ORDER_TOLERANCE, periodMismatches } from './periodRows';
+import { byGap, compareCopies, FILE_RATE_LABEL, periodMismatchItems, RECOMPUTED_LABEL, type MismatchItem } from './mismatch';
 import { fmtMoney, fmtOrders } from './format';
 
 // ============================================================ ADS INTELLIGENCE
@@ -28,6 +29,8 @@ export interface AdsIntelligence {
   spendBelowBreakEven: number;
   /** Period-total rows cannot be split by day and are excluded from the daily chart. */
   periodRowsExcludedFromDaily: number;
+  /** Ad rows whose days do not add up to the period row, and printed ROAS ≠ revenue ÷ spend. */
+  mismatches: MismatchItem[];
   notes: Bilingual[];
 }
 
@@ -82,13 +85,27 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
     { key: 'attributedRevenue', pick: (a) => a.attributedRevenue, tolerance: moneyTolerance },
     { key: 'orders', pick: (a) => a.orders, tolerance: ORDER_TOLERANCE },
   ]);
-  const FIELD_VI: Record<string, string> = { spend: 'chi phí', attributedRevenue: 'doanh số', orders: 'số đơn' };
-  const mmNote = mismatchNote(mm, (m) => {
-    const name = m.group.split('|')[2] || m.group.split('|')[1];
-    const f = m.field === 'orders' ? fmtOrders : (v: number) => fmtMoney(v);
-    return `${name} — ${FIELD_VI[m.field]} cộng ngày ${f(m.dailySum)}, dòng tổng ${f(m.periodValue)}`;
-  });
-  if (mmNote) notes.push(mmNote);
+  const FIELD: Record<string, Bilingual> = { spend: { vi: 'chi phí', en: 'spend' }, attributedRevenue: { vi: 'doanh số', en: 'sales' }, orders: { vi: 'số đơn', en: 'orders' } };
+  const mismatches = periodMismatchItems(
+    mm,
+    (m) => {
+      const name = m.group.split('|')[2] || m.group.split('|')[1];
+      return { vi: `${name} — ${FIELD[m.field].vi}`, en: `${name} — ${FIELD[m.field].en}` };
+    },
+    (m) => (m.field === 'orders' ? 'count' : 'vnd'),
+  );
+  // The report's own ROAS column vs revenue ÷ spend of the same row.
+  for (const a of slice.ads.filter((x) => x.periodStart !== undefined && x.reportedRoas !== undefined)) {
+    const m = compareCopies(
+      `roas|${adKey(a)}`,
+      { vi: `${a.adName ?? a.campaignId} — ROAS`, en: `${a.adName ?? a.campaignId} — ROAS` },
+      'multiple',
+      { label: RECOMPUTED_LABEL, value: a.spend ? (a.attributedRevenue ?? 0) / a.spend : null },
+      { label: FILE_RATE_LABEL, value: a.reportedRoas },
+    );
+    if (m) mismatches.push(m);
+  }
+  mismatches.sort(byGap);
   return {
     available: summary.available,
     campaigns,
@@ -97,6 +114,7 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
     byPlatform,
     spendBelowBreakEven: campaigns.filter((c) => c.efficiency === 'below_break_even').reduce((s, c) => s + (c.spend ?? 0), 0),
     periodRowsExcludedFromDaily: periodRows,
+    mismatches,
     notes,
   };
 }

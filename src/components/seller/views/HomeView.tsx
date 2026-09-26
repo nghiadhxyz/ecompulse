@@ -12,6 +12,7 @@ import {
   fmtMoneyCompact,
   fmtRate,
   formatRangeVi,
+  moneyTolerance,
   type MetricComparison,
   type MetricResult,
   type ProfitResult,
@@ -19,6 +20,7 @@ import {
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, GhostButton, HelpTip, KpiCard, NotEnoughData, Section, SeverityBadge, SourceBadge, tr } from '../ui';
 import { SummaryChannelsPanel } from '../../workspace/SummaryPanels';
+import { ChartTotalNote } from '../../workspace/MismatchBox';
 import { SubsidyPanel } from '../../workspace/SummaryInsightPanels';
 
 const BAR_COLOR = '#3987e5';
@@ -120,6 +122,7 @@ export const HomeView: React.FC = () => {
                 </ResponsiveContainer>
               </div>
             )}
+            <ChartTotalNote chartTotal={series.reduce((s, p) => s + (p.gmv ?? 0), 0)} kpi={k.gmv.value} lang={lang} tolerance={moneyTolerance(k.gmv.value ?? 0)} />
           </Section>
         </div>
         <div className="xl:col-span-2">

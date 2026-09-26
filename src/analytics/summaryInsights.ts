@@ -19,7 +19,7 @@ import { safeDivide, type Bilingual } from './metric';
 import { campaignCalendar, dayTypeOf, weekdayIndex } from './campaignEngine';
 import { dailySummaryRows, summaryRowsInRange, SUMMARY_CHANNEL_LABELS, SUMMARY_STACKED_CHANNELS } from './summaryEngine';
 import { usablePeriodTotals } from './kpiEngine';
-import { moneyTolerance } from './periodRows';
+import { byGap, compareCopies, DAILY_SUM_LABEL, PERIOD_ROW_LABEL, type MismatchItem } from './mismatch';
 import { crossStageRate } from './orderStage';
 
 export type SeriesGrain = 'day' | 'week';
@@ -48,6 +48,8 @@ export interface SubsidyDependence {
   notes: Bilingual[];
   /** Data problems the reader must see (days that do not add up, impossible days). */
   warnings: Bilingual[];
+  /** Period row vs days: "Cả khoảng" uses the period row, the chart the days. */
+  mismatches: MismatchItem[];
   /** Days where sales excluding subsidy exceed sales: impossible, left out of every figure. */
   invalidDays: string[];
 }
@@ -72,6 +74,7 @@ export function subsidyDependence(dataset: CanonicalDataset, filter: DatasetFilt
       points: [],
       notes: [{ vi: 'Báo cáo không có cột "Doanh số không bao gồm trợ giá bởi Shopee".', en: 'The report has no sales-excluding-subsidy column.' }],
       warnings: [],
+      mismatches: [],
       invalidDays: [],
     };
   }
@@ -98,6 +101,7 @@ export function subsidyDependence(dataset: CanonicalDataset, filter: DatasetFilt
     : finish({ key: 'total', days: validDays, gmv: points.reduce((s, p) => s + p.gmv, 0), noSubsidyGmv: points.reduce((s, p) => s + p.noSubsidyGmv, 0), subsidy: 0, share: null });
 
   const warnings: Bilingual[] = [];
+  const mismatches: MismatchItem[] = [];
   if (invalidDays.length > 0) {
     warnings.push({
       vi: `Dữ liệu không hợp lệ ở ${invalidDays.length} ngày (${invalidDays.map(fmtDdMm).join(', ')}): doanh số không gồm trợ giá lớn hơn doanh số, tức trợ giá âm. Các ngày này bị bỏ khỏi biểu đồ và bảng${useTotals ? '' : ' và tổng'}.`,
@@ -108,17 +112,13 @@ export function subsidyDependence(dataset: CanonicalDataset, filter: DatasetFilt
     // The period row and the days describe the same placed orders; say so when they disagree.
     const dayGmv = rows.reduce((s, d) => s + d.placedGmv!, 0);
     const dayNoSub = rows.reduce((s, d) => s + d.placedNoSubsidyGmv!, 0);
-    const diffs: string[] = [];
-    if (Math.abs(dayGmv - total.gmv) > moneyTolerance(total.gmv)) diffs.push(`doanh số đơn đặt ${fmtInt(total.gmv)} theo dòng tổng, ${fmtInt(dayGmv)} khi cộng ngày (lệch ${fmtInt(Math.abs(total.gmv - dayGmv))})`);
-    if (Math.abs(dayNoSub - total.noSubsidyGmv) > moneyTolerance(total.noSubsidyGmv))
-      diffs.push(`không gồm trợ giá ${fmtInt(total.noSubsidyGmv)} theo dòng tổng, ${fmtInt(dayNoSub)} khi cộng ngày (lệch ${fmtInt(Math.abs(total.noSubsidyGmv - dayNoSub))})`);
-    if (diffs.length > 0) {
-      warnings.push({
-        vi: `File tự mâu thuẫn: ${diffs.join('; ')}. Số "Cả khoảng" dùng dòng tổng; biểu đồ theo ngày/tuần dùng số từng ngày nên không khớp với nó.`,
-        en: "The file's period row and its daily rows disagree. The whole-range figure uses the period row; the chart uses the days.",
-      });
-    }
+    for (const m of [
+      compareCopies('subsidy|gmv', { vi: 'Doanh số đơn đặt', en: 'Placed sales' }, 'vnd', { label: PERIOD_ROW_LABEL, value: total.gmv }, { label: DAILY_SUM_LABEL, value: dayGmv }),
+      compareCopies('subsidy|nosub', { vi: 'Doanh số không gồm trợ giá', en: 'Sales excl. subsidy' }, 'vnd', { label: PERIOD_ROW_LABEL, value: total.noSubsidyGmv }, { label: DAILY_SUM_LABEL, value: dayNoSub }),
+    ])
+      if (m) mismatches.push(m);
   }
+  mismatches.sort(byGap);
 
   const notes: Bilingual[] = [
     {
@@ -127,7 +127,7 @@ export function subsidyDependence(dataset: CanonicalDataset, filter: DatasetFilt
     },
   ];
   if (grain === 'week' && points.some((p) => p.days < 7)) notes.push({ vi: 'Tuần ở đầu/cuối kỳ hoặc có ngày bị loại không đủ 7 ngày — cột "Số ngày" cho biết cỡ mẫu.', en: 'Some weeks have fewer than 7 usable days.' });
-  return { available: true, total, points, notes, warnings, invalidDays };
+  return { available: true, total, points, notes, warnings, mismatches, invalidDays };
 }
 
 // ------------------------------------------------------------------ B2 source drivers

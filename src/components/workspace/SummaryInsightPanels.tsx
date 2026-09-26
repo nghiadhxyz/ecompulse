@@ -27,6 +27,7 @@ import {
 import { useWorkspace } from '../seller/SellerContext';
 import { NotEnoughData, Section, tr } from '../seller/ui';
 import { ShareBar, Th } from '../analyst/ui';
+import { MismatchBox } from './MismatchBox';
 import { SummaryNotes } from './SummaryPanels';
 
 const BAR = '#3987e5';
@@ -66,10 +67,11 @@ export const SubsidyPanel: React.FC = () => {
       ) : (
         <>
           {s.warnings.map((w) => (
-            <p key={w.vi} className="text-[11px] text-[#fab219] leading-snug mb-2">
+            <p key={w.vi} className="text-[11px] text-[#f08080] font-semibold leading-snug mb-2" role="alert">
               ⚠ {w[lang]}
             </p>
           ))}
+          <MismatchBox items={s.mismatches} lang={lang} note={vi ? '"Cả khoảng" dùng dòng tổng; biểu đồ dùng số từng ngày.' : 'The whole-range figure uses the period row; the chart uses the days.'} />
           <div className="h-48" role="img" aria-label={vi ? '% phụ thuộc trợ giá theo thời gian' : 'Subsidy share over time'}>
             <ResponsiveContainer width="100%" height="100%">
               {/* Invalid days have no share: the line breaks there instead of dipping below zero. */}
@@ -321,6 +323,13 @@ export const CustomerTrendPanel: React.FC = () => {
         <NotEnoughData lang={lang} reason={tr(lang, t.notes[0])} />
       ) : (
         <>
+          {!pt && (
+            <p className="text-[11px] text-slate-400 mb-2">
+              {vi
+                ? 'Tỉ lệ quay lại: Không tính được — chỉ Shopee có số này (dòng tổng cả kỳ, công thức không công khai). Chọn trọn kỳ báo cáo để xem.'
+                : 'Repeat rate: cannot be computed — only the Shopee period row has it. Select the whole report period.'}
+            </p>
+          )}
           {pt && (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
               {[

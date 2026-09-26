@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { adsIntelligence, fmtCount, fmtDay, fmtMoney, fmtMoneyCompact, fmtMultiple, fmtRate, formatRangeVi, PLATFORM_LABELS, type AdEfficiency } from '../../../analytics';
+import { adsIntelligence, moneyTolerance, fmtCount, fmtDay, fmtMoney, fmtMoneyCompact, fmtMultiple, fmtRate, formatRangeVi, PLATFORM_LABELS, type AdEfficiency } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
+import { ChartTotalNote, MismatchBox } from '../../workspace/MismatchBox';
 import { ShareBar, Th } from '../ui';
 
 const BAR = '#3987e5';
@@ -71,6 +72,7 @@ export const AdsIntelligenceView: React.FC = () => {
           </div>
         ))}
       </div>
+      <MismatchBox items={ai.mismatches} lang={lang} note={vi ? 'Bảng dùng dòng tổng cả kỳ; biểu đồ dùng số từng ngày.' : 'The table uses the period rows; the charts use the days.'} />
       {ai.notes.map((n, i) => (
         <p key={i} className="text-xs text-[#fab219]">{tr(lang, n)}</p>
       ))}
@@ -146,6 +148,7 @@ export const AdsIntelligenceView: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          <ChartTotalNote chartTotal={ai.daily.reduce((s, d) => s + d.spend, 0)} kpi={t.spend} lang={lang} tolerance={moneyTolerance(t.spend ?? 0)} />
         </Section>
         <Section title={vi ? 'ROAS theo ngày' : 'Daily ROAS'} subtitle={vi ? `Đường nét đứt: ROAS hòa vốn của shop (${fmtMultiple(t.breakEvenRoas, lang)})` : 'Dashed: shop break-even ROAS'}>
           <div className="h-48" role="img" aria-label={vi ? 'ROAS theo ngày' : 'Daily ROAS'}>

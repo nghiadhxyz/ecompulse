@@ -217,7 +217,7 @@ describe('summary reports that disagree with themselves', () => {
   it('warns when the period row and the days give different placed sales', () => {
     const s = subsidyDependence(ds, { range: RANGE });
     expect(s.total!.gmv).toBe(3000);
-    expect(s.warnings.some((w) => w.vi.includes('3.000 theo dòng tổng, 2.500 khi cộng ngày'))).toBe(true);
+    expect(s.mismatches.find((m) => m.key === 'subsidy|gmv')).toMatchObject({ used: { value: 3000 }, other: { value: 2500 } });
   });
 
   it('platform table uses the same period totals as the KPI cards', () => {

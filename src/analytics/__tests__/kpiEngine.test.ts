@@ -199,9 +199,11 @@ describe('KPI engine — daily grain (summary reports)', () => {
     const withTotal = { ...ds, periodTotals: [{ platform: 'shopee' as const, start: '2025-09-01', end: '2025-09-02', stage: 'placed' as const, orders: 30, productClicks: 500, reportedCvr: 0.08 }] };
     const cvr = computeKpis(withTotal, { range: SEPT_1_2 }).metrics.cvr;
     expect(cvr.value).toBeCloseTo(0.06, 10);
-    expect(cvr.warning?.vi).toContain('File ghi CVR 8,00%');
+    expect(cvr.warning?.vi).toContain('file ghi CVR 8,00%');
+    expect(cvr.mismatch).toMatchObject({ used: { value: 0.06 }, other: { value: 0.08 } });
     const agreeing = { ...withTotal, periodTotals: [{ ...withTotal.periodTotals[0], reportedCvr: 0.06 }] };
     expect(computeKpis(agreeing, { range: SEPT_1_2 }).metrics.cvr.warning).toBeUndefined();
+    expect(computeKpis(agreeing, { range: SEPT_1_2 }).metrics.cvr.mismatch).toBeUndefined();
   });
 
   it('does not present summed daily buyers as distinct buyers', () => {

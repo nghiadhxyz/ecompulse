@@ -19,7 +19,11 @@ import { buildDailyBrief } from '../dailyBrief';
 import { questionUnavailable } from '../dolphinEvidence';
 import { funnel } from '../funnelEngine';
 import { sourceChecks, type SourceCheck } from '../canonicalSources';
-import { channelMix } from '../summaryEngine';
+import { channelMix, summaryProducts } from '../summaryEngine';
+import { adsIntelligence } from '../growthEngines';
+import { dailySeries } from '../timeseries';
+import { describeMismatch, type MismatchItem } from '../mismatch';
+import { fmtPerViewer, fmtShare } from '../format';
 import { anomalyScan } from '../anomalyScan';
 import { calendarPerformance } from '../campaignEngine';
 import { advancedStats } from '../statsEngine';
@@ -68,7 +72,7 @@ describe.skipIf(!existsSync(NEW_WORKBOOK))('Shopee workbook with inconsistent ro
     // (4) + (5) Subsidy: period row vs days, and days with a negative subsidy.
     const s = subsidyDependence(ds, { range });
     expect(s.total?.gmv).toBe(78_626_020);
-    expect(s.warnings.some((w) => w.vi.includes('78.626.020') && w.vi.includes('63.713.950'))).toBe(true);
+    expect(s.mismatches.find((m) => m.key === 'subsidy|gmv')).toMatchObject({ used: { value: 78_626_020 }, other: { value: 63_713_950 } });
     expect(s.invalidDays).toEqual(['2026-07-25', '2026-07-26', '2026-08-01', '2026-08-07', '2026-08-19', '2026-08-21']);
     expect(s.points.every((p) => p.share === null || p.share >= 0)).toBe(true);
     expect(s.points.find((p) => p.key === '2026-07-25')?.share).toBeNull();
@@ -237,5 +241,62 @@ describe('0.3 — canonical sources', () => {
     expect(checks.filter((c) => c.invalid)).toEqual([]);
     const sessions = find(checks, 'live_sessions');
     expect([sessions.canonical.value, other(sessions, 'live_sessions')]).toEqual([27_000, 27_000]);
+  });
+});
+
+describe('0.4–0.5 — mismatch warnings and rates', () => {
+  const noRounding = (items: MismatchItem[]) => items.every((m) => !describeMismatch(m).vi.includes('làm tròn'));
+  const sortedByGap = (items: MismatchItem[]) => items.every((m, i) => i === 0 || items[i - 1].gap >= m.gap);
+
+  it.skipIf(!existsSync(NEW_WORKBOOK))('flags every disagreement in red, largest first (inconsistent file)', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const m = computeKpis(ds, { range }).metrics;
+    // KPI card: both numbers, never "rounding".
+    expect(m.gmv.mismatch).toMatchObject({ used: { value: 78_626_020 }, other: { value: 63_713_950 } });
+    expect(m.gmv.warning?.vi).toContain('Dữ liệu không khớp');
+    expect(m.gmv.warning?.vi).not.toContain('làm tròn');
+    expect(m.cvr.mismatch!.other.value).toBeCloseTo(0.0597, 10);
+    // Distinct counts are never compared with a sum of days.
+    expect(m.visits.mismatch).toBeUndefined();
+    expect(m.buyers.mismatch).toBeUndefined();
+    // Chart total (days) ≠ KPI (period row).
+    expect(dailySeries(ds, { range }).reduce((s, p) => s + (p.gmv ?? 0), 0)).toBe(63_713_950);
+
+    const mix = channelMix(ds, { range });
+    expect(mix.mismatches.length).toBeGreaterThan(3);
+    expect(sortedByGap(mix.mismatches) && noRounding(mix.mismatches)).toBe(true);
+    // Printed CTR / CVR of the products vs recomputed (1.2).
+    const prod = summaryProducts(ds, { range }).mismatches;
+    const ctr = prod.find((x) => x.key.endsWith('|26061744778|CTR'))!;
+    const cvr = prod.find((x) => x.key.endsWith('|26061744778|CVR'))!;
+    expect([ctr.used.value, ctr.other.value, cvr.used.value, cvr.other.value].map((v) => Math.round(v * 10_000) / 100)).toEqual([2.61, 4.08, 3.45, 4.02]);
+    // Printed ROAS vs revenue ÷ spend.
+    const ads = adsIntelligence(ds, { range }).mismatches;
+    expect(ads.find((x) => x.key.startsWith('roas|') && x.label.vi.startsWith('Quảng cáo GMV tối đa'))).toMatchObject({ used: { value: 55_227_941 / 5_229_292 } });
+    expect(sortedByGap(ads)).toBe(true);
+    // The Dolphin data alert lists the three largest gaps.
+    const alert = buildDailyBrief(ds, '2026-08-21').alerts.find((a) => a.type === 'data_period_mismatch')!;
+    expect(alert.title.vi).toContain('Dữ liệu không khớp');
+    expect(alert.message.vi).toMatch(/Và \d+ chỗ khác/);
+  });
+
+  it.skipIf(!existsSync(WORKBOOK))('shows no mismatch at all for a clean export', async () => {
+    const ds = await summaryWorkspace(WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const m = computeKpis(ds, { range }).metrics;
+    expect(Object.values(m).filter((x) => x.mismatch)).toEqual([]);
+    expect(channelMix(ds, { range }).mismatches).toEqual([]);
+    expect(channelMix(ds, { range }, 'paid').mismatches).toEqual([]);
+    expect(summaryProducts(ds, { range }).mismatches).toEqual([]);
+    expect(adsIntelligence(ds, { range }).mismatches).toEqual([]);
+    expect(subsidyDependence(ds, { range }).mismatches).toEqual([]);
+    expect(buildDailyBrief(ds, '2026-08-21').alerts.filter((a) => a.type === 'data_period_mismatch' || a.type === 'data_cvr_mismatch')).toEqual([]);
+  });
+
+  it('never shows a share above 100% and never a per-viewer count as %', () => {
+    expect(fmtShare(20 / 14)).toBe('—');
+    expect(fmtShare(0.049)).toBe('4,9%');
+    expect(fmtPerViewer(13 / 6)).toBe('2,17 nhấp/người xem');
   });
 });

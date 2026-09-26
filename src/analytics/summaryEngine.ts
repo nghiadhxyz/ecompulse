@@ -13,7 +13,8 @@ import type { CanonicalDataset, SalesSummaryRow, SummaryChannel, SummaryStage } 
 import { sliceDataset, type DatasetFilter } from './filters';
 import { isInRange, type DateRange } from './period';
 import type { Bilingual } from './metric';
-import { mismatchNote, moneyTolerance, ORDER_TOLERANCE, periodMismatches, selectPeriodOrDaily } from './periodRows';
+import { moneyTolerance, ORDER_TOLERANCE, periodMismatches, selectPeriodOrDaily } from './periodRows';
+import { byGap, compareCopies, FILE_RATE_LABEL, periodMismatchItems, RECOMPUTED_LABEL, type MismatchItem } from './mismatch';
 import { fmtMoney, fmtOrders } from './format';
 
 export const SUMMARY_CHANNEL_LABELS: Record<SummaryChannel, Bilingual> = {
@@ -51,19 +52,44 @@ export function hasSalesSummaries(dataset: CanonicalDataset): boolean {
   return (dataset.salesSummaries?.length ?? 0) > 0;
 }
 
-/** Warning when the days of a whole selected period do not add up to the platform's rows. */
-export function summaryMismatchNote(dataset: CanonicalDataset, filter: DatasetFilter, stage: SummaryStage): Bilingual | null {
+/** Channel / source rows whose days do not add up to the platform's period row. */
+export function summaryMismatches(dataset: CanonicalDataset, filter: DatasetFilter, stage: SummaryStage): MismatchItem[] {
   const rows = stageRows(dataset, filter, stage).filter((r) => r.dimension !== 'sku');
   const mm = periodMismatches(rows, filter.range, summaryRowKey, [
     { key: 'gmv', pick: (r) => r.gmv, tolerance: moneyTolerance },
     { key: 'orders', pick: (r) => r.orders, tolerance: ORDER_TOLERANCE },
   ]);
-  return mismatchNote(mm, (m) => {
-    const [, , , channel, key] = m.group.split('|');
-    const name = key === channel ? SUMMARY_CHANNEL_LABELS[channel as SummaryChannel]?.vi ?? key : key;
-    const f = m.field === 'orders' ? (v: number) => fmtOrders(v) : (v: number) => fmtMoney(v);
-    return `${name} — ${m.field === 'orders' ? 'số đơn' : 'doanh số'} cộng ngày ${f(m.dailySum)}, dòng tổng ${f(m.periodValue)}`;
-  });
+  return periodMismatchItems(
+    mm,
+    (m) => {
+      const [, , , channel, key] = m.group.split('|');
+      const name = key === channel ? SUMMARY_CHANNEL_LABELS[channel as SummaryChannel] ?? { vi: key, en: key } : { vi: key, en: key };
+      return m.field === 'orders' ? { vi: `${name.vi} — số đơn`, en: `${name.en} — orders` } : { vi: `${name.vi} — doanh số`, en: `${name.en} — sales` };
+    },
+    (m) => (m.field === 'orders' ? 'count' : 'vnd'),
+  );
+}
+
+/**
+ * Printed rates of period rows (CTR, CVR, share of the channel) that differ from the ones
+ * recomputed from their own numerator and denominator. Product-card rows only: the other
+ * channels define their "CTR" on viewers and do not print comparable rates.
+ */
+export function rateMismatches(rows: SalesSummaryRow[], channelGmv: (r: SalesSummaryRow) => number | null): MismatchItem[] {
+  const out: MismatchItem[] = [];
+  for (const r of rows) {
+    if (!r.reported || r.periodStart === undefined || r.channel !== 'product_card' || r.dimension === 'channel') continue;
+    const name = r.dimension === 'sku' ? `${r.label ?? r.key} (${r.key})` : r.key;
+    const add = (what: string, reported: number | undefined, computed: number | null) => {
+      const m = compareCopies(`rate|${summaryRowKey(r)}|${what}`, { vi: `${name} — ${what}`, en: `${name} — ${what}` }, 'ratio', { label: RECOMPUTED_LABEL, value: computed }, { label: FILE_RATE_LABEL, value: reported });
+      if (m) out.push(m);
+    };
+    add('CTR', r.reported.ctr, r.impressions ? (r.clicks ?? 0) / r.impressions : null);
+    add('CVR', r.reported.cvr, r.clicks ? (r.orders ?? 0) / r.clicks : null);
+    const ch = channelGmv(r);
+    add('tỷ lệ doanh số', r.reported.share, ch ? (r.gmv ?? 0) / ch : null);
+  }
+  return out.sort(byGap);
 }
 
 export interface SourceMetrics {
@@ -96,6 +122,8 @@ export interface ChannelMix {
   adsAssistedShare: number | null;
   /** False over part of the period: unique counts are then sums of daily values. */
   uniqueIsDistinct: boolean;
+  /** Where the file disagrees with itself (days vs period row, printed vs recomputed rates). */
+  mismatches: MismatchItem[];
   notes: Bilingual[];
 }
 
@@ -159,9 +187,9 @@ export function channelMix(dataset: CanonicalDataset, filter: DatasetFilter, sta
   if (!whole && channels.some((c) => c.uniqueImpressions !== null)) {
     notes.push({ vi: 'Lượt hiển thị/nhấp duy nhất khi chọn một phần kỳ là cộng từng ngày (một người xem nhiều ngày được đếm nhiều lần). Chọn trọn kỳ để có số người duy nhất.', en: 'Unique counts over part of the period are sums of daily values.' });
   }
-  const mm = summaryMismatchNote(dataset, filter, stage);
-  if (mm) notes.push(mm);
-  return { available: channels.length > 0, stage, total, channels: channels.sort((a, b) => b.gmv - a.gmv), adsGmv, adsAssistedShare: adsGmv !== null && total ? adsGmv / total : null, uniqueIsDistinct: whole, notes };
+  const channelRowGmv = (r: SalesSummaryRow) => rows.find((x) => x.dimension === 'channel' && x.channel === r.channel)?.gmv ?? null;
+  const mismatches = [...summaryMismatches(dataset, filter, stage), ...rateMismatches(rows.filter((r) => r.dimension === 'source'), channelRowGmv)].sort(byGap);
+  return { available: channels.length > 0, stage, total, channels: channels.sort((a, b) => b.gmv - a.gmv), adsGmv, adsAssistedShare: adsGmv !== null && total ? adsGmv / total : null, uniqueIsDistinct: whole, mismatches, notes };
 }
 
 export interface SummaryProductRow {
@@ -209,6 +237,8 @@ export interface SummaryProducts {
   byChannel: ChannelTopProducts[];
   /** Share of channel GMV covered by the listed products. */
   coverage: number | null;
+  /** Printed CTR / CVR / share of the listed products that differ from the recomputed ones. */
+  mismatches: MismatchItem[];
   notes: Bilingual[];
 }
 
@@ -220,7 +250,7 @@ export function summaryProducts(dataset: CanonicalDataset, filter: DatasetFilter
   if (placed.length === 0) {
     if (anySku) notes.push({ vi: 'Số liệu Top 5 sản phẩm là tổng cả kỳ báo cáo — hãy chọn khoảng thời gian bao trọn kỳ đó.', en: 'Top-5 product rows are period totals — select a range covering the whole report period.' });
     const p = (dataset.salesSummaries ?? []).find((r) => r.dimension === 'sku' && r.periodStart);
-    return { available: false, period: p ? { start: p.periodStart!, end: p.date } : null, rows: [], byChannel: [], coverage: null, notes };
+    return { available: false, period: p ? { start: p.periodStart!, end: p.date } : null, rows: [], byChannel: [], coverage: null, mismatches: [], notes };
   }
   const paidBy = (channel: SummaryChannel, sku: string) => paid.find((r) => r.channel === channel && r.key === sku)?.gmv ?? null;
   const map = new Map<string, SummaryProductRow & { channels: Set<SummaryChannel> }>();
@@ -284,7 +314,8 @@ export function summaryProducts(dataset: CanonicalDataset, filter: DatasetFilter
   notes.push({ vi: 'Chưa có giá vốn theo đơn nên chưa tính được lợi nhuận sản phẩm — cần file xuất đơn hàng.', en: 'No per-order COGS: product profit needs an order export.' });
   const p = placed.find((r) => r.periodStart);
   const rows = [...map.values()].map(({ channels: _c, ...r }) => r).sort((a, b) => b.gmv - a.gmv);
-  return { available: true, period: p ? { start: p.periodStart!, end: p.date } : null, rows, byChannel, coverage, notes };
+  const mismatches = rateMismatches(placed, (r) => mix.channels.find((c) => c.channel === r.channel)?.gmv ?? null);
+  return { available: true, period: p ? { start: p.periodStart!, end: p.date } : null, rows, byChannel, coverage, mismatches, notes };
 }
 
 /** Daily rows of one stage in a range (never period rows) — for series by day. */

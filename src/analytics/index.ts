@@ -13,6 +13,7 @@ export * from './profitEngine';
 export * from './kpiEngine';
 export * from './orderStage';
 export * from './canonicalSources';
+export * from './mismatch';
 export * from './comparisonEngine';
 export * from './contributionEngine';
 export * from './dataQuality';

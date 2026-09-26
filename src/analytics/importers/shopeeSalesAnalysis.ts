@@ -15,7 +15,7 @@
  * the analysed range.
  */
 import { emptyDataset, type AdPerformance, type AffiliatePerformance, type CanonicalDataset, type LiveSession, type Product, type ReportedFigure, type SalesSummaryRow, type SummaryChannel, type SummaryStage } from '../model';
-import { normalizeHeader, toIsoDate, toNumber } from '../parse';
+import { normalizeHeader, toIsoDate, toNumber, toRate } from '../parse';
 import type { SheetInput } from './orderExport';
 
 export interface SheetReadInfo {
@@ -61,6 +61,17 @@ const num = (v: unknown): number | undefined => {
   const s = str(v);
   if (!s || s === '-') return undefined;
   return toNumber(v);
+};
+const rate = (v: unknown): number | undefined => {
+  const s = str(v);
+  if (!s || s === '-') return undefined;
+  return toRate(v);
+};
+/** Printed rates of a row (period sheets only) — compared with the recomputed ones, never used. */
+const printedRates = (r: Row, col: (n: string) => number) => {
+  const pick = (name: string) => (col(name) >= 0 ? rate(r[col(name)]) : undefined);
+  const reported = { ctr: pick('CTR'), cvr: pick('Tỷ lệ chuyển đổi đơn hàng'), share: pick('Tỷ lệ doanh số') };
+  return reported.ctr === undefined && reported.cvr === undefined && reported.share === undefined ? undefined : reported;
 };
 
 function parsePeriod(v: unknown): { start: string; end: string } | null {
@@ -217,7 +228,8 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
           if (channel === 'ads') {
             const spend = spendI >= 0 ? num(r[spendI]) : undefined;
             if (stage === 'placed') {
-              ads.push({ date: period.end, periodStart: period.start, platform, campaignId: `shopee-ads:${a}`, adName: a, adType: a, spend, impressions: metrics.impressions, orders: metrics.orders, attributedRevenue: metrics.gmv });
+              const roasI = col('ROAS quảng cáo');
+              ads.push({ date: period.end, periodStart: period.start, platform, campaignId: `shopee-ads:${a}`, adName: a, adType: a, spend, impressions: metrics.impressions, orders: metrics.orders, attributedRevenue: metrics.gmv, reportedRoas: roasI >= 0 ? num(r[roasI]) : undefined });
             }
             continue;
           }
@@ -231,6 +243,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
             key: isChannelTotal ? channel : a,
             label: a,
             ...metrics,
+            reported: printedRates(r, col),
           });
           count++;
         }
@@ -279,6 +292,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
           clicks: num(r[col('Lượt nhấp vào sản phẩm')]),
           uniqueImpressions: num(r[col('Lượt hiển thị sản phẩm duy nhất')]),
           uniqueClicks: num(r[col('Lượt nhấp sản phẩm duy nhất')]),
+          reported: printedRates(r, col),
         });
         count++;
       }

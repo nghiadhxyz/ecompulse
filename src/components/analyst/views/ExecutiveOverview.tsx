@@ -9,12 +9,14 @@ import {
   fmtMoneyCompact,
   fmtPp,
   formatRangeVi,
+  moneyTolerance,
   type KpiKey,
   type MetricComparison,
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { KpiCard, NotEnoughData, Section, tr } from '../../seller/ui';
 import { SourceDriversPanel, SubsidyPanel } from '../../workspace/SummaryInsightPanels';
+import { ChartTotalNote } from '../../workspace/MismatchBox';
 import { BreakdownTable } from '../ui';
 
 const CURRENT_COLOR = '#3987e5';
@@ -91,6 +93,9 @@ export const ExecutiveOverview: React.FC = () => {
               <span key={s} className="text-xs px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-slate-100">{s}</span>
             ))}
           </div>
+        )}
+        {chart.length > 1 && (
+          <ChartTotalNote chartTotal={cur.reduce((s, p) => s + (p.gmv ?? 0), 0)} kpi={cmp.current.metrics.gmv.value} lang={lang} tolerance={moneyTolerance(cmp.current.metrics.gmv.value ?? 0)} />
         )}
         {chart.length > 1 && gmvBasis && (
           <p className="text-[11px] text-slate-400 mt-4">{vi ? `Biểu đồ: GMV theo ngày, ${gmvBasis.vi.toLowerCase()}.` : `Chart: daily GMV, ${gmvBasis.en.toLowerCase()}.`}</p>

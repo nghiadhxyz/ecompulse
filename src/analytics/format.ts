@@ -101,3 +101,23 @@ export function sessionDateLabel(s: { date: string; periodStart?: string; startT
   if (s.periodStart) return lang === 'vi' ? `Không rõ ngày (tổng kỳ ${fmtDay(s.periodStart)}–${fmtDay(s.date)})` : `Unknown date (period ${fmtDay(s.periodStart)}–${fmtDay(s.date)})`;
   return `${fmtDay(s.date)}${s.startTime ? ` ${s.startTime}` : ''}`;
 }
+
+/**
+ * A share / conversion that cannot exceed 100% (CTR, CVR, retention, funnel step, share of
+ * sales). Above 100% the inputs count different things or the file is wrong: "—", never a number.
+ */
+export function fmtShare(v: number | null | undefined, lang: Lang = 'vi', digits = 1): string {
+  if (v !== null && v !== undefined && v > 1 + 1e-9) return DASH;
+  return fmtRate(v, lang, digits);
+}
+
+export const isOverFull = (v: number | null | undefined) => v !== null && v !== undefined && v > 1 + 1e-9;
+
+export const OVER_FULL_NOTE = { vi: 'Không hợp lệ: tỷ lệ lớn hơn 100% (tử số và mẫu số đếm khác nhau).', en: 'Invalid: above 100% (numerator and denominator count different things).' };
+
+/** Clicks per viewer — a count per person, never shown as a percentage. */
+export function fmtPerViewer(v: number | null | undefined, lang: Lang = 'vi'): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return DASH;
+  const n = new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(v);
+  return lang === 'vi' ? `${n} nhấp/người xem` : `${n} clicks/viewer`;
+}

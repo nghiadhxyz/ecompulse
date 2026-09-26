@@ -4,9 +4,10 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { channelMix, fmtCount, fmtMoneyCompact, fmtOrders, fmtRate, formatRangeVi, STAGE_BASIS, summaryProducts, SUMMARY_CHANNEL_LABELS, SUMMARY_TOP_N, type SummaryChannel, type SummaryStage } from '../../analytics';
+import { channelMix, describeMismatch, fmtPerViewer, fmtShare, isOverFull, OVER_FULL_NOTE, fmtCount, fmtMoneyCompact, fmtOrders, fmtRate, formatRangeVi, STAGE_BASIS, summaryProducts, SUMMARY_CHANNEL_LABELS, SUMMARY_TOP_N, type SummaryChannel, type SummaryStage } from '../../analytics';
 import { useWorkspace } from '../seller/SellerContext';
 import { NotEnoughData, Section, tr } from '../seller/ui';
+import { MismatchBox } from './MismatchBox';
 import { ShareBar, Th } from '../analyst/ui';
 
 export const SUMMARY_STAGES: { key: SummaryStage; vi: string; en: string }[] = [
@@ -28,12 +29,30 @@ export const StagePicker: React.FC<{ stage: SummaryStage; onChange: (s: SummaryS
 export const SummaryNotes: React.FC<{ notes: { vi: string; en: string }[]; lang: 'vi' | 'en' }> = ({ notes, lang }) => (
   <ul className="mt-2 space-y-0.5">
     {notes.map((n, i) => (
-      <li key={i} className={`text-[11px] ${n.vi.startsWith('Cộng các ngày lệch') ? 'text-[#fab219]' : 'text-slate-500'}`}>
+      <li key={i} className="text-[11px] text-slate-500">
         • {tr(lang, n)}
       </li>
     ))}
   </ul>
 );
+
+/** A rate that cannot exceed 100%: above it, "—" with the reason. */
+const RateCell: React.FC<{ v: number | null; lang: 'vi' | 'en'; digits?: number; small?: boolean }> = ({ v, lang, digits = 1, small }) => (
+  <td className={`px-2.5 ${small ? 'py-1' : 'py-1.5'} text-right`} title={isOverFull(v) ? tr(lang, OVER_FULL_NOTE) : undefined}>
+    {fmtShare(v, lang, digits)}
+  </td>
+);
+
+/**
+ * Unique clicks ÷ unique viewers. On the product card both are people (a share, %); on
+ * Live / Video / Affiliate the denominator is viewers, so it is clicks per viewer — never a %.
+ */
+const UniqueCell: React.FC<{ channel: SummaryChannel; v: number | null; lang: 'vi' | 'en'; small?: boolean }> = ({ channel, v, lang, small }) =>
+  channel === 'product_card' ? (
+    <RateCell v={v} lang={lang} small={small} />
+  ) : (
+    <td className={`px-2.5 ${small ? 'py-1' : 'py-1.5'} text-right whitespace-nowrap`}>{fmtPerViewer(v, lang)}</td>
+  );
 
 export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) => {
   // Follows the app-wide order stage picker (placed by default).
@@ -66,7 +85,7 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
                   <Th title={vi ? 'Shopee chia một đơn cho nhiều nguồn theo mức đóng góp nên số đơn có thể lẻ' : 'Can be fractional'}>{vi ? 'Đơn' : 'Orders'}</Th>
                   <Th>{vi ? 'Lượt nhấp' : 'Clicks'}</Th>
                   <Th title={vi ? 'Đơn / lượt nhấp' : 'Orders / clicks'}>{vi ? 'Chuyển đổi' : 'Conv.'}</Th>
-                  <Th title={uniqueTitle}>{vi ? 'CTR duy nhất' : 'Unique CTR'}{mix.uniqueIsDistinct ? '' : '*'}</Th>
+                  <Th title={uniqueTitle}>{vi ? 'CTR duy nhất · nhấp/người xem' : 'Unique CTR · clicks/viewer'}{mix.uniqueIsDistinct ? '' : '*'}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -80,22 +99,22 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
                           {tr(lang, SUMMARY_CHANNEL_LABELS[c.channel])}
                         </td>
                         <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(c.gmv, lang)}</td>
-                        <td className="px-2.5 py-1.5 whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtRate(c.share, lang)}<ShareBar share={c.share} /></div></td>
+                        <td className="px-2.5 py-1.5 whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtShare(c.share, lang)}<ShareBar share={c.share} /></div></td>
                         <td className="px-2.5 py-1.5 text-right">{fmtOrders(c.orders, lang)}</td>
                         <td className="px-2.5 py-1.5 text-right">{fmtCount(c.clicks, lang)}</td>
-                        <td className="px-2.5 py-1.5 text-right">{c.clicks && c.orders !== null ? fmtRate(c.orders / c.clicks, lang, 2) : '—'}</td>
-                        <td className="px-2.5 py-1.5 text-right">{fmtRate(c.uniqueCtr, lang, 1)}</td>
+                        <RateCell v={c.clicks && c.orders !== null ? c.orders / c.clicks : null} lang={lang} digits={2} />
+                        <UniqueCell channel={c.channel} v={c.uniqueCtr} lang={lang} />
                       </tr>
                       {expanded &&
                         c.sources.map((s) => (
                           <tr key={s.key} className="border-t border-white/5 text-slate-300 bg-white/[0.015]">
                             <td className="px-2.5 py-1 pl-9 whitespace-nowrap">{s.key}</td>
                             <td className="px-2.5 py-1 text-right whitespace-nowrap">{fmtMoneyCompact(s.gmv, lang)}</td>
-                            <td className="px-2.5 py-1 text-right text-slate-400 whitespace-nowrap">{fmtRate(s.share, lang)} {vi ? 'của kênh' : 'of channel'}</td>
+                            <td className="px-2.5 py-1 text-right text-slate-400 whitespace-nowrap">{fmtShare(s.share, lang)} {vi ? 'của kênh' : 'of channel'}</td>
                             <td className="px-2.5 py-1 text-right">{fmtOrders(s.orders, lang)}</td>
                             <td className="px-2.5 py-1 text-right">{fmtCount(s.clicks, lang)}</td>
-                            <td className="px-2.5 py-1 text-right">{s.clicks && s.orders !== null ? fmtRate(s.orders / s.clicks, lang, 2) : '—'}</td>
-                            <td className="px-2.5 py-1 text-right">{fmtRate(s.uniqueCtr, lang, 1)}</td>
+                            <RateCell v={s.clicks && s.orders !== null ? s.orders / s.clicks : null} lang={lang} digits={2} small />
+                            <UniqueCell channel={c.channel} v={s.uniqueCtr} lang={lang} small />
                           </tr>
                         ))}
                     </React.Fragment>
@@ -112,9 +131,10 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
           {mix.adsGmv !== null && (
             <div className="mt-2 rounded-xl border border-dashed border-white/15 px-3 py-2 text-xs text-slate-300">
               <span className="font-semibold text-white">{vi ? 'Lớp Quảng cáo Shopee (không phải kênh riêng, tổng các dòng quảng cáo): ' : 'Shopee Ads layer (not a separate channel, sum of the ad rows): '}</span>
-              <b className="text-white">{fmtMoneyCompact(mix.adsGmv, lang)}</b> — <b className="text-white">{fmtRate(mix.adsAssistedShare, lang)}</b> {vi ? 'doanh số có ads hỗ trợ' : 'of sales ads-assisted'} ({vi ? 'đã nằm trong 4 kênh trên' : 'already inside the 4 channels'}). {vi ? 'Xem chi phí và ROAS ở mục Quảng cáo.' : 'See spend and ROAS in Ads.'}
+              <b className="text-white">{fmtMoneyCompact(mix.adsGmv, lang)}</b> — <b className="text-white" title={isOverFull(mix.adsAssistedShare) ? tr(lang, OVER_FULL_NOTE) : undefined}>{fmtShare(mix.adsAssistedShare, lang)}</b> {vi ? 'doanh số có ads hỗ trợ' : 'of sales ads-assisted'} ({vi ? 'đã nằm trong 4 kênh trên' : 'already inside the 4 channels'}). {vi ? 'Xem chi phí và ROAS ở mục Quảng cáo.' : 'See spend and ROAS in Ads.'}
             </div>
           )}
+          <MismatchBox items={mix.mismatches} lang={lang} />
           <SummaryNotes notes={mix.notes} lang={lang} />
         </>
       )}
@@ -129,6 +149,15 @@ export const SummaryProductsPanel: React.FC = () => {
   const [channel, setChannel] = useState<SummaryChannel | null>(null);
   if (!(dataset.salesSummaries?.some((r) => r.dimension === 'sku'))) return null;
   const current = sp.byChannel.find((c) => c.channel === channel) ?? sp.byChannel[0];
+  // Printed rate ≠ recomputed rate, by "channel|sku|CTR" (see rateMismatches).
+  const flagged = new Map(sp.mismatches.map((m) => {
+    const parts = m.key.split('|');
+    return [`${parts[4]}|${parts[5]}|${parts[6]}`, m] as const;
+  }));
+  const flag = (sku: string, what: string) => {
+    const m = current ? flagged.get(`${current.channel}|${sku}|${what}`) : undefined;
+    return m ? <span className="text-[#f08080] font-bold ml-0.5" title={describeMismatch(m)[lang]}>⚠</span> : null;
+  };
 
   return (
     <Section
@@ -182,14 +211,15 @@ export const SummaryProductsPanel: React.FC = () => {
                     <td className="px-2.5 py-1.5 text-right">{fmtOrders(r.orders, lang)}</td>
                     <td className="px-2.5 py-1.5 text-right">{fmtCount(r.units, lang)}</td>
                     <td className="px-2.5 py-1.5 text-right">{fmtCount(r.buyers, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtRate(r.ctr, lang, 2)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtRate(r.cvr, lang, 2)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtRate(r.uniqueCtr, lang, 1)}</td>
+                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtShare(r.ctr, lang, 2)}{flag(r.sku, 'CTR')}</td>
+                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtShare(r.cvr, lang, 2)}{flag(r.sku, 'CVR')}</td>
+                    <td className="px-2.5 py-1.5 text-right">{fmtShare(r.uniqueCtr, lang, 1)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <MismatchBox items={sp.mismatches} lang={lang} note={vi ? 'Bảng dùng số tự tính từ tử số và mẫu số.' : 'The table uses recomputed rates.'} />
           <SummaryNotes notes={sp.notes} lang={lang} />
         </>
       )}

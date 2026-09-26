@@ -131,6 +131,8 @@ export interface AdPerformance {
   orders?: number;
   /** Revenue the ad platform attributes to the ad. */
   attributedRevenue?: number;
+  /** ROAS as the report prints it — only compared with revenue ÷ spend, never used. */
+  reportedRoas?: number;
 }
 
 export interface LiveSession {
@@ -308,6 +310,8 @@ export interface SalesSummaryRow {
   /** Distinct impressions / clicks ("… duy nhất") — not additive across days or channels. */
   uniqueImpressions?: number;
   uniqueClicks?: number;
+  /** Rates as the report prints them (ratios) — only compared with the recomputed ones. */
+  reported?: { ctr?: number; cvr?: number; share?: number };
 }
 
 export type CostType = 'packaging' | 'staff' | 'rent' | 'tools' | 'shipping' | 'marketing' | 'other';
