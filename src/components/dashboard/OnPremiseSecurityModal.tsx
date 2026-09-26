@@ -237,9 +237,9 @@ export const OnPremiseSecurityModal: React.FC<OnPremiseSecurityModalProps> = ({
               <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-200 flex items-start space-x-3">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <span className="font-bold">Cam Kết Kiến Trúc Zero-Knowledge On-Premise:</span>
+                  <span className="font-bold">Kiến trúc Local-First:</span>
                   <p className="text-[11px] text-emerald-300/90 leading-relaxed">
-                    EcomPulse được thiết kế theo nguyên lý <strong>Local-First</strong>. Mọi file Excel, số liệu đơn hàng, thông tin khách hàng và lịch sử phân tích của bạn tồn tại độc quyền trong bộ nhớ máy trạm này. Nhà phát triển hoặc bất kỳ bên thứ ba nào <strong>hoàn toàn không thể xem hoặc thu thập dữ liệu của bạn</strong>.
+                    EcomPulse được thiết kế theo nguyên lý <strong>Local-First</strong>. File Excel, dòng đơn hàng và lịch sử phân tích được lưu trong trình duyệt trên máy này và không tự động tải lên máy chủ EcomPulse. Nếu bạn bật <strong>Cloud AI</strong> (Cài đặt → Quyền riêng tư AI), số liệu tổng hợp đã ẩn danh sẽ được gửi tới máy chủ EcomPulse và Google Gemini khi bạn dùng tính năng AI.
                   </p>
                 </div>
               </div>

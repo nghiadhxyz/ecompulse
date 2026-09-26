@@ -38,6 +38,8 @@ import {
   X,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { cloudAiPost, aiChat, unavailableMessage } from '../utils/aiClient';
+import { blockedMessage, cloudAiAllowed } from '../utils/aiPrivacy';
 import {
   ParsedStoreData,
   ActionCard,
@@ -195,18 +197,18 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
   const fetchExecutiveSummary = async (customKey?: string) => {
     setIsSummaryLoading(true);
     try {
+      if (!cloudAiAllowed()) {
+        setExecutiveSummary(blockedMessage(language));
+        return;
+      }
       const anonymized = anonymizeStoreDataForAI(data);
-      const res = await fetch('/api/ai/executive-summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          analyticsData: anonymized,
-          language,
-          apiKey: customKey || apiKey,
-        }),
+      const resJson = await cloudAiPost<{ summary?: string; isFallback?: boolean }>('/api/ai/executive-summary', {
+        analyticsData: anonymized,
+        language,
+        apiKey: customKey || apiKey || undefined,
       });
-      const resJson = await res.json();
-      setExecutiveSummary(resJson.summary || '');
+      // Server fallbacks are templates, not analysis — never shown as an AI answer.
+      setExecutiveSummary(resJson && !resJson.isFallback && resJson.summary ? resJson.summary : unavailableMessage(language));
     } catch (err) {
       console.error('Failed to fetch AI executive summary', err);
     } finally {
@@ -217,18 +219,17 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
   const fetchActionCards = async (customKey?: string) => {
     setIsActionsLoading(true);
     try {
+      if (!cloudAiAllowed()) {
+        setActionCards([]);
+        return;
+      }
       const anonymized = anonymizeStoreDataForAI(data);
-      const res = await fetch('/api/ai/action-center', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          analyticsData: anonymized,
-          language,
-          apiKey: customKey || apiKey,
-        }),
+      const resJson = await cloudAiPost<{ actionCards?: typeof actionCards; isFallback?: boolean }>('/api/ai/action-center', {
+        analyticsData: anonymized,
+        language,
+        apiKey: customKey || apiKey || undefined,
       });
-      const resJson = await res.json();
-      if (resJson.actionCards && resJson.actionCards.length > 0) {
+      if (resJson && !resJson.isFallback && resJson.actionCards && resJson.actionCards.length > 0) {
         setActionCards(resJson.actionCards);
         
         // Auto-save snapshot report to On-Premise Local Storage
@@ -363,21 +364,15 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
     }, 1200);
 
     try {
-      const anonymized = anonymizeStoreDataForAI(data);
-      const res = await fetch('/api/ai/chat-analyst', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          conversationHistory: chatMessages.slice(-6),
-          analyticsData: anonymized,
-          language,
-          model: currentModelObj.apiModel,
-          apiKey,
-        }),
+      const reply = await aiChat({
+        message: text,
+        history: chatMessages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+        analyticsData: anonymizeStoreDataForAI(data),
+        language,
+        model: currentModelObj.apiModel,
+        apiKey: apiKey || undefined,
       });
-
-      const resJson = await res.json();
+      const resJson = { reply: reply.text };
 
       // Enforce realistic thinking delay of at least 1.5 seconds (1500ms)
       const elapsed = Date.now() - startTime;
@@ -418,6 +413,10 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
   const handleRunAiSimulatorAnalysis = async () => {
     setIsSimLoading(true);
     try {
+      if (!cloudAiAllowed()) {
+        setAiSimAnalysis(blockedMessage(language));
+        return;
+      }
       const res = await fetch('/api/ai/simulate-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -439,7 +438,7 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
         }),
       });
       const resJson = await res.json();
-      setAiSimAnalysis(resJson.analysis || '');
+      setAiSimAnalysis(!resJson.isFallback && resJson.analysis ? resJson.analysis : unavailableMessage(language));
     } catch (err) {
       console.error('Sim error', err);
     } finally {

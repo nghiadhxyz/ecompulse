@@ -758,6 +758,36 @@ ${hasData ? JSON.stringify(analyticsData, null, 2) : 'CHƯA CÓ DỮ LIỆU BÁN
   }
 });
 
+
+// Dolphin Evidence Mode: rephrase a structured answer computed in the browser.
+// Receives aggregates only (no order rows); never computes or changes numbers.
+app.post('/api/ai/rephrase-evidence', async (req, res) => {
+  const { answer, language = 'vi', apiKey } = req.body || {};
+  if (!answer || typeof answer !== 'object' || typeof answer.insight !== 'string') {
+    return res.status(400).json({ ok: false, error: 'INVALID_ANSWER' });
+  }
+  const ai = getGeminiClient(apiKey || (req.headers['x-gemini-api-key'] as string));
+  if (!ai) return res.json({ ok: false, error: 'NO_API_KEY' });
+  const systemInstruction = [
+    language === 'vi' ? 'Bạn là Dolphin, trợ lý phân tích bán hàng. Trả lời bằng tiếng Việt.' : 'You are Dolphin, a sales analytics assistant. Answer in English.',
+    'Only rephrase the structured answer you are given into short, natural prose.',
+    'Do NOT add, remove or recalculate any number. Do NOT invent data.',
+    'Never claim causation: use "related to", "moved together with", "contributed", "worth checking" - never "caused by".',
+    'If "unavailable" is set, say clearly that there is not enough data.',
+    'Keep four parts: Insight, Evidence, Interpretation, Next check.',
+  ].join('\n');
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.7-flash',
+      contents: JSON.stringify(answer),
+      config: { systemInstruction, temperature: 0.2 },
+    });
+    res.json({ ok: true, text: response.text || '' });
+  } catch (error: any) {
+    res.json({ ok: false, error: String(error?.message || error).slice(0, 200) });
+  }
+});
+
 // Phase 2: AI Price & Promotion Simulator
 app.post('/api/ai/simulate-price', async (req, res) => {
   const { simulationParams, currentMetrics, language = 'vi', apiKey } = req.body;

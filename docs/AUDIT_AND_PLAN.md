@@ -195,7 +195,16 @@ Nguyên tắc:
 **Kết quả Phase 4 (2026-09-26):** `tsc` ✅ · `npm test` 205/205 ✅ · build ✅ (Analyst chunk 132 KB) · chạy thử Edge headless: 4 module mới trên demo, nhập đồng thời file đơn + Ads (số tổng kỳ) + Live + danh mục, Ads chỉ tính khi chọn trọn kỳ, Category Intelligence từ danh mục nhập, nhập ngành hàng ở Cài đặt, Seller/Analyst không hồi quy, mobile không tràn, 0 lỗi console.
 
 ### Phase 5 — Intelligence
-Root cause tree · Anomaly & Opportunity · Dolphin Evidence Mode (INSIGHT/EVIDENCE/INTERPRETATION/NEXT CHECK) · Privacy mode enforcement (Local Only / Privacy AI / Cloud AI) + Local LLM client · gộp `server.ts`/`api/index.ts` dùng chung handler
+- [x] Root Cause (`rootCauseEngine.ts`): 8 chỉ số, phân rã Sàn → Ngành → Nhóm hàng → SKU, đóng góp cộng đúng bằng thay đổi (kể cả tỷ lệ — gồm hiệu ứng cơ cấu), vai trò chính/đóng góp/ngược chiều, tập trung theo chiến dịch/live/kênh/ngày, động lực GMV (traffic × chuyển đổi × giữ đơn × giá trị đơn, LMDI), cảnh báo thay đổi nhỏ, không kết luận nguyên nhân
+- [x] Anomaly & Opportunity (`anomalyScan.ts`): median/MAD 14 ngày thường (bỏ ngày sale), ngưỡng 3,5, gắn nhãn ngày sale là "dự kiến"; cơ hội: hiệu quả tăng nhanh hơn traffic, CVR cao ít traffic, biên cao tỷ trọng nhỏ
+- [x] Dolphin Evidence Mode (`dolphinEvidence.ts` + `DolphinAsk`): 9 loại câu hỏi tiếng Việt, trả lời NHẬN ĐỊNH / BẰNG CHỨNG (có Xem dữ liệu) / DIỄN GIẢI / NÊN KIỂM TRA, "tốt nhất" tách theo tiêu chí, "Không đủ dữ liệu" khi thiếu; AI chỉ diễn đạt lại gói số liệu tổng hợp (`/api/ai/rephrase-evidence`)
+- [x] Chế độ AI Local Only (mặc định) / Privacy AI (Ollama, LM Studio… gọi thẳng từ trình duyệt) / Cloud AI (phải đồng ý, rút lại được) — áp dụng cho mọi lời gọi AI (`utils/aiClient.ts`): AI Action Center, Dolphin chat, diễn đạt lại
+- [x] Câu trả lời "fallback" mẫu của server (có số bịa như 382.000.000 ₫) không còn hiển thị như câu trả lời AI
+- [x] Làm sạch dữ liệu thô bằng AI (`runAiDataCleaningAgent`) luôn chạy cục bộ — không gửi dòng dữ liệu thô
+- [x] Bỏ tuyên bố "Zero-Knowledge" trong README/badge/modal; badge đổi theo chế độ AI
+- [ ] Gộp `server.ts`/`api/index.ts` dùng chung handler — để lại (hai file đã có cùng route mới; gộp là refactor rủi ro, không đổi hành vi)
+
+**Kết quả Phase 5 (2026-09-26):** `tsc` ✅ · `npm test` 242/242 ✅ · build ✅ · Edge headless: Root Cause GMV đi TikTok → Nhà cửa & Đời sống → Đồ bếp → Nồi chiên 5L, Tỷ lệ hủy báo "thay đổi rất nhỏ", Anomaly chỉ đánh dấu 9.9 (ngày sale), Dolphin trả lời 9.9/tốt nhất/GMV, nút diễn đạt AI ẩn ở Local Only, hộp đồng ý Cloud AI chặn khi chưa tick, 0 request `/api/ai` trong toàn bộ phiên, mobile không tràn.
 
 ### Phase 6 — Planning
 Change log & impact · Monthly planning · Action Center có đo kết quả · Report Center + export

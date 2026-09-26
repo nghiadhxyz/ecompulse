@@ -19,6 +19,8 @@ export type AnalystView =
   | 'ads'
   | 'live'
   | 'video'
+  | 'rootCause'
+  | 'anomaly'
   | 'dataHub'
   | 'dataQuality'
   | 'mapping'

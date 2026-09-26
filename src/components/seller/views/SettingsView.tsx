@@ -3,6 +3,7 @@ import { Store, LineChart, Save } from 'lucide-react';
 import { assessDataQuality, fmtMoney, PLATFORM_LABELS, toNumber, type CanonicalDataset, type CostSettings, type Lang, type Platform } from '../../../analytics';
 import type { WorkspaceMode } from '../../../utils/workspacePreferences';
 import { HelpTip, PrimaryButton, Section } from '../ui';
+import { AiPrivacySettings } from '../../workspace/AiPrivacySettings';
 
 interface SettingsViewProps {
   lang: Lang;
@@ -235,6 +236,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
           </label>
         </div>
       </Section>
+
+      <AiPrivacySettings lang={lang} />
 
       <Section title={vi ? 'Chế độ làm việc & ngôn ngữ' : 'Workspace mode & language'} subtitle={vi ? 'Đổi chế độ không làm mất dữ liệu.' : 'Switching mode keeps your data.'}>
         <div className="flex flex-wrap gap-2">

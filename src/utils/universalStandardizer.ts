@@ -26,7 +26,6 @@ import {
   VideoContributionMetric,
   AffiliateContributionMetric,
 } from '../types';
-import { getSavedCustomApiKey } from './dataAnonymizer';
 import { deriveProductGrowthMomentumAndCreatorSummary } from './analyticsEngine';
 
 // =========================================================================
@@ -931,44 +930,8 @@ export async function runAiDataCleaningAgent(
   rawText?: string,
   platform: string = 'Shopee'
 ): Promise<CleanedAgentWorkbookData> {
-  const customApiKey = getSavedCustomApiKey();
-
-  try {
-    const response = await fetch('/api/ai/standardize-raw-data', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        rawData,
-        rawText,
-        platform,
-        apiKey: customApiKey || undefined,
-      }),
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      if (result.ok && result.data) {
-        // If server returns modern cleaned format
-        if (result.data.sales_daily) {
-          return {
-            ...result.data,
-            telemetry: {
-              ...result.data.telemetry,
-              engineUsed: result.isFallback
-                ? 'On-Premise AI Cleaning Agent'
-                : 'Gemini 3.7 Flash AI Standardization Agent',
-            },
-          };
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('AI agent call error, operating on local deterministic cleaning agent:', err);
-  }
-
-  // Fallback to local deterministic agent
+  // Raw sheets never leave the browser (local-first privacy rule): cleaning always runs
+  // on the local deterministic agent. AI features only ever receive aggregates.
   return localAgentCleanAndStandardize(rawData, rawText, platform);
 }
 

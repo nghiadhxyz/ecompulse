@@ -36,7 +36,8 @@ import {
 } from 'lucide-react';
 import dolphinAvatar from '../../assets/images/dolphin_ai_avatar_1787721342181.jpg';
 import { GoogleUserProfile, ParsedStoreData } from '../../types';
-import { anonymizeStoreDataForAI, getSavedCustomApiKey } from '../../utils/dataAnonymizer';
+import { anonymizeStoreDataForAI } from '../../utils/dataAnonymizer';
+import { aiChat } from '../../utils/aiClient';
 import { ShopeeLogo, TikTokShopLogo } from '../PlatformLogos';
 
 export interface DolphinChatModalProps {
@@ -272,26 +273,15 @@ Dưới đây là các phương án hướng dẫn để bạn bắt đầu dễ
     }, 1200);
 
     try {
-      const savedApiKey = getSavedCustomApiKey() || undefined;
-
-      const response = await fetch('/api/ai/chat-analyst', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: query,
-          conversationHistory: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
-          // Only anonymized aggregates leave the browser — never order rows or raw sheets.
-          analyticsData: data ? anonymizeStoreDataForAI(data) : null,
-          language,
-          apiKey: savedApiKey,
-        }),
+      // Privacy mode decides where (if anywhere) the question goes. Only anonymized
+      // aggregates are ever sent — never order rows or raw sheets.
+      const reply = await aiChat({
+        message: query,
+        history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+        analyticsData: data ? anonymizeStoreDataForAI(data) : null,
+        language,
       });
-
-      let replyContent = '';
-      if (response.ok) {
-        const resJson = await response.json();
-        replyContent = resJson.reply || '';
-      }
+      const replyContent = reply.text;
 
       let dynamicFollowUps = isInternalFinance
         ? [
@@ -374,7 +364,7 @@ Dưới đây là các phương án hướng dẫn để bạn bắt đầu dễ
         {
           id: `ai-err-${Date.now()}`,
           role: 'assistant',
-          content: 'Không thể kết nối đến máy chủ phân tích. Hệ thống đã tự động kích hoạt Semantic Engine Cục bộ để tính toán trực tiếp từ dữ liệu của shop.',
+          content: 'Không thể kết nối tới dịch vụ AI. Bạn vẫn có thể hỏi Dolphin ở chế độ bằng chứng (Local Only) trong Seller/Analyst workspace.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);

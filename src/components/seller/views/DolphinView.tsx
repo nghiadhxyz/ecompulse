@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle2, AlertTriangle, ClipboardCheck, Bot, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ClipboardCheck, ShieldCheck } from 'lucide-react';
+import { DolphinAsk } from '../DolphinAsk';
 import { addDays, buildDailyBrief, fmtDay, type AlertSeverity, type BriefItem } from '../../../analytics';
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, KpiCard, NotEnoughData, Section, SeverityBadge, SEVERITY_STYLE, tr } from '../ui';
@@ -42,6 +43,8 @@ export const DolphinView: React.FC = () => {
   const h = brief.headline;
   return (
     <div className="space-y-4">
+      <DolphinAsk />
+
       <Section
         title={vi ? 'Bản tin kinh doanh hằng ngày' : 'Daily business brief'}
         subtitle={vi ? `Chuyện gì đã xảy ra ngày ${fmtDay(day)} và hôm nay cần kiểm tra gì` : `What happened on ${fmtDay(day)} and what to check today`}
@@ -145,10 +148,6 @@ export const DolphinView: React.FC = () => {
         )}
       </Section>
 
-      <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
-        <Bot className="w-3.5 h-3.5" aria-hidden />
-        {vi ? 'Chế độ hỏi đáp Dolphin dựa trên bằng chứng sẽ có ở giai đoạn tiếp theo.' : 'Evidence-based Dolphin chat arrives in a later phase.'}
-      </p>
     </div>
   );
 };

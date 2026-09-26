@@ -33,6 +33,8 @@ import { CampaignCalendar } from './views/CampaignCalendar';
 import { AdsIntelligenceView } from './views/AdsIntelligenceView';
 import { LiveAuditor } from './views/LiveAuditor';
 import { VideoAffiliateView } from './views/VideoAffiliateView';
+import { RootCauseView } from './views/RootCauseView';
+import { AnomalyOpportunityView } from './views/AnomalyOpportunityView';
 
 interface Props {
   language: Lang;
@@ -83,8 +85,8 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
     vi: 'Phân tích sâu',
     en: 'Intelligence',
     items: [
-      { key: 'rootCause', vi: 'Root Cause', en: 'Root Cause', phase: 5 },
-      { key: 'anomaly', vi: 'Anomaly & Opportunity', en: 'Anomaly & Opportunity', phase: 5 },
+      { key: 'rootCause', vi: 'Root Cause', en: 'Root Cause' },
+      { key: 'anomaly', vi: 'Anomaly & Opportunity', en: 'Anomaly & Opportunity' },
       { key: 'whatIf', vi: 'What-If (dashboard cổ điển)', en: 'What-If (classic)', classic: true },
       { key: 'changeImpact', vi: 'Change Impact', en: 'Change Impact', phase: 6 },
     ],
@@ -103,7 +105,7 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
   },
 ];
 
-const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'live', 'video', 'mapping', 'dataQuality'];
+const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'live', 'video', 'rootCause', 'anomaly', 'mapping', 'dataQuality'];
 
 export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted, onOpenClassic }) => {
   const vi = lang === 'vi';
@@ -247,6 +249,8 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
             {view === 'ads' && <AdsIntelligenceView />}
             {view === 'live' && <LiveAuditor />}
             {view === 'video' && <VideoAffiliateView />}
+            {view === 'rootCause' && <RootCauseView />}
+            {view === 'anomaly' && <AnomalyOpportunityView />}
             {view === 'dataQuality' && <DataQualityPanel dataset={dataset} language={lang} />}
             {view === 'mapping' && <DataMapping />}
           </ViewErrorBoundary>

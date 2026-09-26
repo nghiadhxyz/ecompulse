@@ -360,7 +360,7 @@ export const EmptyStateUpload: React.FC<EmptyStateUploadProps> = ({
         <div className="flex items-center gap-3">
           <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
           <p className="text-xs text-slate-300">
-            <strong>Bảo Mật Zero-Knowledge:</strong> File Excel nhiều sheet được phân tích 100% trong bộ nhớ RAM trình duyệt của bạn. Bấm để xóa sạch dữ liệu IndexedDB bất cứ lúc nào.
+            <strong>Local-first:</strong> File Excel được phân tích trong bộ nhớ trình duyệt, không tải file lên máy chủ. Bấm để xóa sạch dữ liệu IndexedDB bất cứ lúc nào.
           </p>
         </div>
         <button

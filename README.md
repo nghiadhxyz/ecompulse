@@ -1,20 +1,20 @@
 # EcomPulse - Hệ Thống Phân Tích Dữ Liệu TMĐT & Ra Quyết Định Đa Kênh
 
-> 🛡️ **Kiến Trúc Bảo Mật On-Premise & Zero-Knowledge Data Isolation**
-> Dữ liệu doanh thu, đơn hàng, khách hàng và báo cáo Excel được xử lý và lưu trữ **100% tại máy trạm / Local Browser** của khách hàng. Tuyệt đối không gửi hoặc lưu trữ dữ liệu sang máy chủ của bên phát triển.
+> 🛡️ **Local-first**
+> File Excel được đọc trong bộ nhớ trình duyệt; dữ liệu đơn hàng và báo cáo được lưu trong IndexedDB trên máy bạn và **không tự động tải lên** máy chủ EcomPulse. Khi bạn bật **Cloud AI**, số liệu tổng hợp đã ẩn danh sẽ được gửi tới máy chủ EcomPulse và Google Gemini — lúc đó ứng dụng **không còn là "zero knowledge"**.
 
 ---
 
-## 🔒 Nguyên Lý Bảo Mật On-Premise
+## 🔒 Quyền riêng tư
 
-1. **In-Browser RAM Execution**: File Excel nhiều sheet (.xlsx, .xls, .csv) của Shopee, TikTok Shop được thư viện JS phân tích 100% trong bộ nhớ RAM trình duyệt, không thực hiện tải file lên bất kỳ máy chủ nào.
-2. **Local-First Database (IndexedDB & LocalStorage)**: Báo cáo đã lưu, thẻ hành động (Action Cards), bảng lộ trình (Roadmap) và lịch sử trò chuyện được lưu cục bộ trong IndexedDB của trình duyệt máy khách hàng.
-3. **PII Data Anonymization Guard**: Bộ lọc tự động ẩn danh số điện thoại, tên khách hàng và thông tin cá nhân trước bất kỳ thao tác AI nào.
-4. **Quyền Riêng Tư AI Đa Dạng**:
-   - **Chế độ 100% Offline (Rule-Based Engine)**: Chạy hoàn toàn bằng thuật toán toán học nội bộ, không cần internet.
-   - **Chế độ BYOK (Bring Your Own Key)**: Khách hàng sử dụng API Key Gemini của chính mình kết nối trực tiếp.
-   - **Chế độ Local LLM**: Hỗ trợ kết nối máy chủ AI nội bộ (Ollama / vLLM / LM Studio) qua mạng LAN.
-5. **Sao Lưu & Xóa Trắng Dữ Liệu**: Khách hàng có toàn quyền Xuất sao lưu JSON, Khôi phục hoặc Xóa sạch 100% dữ liệu khỏi máy tính bất cứ lúc nào.
+1. **Đọc file trong trình duyệt**: File .xlsx / .xls / .csv của Shopee, TikTok Shop, Lazada được phân tích trong Web Worker, không tải file lên máy chủ.
+2. **Lưu trữ cục bộ**: Dữ liệu chuẩn hóa, giá vốn, cài đặt lưu trong IndexedDB / localStorage của trình duyệt. Có nút xóa sạch dữ liệu.
+3. **Không đọc thông tin cá nhân**: Cột tên, số điện thoại, địa chỉ người mua không được đọc; mã người mua được băm một chiều (pseudonymize) trước khi lưu.
+4. **Ba chế độ AI** (Cài đặt → Quyền riêng tư AI; mặc định Local Only):
+   - **Local Only**: không gọi mô hình AI nào. Dolphin trả lời bằng số liệu tính trên máy (Evidence Mode). Không dữ liệu nào rời trình duyệt.
+   - **Privacy AI**: gọi mô hình chạy trên máy / mạng nội bộ của bạn (Ollama, LM Studio, llama.cpp — API OpenAI-compatible) trực tiếp từ trình duyệt. Không qua máy chủ EcomPulse.
+   - **Cloud AI**: chỉ bật sau khi bạn đọc và đồng ý. Gửi số liệu tổng hợp đã ẩn danh (không có dòng đơn hàng, không có tên/SĐT/địa chỉ) qua máy chủ EcomPulse tới Google Gemini. Có thể dùng API key riêng (BYOK). Có thể rút lại đồng ý bất cứ lúc nào.
+5. **AI không phải nguồn số liệu**: Mọi KPI, lợi nhuận, so sánh được tính bằng engine phân tích cục bộ; AI chỉ diễn đạt lại câu trả lời đã tính và không được thêm số mới.
 
 ---
 
