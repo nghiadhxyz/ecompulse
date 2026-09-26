@@ -111,7 +111,14 @@ export interface Campaign {
 }
 
 export interface AdPerformance {
+  /** Day of the row, or the LAST day when the row is a period total (see periodStart). */
   date: string;
+  /**
+   * Set when the report gives one total for a period (e.g. 01–30/09) instead of daily rows.
+   * Such a row only counts when the whole period lies inside the analysed range —
+   * it is never spread across days.
+   */
+  periodStart?: string;
   platform: Platform;
   campaignId?: string;
   adName?: string;
@@ -129,6 +136,8 @@ export interface LiveSession {
   sessionId: string;
   platform: Platform;
   date: string;
+  /** Local start time "HH:MM" when the report has it. */
+  startTime?: string;
   title?: string;
   durationMinutes?: number;
   viewers?: number;
@@ -143,7 +152,10 @@ export interface LiveSession {
 }
 
 export interface AffiliatePerformance {
+  /** Day of the row, or the last day of a period total (see periodStart). */
   date?: string;
+  periodStart?: string;
+  contentTitle?: string;
   platform: Platform;
   creatorId: string;
   contentType?: 'affiliate' | 'shop_video' | 'organic_video' | 'creator';
@@ -157,7 +169,9 @@ export interface AffiliatePerformance {
 
 /** Daily traffic facts, optionally per SKU. Enables CVR and funnel. */
 export interface TrafficDaily {
+  /** Day of the row, or the last day of a period total (see periodStart). */
   date: string;
+  periodStart?: string;
   platform: Platform;
   sku?: string;
   impressions?: number;
@@ -231,6 +245,9 @@ export interface CostSettings {
   paymentFeeRate?: Partial<Record<Platform, number>>;
   /** User confirmed they ran no paid ads in the period (so Ads = 0 is real, not missing). */
   noAdsDeclared?: boolean;
+  /** Catalog overrides entered by the user: SKU → category / niche. */
+  skuCategory?: Record<string, string>;
+  skuSubcategory?: Record<string, string>;
   /** User confirmed the shop pays no shipping (buyer / platform pays), so shipping = 0 is real. */
   noSellerShippingDeclared?: boolean;
   /** Per-SKU unit COGS entered by the user; overrides catalog values. */

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { UploadCloud, FileSpreadsheet, X, Loader2, ShieldCheck, Trash2, PlayCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { formatRangeVi, PLATFORM_LABELS, type CanonicalDataset, type Lang } from '../../../analytics';
+import { formatRangeVi, PLATFORM_LABELS, REPORT_KIND_LABELS, type CanonicalDataset, type Lang } from '../../../analytics';
 import { DataQualityPanel } from '../../data/DataQualityPanel';
 import { startImport, type ImportHandle, type ImportOutcome } from '../importClient';
 import { GhostButton, PrimaryButton, Section } from '../ui';
@@ -94,8 +94,8 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
               <p className="text-sm font-bold text-white mt-2">{vi ? 'Kéo thả file vào đây hoặc chọn file' : 'Drop files here or choose files'}</p>
               <p className="text-xs text-slate-400 mt-1 max-w-lg mx-auto">
                 {vi
-                  ? 'Hỗ trợ: file xuất đơn hàng Shopee, TikTok Shop, Lazada (.xlsx/.csv) · báo cáo Phân tích bán hàng Shopee · file giá vốn (cột SKU + Giá vốn). Có thể chọn nhiều file cùng lúc.'
-                  : 'Supported: Shopee / TikTok Shop / Lazada order exports (.xlsx/.csv), Shopee sales analysis, COGS sheet (SKU + COGS). Multiple files allowed.'}
+                  ? 'Hỗ trợ (Shopee, TikTok Shop, Lazada · .xlsx/.csv): file xuất đơn hàng · báo cáo Quảng cáo · Livestream · Hiệu quả sản phẩm (traffic) · Affiliate/Video · Phân tích bán hàng Shopee · danh mục sản phẩm (SKU + Ngành hàng / Nhóm hàng / Giá vốn). Có thể chọn nhiều file cùng lúc.'
+                  : 'Supported (Shopee, TikTok Shop, Lazada · .xlsx/.csv): orders, ads, live, product traffic, affiliate/video, Shopee sales analysis, product catalog (SKU + category / niche / COGS). Multiple files allowed.'}
               </p>
               <PrimaryButton className="mt-3" onClick={() => inputRef.current?.click()}>
                 <FileSpreadsheet className="w-4 h-4" /> {vi ? 'Chọn file' : 'Choose files'}
@@ -199,12 +199,32 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
     );
   }
   if (o.type === 'shopee_summary') return null;
-  if (o.type === 'cogs') {
+  if (o.type === 'report') {
+    const r = o.result;
+    const ok = r.stats.imported > 0;
     return (
-      <li className="rounded-lg border border-[#0ca30c]/30 bg-[#0ca30c]/[0.06] px-3 py-2 text-xs text-slate-200">
-        <CheckCircle2 className="w-3.5 h-3.5 inline text-[#4ade80] mr-1" aria-hidden />
-        <b>{entry.fileName}</b>: {vi ? `Đã cập nhật giá vốn cho ${Object.keys(o.result.skuCogs).length} SKU` : `COGS updated for ${Object.keys(o.result.skuCogs).length} SKUs`}
-        {o.result.skipped > 0 && <span className="text-[#fab219]"> · {vi ? `${o.result.skipped} dòng giá vốn không hợp lệ bị bỏ qua` : `${o.result.skipped} invalid rows skipped`}</span>}
+      <li className={`rounded-lg border px-3 py-2.5 text-xs text-slate-200 ${ok ? 'border-[#0ca30c]/30 bg-[#0ca30c]/[0.06]' : 'border-[#fab219]/40 bg-[#fab219]/10'}`}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {ok ? <CheckCircle2 className="w-3.5 h-3.5 text-[#4ade80]" aria-hidden /> : <AlertTriangle className="w-3.5 h-3.5 text-[#fab219]" aria-hidden />}
+          <b className="text-white">{entry.fileName}</b>
+          <span>· {REPORT_KIND_LABELS[r.kind][lang]} · {r.label}</span>
+          <span>· {r.stats.imported.toLocaleString('vi-VN')} {vi ? 'dòng đã nhập' : 'rows imported'}</span>
+          {r.period && <span>· {formatRangeVi(r.period)}</span>}
+          {r.catalog && (
+            <span>· {vi ? `${r.catalog.withCategory} SKU có ngành hàng, ${r.catalog.withCogs} SKU có giá vốn` : `${r.catalog.withCategory} with category, ${r.catalog.withCogs} with COGS`}</span>
+          )}
+        </div>
+        {r.warnings.map((w, i) => (
+          <p key={i} className="text-[#fab219] mt-1">• {w[lang]}</p>
+        ))}
+        <details className="mt-1.5">
+          <summary className="cursor-pointer text-sky-300">{vi ? 'Xem cách ánh xạ cột' : 'Column mapping'}</summary>
+          <ul className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 text-slate-400">
+            {Object.entries(r.columnsUsed).map(([field, header]) => (
+              <li key={field}><span className="text-slate-500">{field}</span> ← {header}</li>
+            ))}
+          </ul>
+        </details>
       </li>
     );
   }

@@ -111,8 +111,15 @@ export function sliceDataset(dataset: CanonicalDataset, filter: DatasetFilter): 
     }
   }
 
-  const inRange = <T extends { date?: string; platform?: Platform }>(rows: T[]) =>
-    rows.filter((r) => r.date !== undefined && isInRange(r.date, range) && platformMatch(filter, r.platform));
+  // Period-total rows (periodStart set) count only when the whole period is inside the range.
+  const inRange = <T extends { date?: string; periodStart?: string; platform?: Platform }>(rows: T[]) =>
+    rows.filter(
+      (r) =>
+        r.date !== undefined &&
+        isInRange(r.date, range) &&
+        (r.periodStart === undefined || r.periodStart >= range.start) &&
+        platformMatch(filter, r.platform),
+    );
   // Product-scoped rows (traffic, ads) follow the product filters; shop-level rows drop out.
   const productScoped = <T extends { sku?: string }>(rows: T[]) =>
     lineFiltered && !comboSet ? rows.filter((r) => r.sku && skuMatch(r.sku)) : comboSet ? rows.filter((r) => r.sku && comboSet.has(r.sku)) : rows;

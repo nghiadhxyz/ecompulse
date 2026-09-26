@@ -110,8 +110,8 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
       await storeImported(mergeIntoWorkspace(imported, outcome.result.dataset));
       return outcome;
     }
-    if (outcome.type === 'cogs') {
-      updateSettings({ ...costSettings, skuCogs: { ...(costSettings.skuCogs || {}), ...outcome.result.skuCogs } });
+    if (outcome.type === 'report') {
+      await storeImported(mergeIntoWorkspace(imported, outcome.result.dataset));
       return outcome;
     }
     if (outcome.type === 'shopee_summary') {

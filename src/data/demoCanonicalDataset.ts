@@ -226,6 +226,7 @@ function planLiveSessions(rng: Rng, days: string[]): LiveSpec[] {
           sessionId: `LIVE-TT-${date.replace(/-/g, '')}`,
           platform: 'tiktok',
           date,
+          startTime: double ? '19:30' : date >= '2025-09-02' ? '21:00' : '20:00',
           title: double ? `Siêu live ${dayOfMonth(date)}.${monthOf(date)} — Deal sốc` : date >= '2025-09-02' ? 'Live tối 21h — Mẹ & Bé + Làm đẹp' : 'Live tối 20h — Mẹ & Bé + Làm đẹp',
           durationMinutes: double ? 240 : special ? 150 : 120,
         },
@@ -239,6 +240,7 @@ function planLiveSessions(rng: Rng, days: string[]): LiveSpec[] {
           sessionId: `LIVE-SP-${date.replace(/-/g, '')}`,
           platform: 'shopee',
           date,
+          startTime: double ? '20:00' : '12:00',
           title: double ? `Shopee Live ${dayOfMonth(date)}.${monthOf(date)}` : 'Shopee Live trưa — Xả kho',
           durationMinutes: double ? 180 : 90,
         },
@@ -394,6 +396,39 @@ export function buildDemoCanonicalDataset(): CanonicalDataset {
     }
   }
 
+  // ---- shop videos: attribute video orders to specific videos (separate stream keeps stories)
+  const contentRng = makeRng(98765);
+  const VIDEOS: Record<string, { id: string; title: string; weight: number }[]> = {
+    tiktok: [
+      { id: 'VID-TT-01', title: 'Review nồi chiên 5L nấu cả mâm cơm', weight: 5 },
+      { id: 'VID-TT-02', title: 'Routine da dầu mụn với Serum B5', weight: 8 },
+      { id: 'VID-TT-03', title: 'Thử 3 màu son lì dưới ánh đèn', weight: 4 },
+      { id: 'VID-TT-04', title: 'Mẹ bỉm review tã Bobby', weight: 3 },
+      { id: 'VID-TT-05', title: 'Unbox combo skincare 289k', weight: 2 },
+      { id: 'VID-TT-06', title: 'Mẹo sắp tủ lạnh với hộp thủy tinh', weight: 1 },
+    ],
+    shopee: [
+      { id: 'VID-SP-01', title: 'Shopee Video · Serum B5 trước/sau 14 ngày', weight: 4 },
+      { id: 'VID-SP-02', title: 'Shopee Video · Tã quần size M/L', weight: 3 },
+      { id: 'VID-SP-03', title: 'Shopee Video · Kem chống nắng đi biển', weight: 2 },
+    ],
+  };
+  const pickVideo = (platform: string) => {
+    const list = VIDEOS[platform];
+    if (!list) return undefined;
+    let r = contentRng.next() * list.reduce((t, v) => t + v.weight, 0);
+    for (const v of list) {
+      r -= v.weight;
+      if (r <= 0) return v;
+    }
+    return list[list.length - 1];
+  };
+  for (const o of orders) {
+    if (o.channel !== 'video') continue;
+    const v = pickVideo(o.platform);
+    if (v) o.channel = `video:${v.id}`;
+  }
+
   // ---- derived facts, computed from the orders above
   const linesByOrder = new Map<string, OrderLine[]>();
   for (const l of lines) {
@@ -477,10 +512,30 @@ export function buildDemoCanonicalDataset(): CanonicalDataset {
     row.gmv! += orderGross(o);
     row.commission! += o.affiliateCommission || 0;
   }
-  const affiliates = Array.from(affMap.values()).map((a) => {
+  const affiliateRows = Array.from(affMap.values()).map((a) => {
     const clicks = Math.round((a.orders || 0) / rng.between(0.03, 0.06));
     return { ...a, clicks, views: Math.round(clicks / rng.between(0.04, 0.08)) };
   });
+  // Shop videos per day: orders / GMV from the attributed orders; views and clicks derived.
+  const videoMap = new Map<string, AffiliatePerformance>();
+  const videoTitle = new Map(Object.values(VIDEOS).flat().map((v) => [v.id, v.title]));
+  for (const o of orders) {
+    if (!o.channel?.startsWith('video:') || !isValid(o)) continue;
+    const id = o.channel.slice('video:'.length);
+    const key = `${o.orderDate}|${id}`;
+    let row = videoMap.get(key);
+    if (!row) {
+      row = { date: o.orderDate, platform: o.platform, creatorId: 'shop', contentType: 'shop_video', contentId: id, contentTitle: videoTitle.get(id), orders: 0, gmv: 0 };
+      videoMap.set(key, row);
+    }
+    row.orders! += 1;
+    row.gmv! += orderGross(o);
+  }
+  const videoRows = Array.from(videoMap.values()).map((v) => {
+    const clicks = Math.round((v.orders || 0) / contentRng.between(0.025, 0.05));
+    return { ...v, clicks, views: Math.round(clicks / contentRng.between(0.02, 0.05)) };
+  });
+  const affiliates = [...affiliateRows, ...videoRows];
 
   // Traffic: platform-level visits (unique per day), plus per-SKU clicks from above
   for (const date of days) {

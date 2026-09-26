@@ -22,8 +22,9 @@ function mergeProduct(a: Product | undefined, b: Product): Product {
   return {
     ...a,
     name: a.name ?? b.name,
-    category: a.category ?? b.category,
-    subcategory: a.subcategory ?? b.subcategory,
+    // A newer catalog/order file updates category and niche.
+    category: b.category ?? a.category,
+    subcategory: b.subcategory ?? a.subcategory,
     productId: a.productId ?? b.productId,
     listPrice: b.listPrice ?? a.listPrice,
     // A cost present in the newer file updates the catalog.
@@ -62,10 +63,10 @@ export function mergeIntoWorkspace(base: CanonicalDataset | null, incoming: Cano
 
   ws.combos = mergeKeyed(ws.combos, incoming.combos, (c) => c.comboId);
   ws.campaigns = mergeKeyed(ws.campaigns, incoming.campaigns, (c) => c.campaignId);
-  ws.ads = mergeKeyed(ws.ads, incoming.ads, (a) => `${a.date}|${a.platform}|${a.campaignId ?? ''}|${a.adName ?? ''}|${a.sku ?? ''}`);
+  ws.ads = mergeKeyed(ws.ads, incoming.ads, (a) => `${a.periodStart ?? ''}|${a.date}|${a.platform}|${a.campaignId ?? ''}|${a.adName ?? ''}|${a.sku ?? ''}`);
   ws.liveSessions = mergeKeyed(ws.liveSessions, incoming.liveSessions, (s) => `${s.platform}|${s.sessionId}`);
-  ws.affiliates = mergeKeyed(ws.affiliates, incoming.affiliates, (a) => `${a.date ?? ''}|${a.platform}|${a.creatorId}|${a.contentId ?? ''}`);
-  ws.traffic = mergeKeyed(ws.traffic, incoming.traffic, (t) => `${t.date}|${t.platform}|${t.sku ?? ''}`);
+  ws.affiliates = mergeKeyed(ws.affiliates, incoming.affiliates, (a) => `${a.periodStart ?? ''}|${a.date ?? ''}|${a.platform}|${a.creatorId}|${a.contentId ?? ''}`);
+  ws.traffic = mergeKeyed(ws.traffic, incoming.traffic, (t) => `${t.periodStart ?? ''}|${t.date}|${t.platform}|${t.sku ?? ''}`);
   ws.dailyMetrics = mergeKeyed(ws.dailyMetrics, incoming.dailyMetrics, (d) => `${d.date}|${d.platform}`);
   ws.costs = [...ws.costs, ...incoming.costs];
   ws.settlements = [...ws.settlements, ...incoming.settlements];
@@ -76,7 +77,18 @@ export function mergeIntoWorkspace(base: CanonicalDataset | null, incoming: Cano
   return ws;
 }
 
-/** Returns a new dataset object carrying these cost settings (engines cache per object). */
+/**
+ * Returns a new dataset object carrying these settings (engines cache per object).
+ * User catalog overrides (category / niche per SKU) are applied to the products.
+ */
 export function withCostSettings(dataset: CanonicalDataset, settings: CostSettings | undefined): CanonicalDataset {
-  return { ...dataset, costSettings: settings };
+  const cat = settings?.skuCategory ?? {};
+  const sub = settings?.skuSubcategory ?? {};
+  if (Object.keys(cat).length === 0 && Object.keys(sub).length === 0) return { ...dataset, costSettings: settings };
+  const bySku = new Map(dataset.products.map((p) => [p.sku, p]));
+  for (const sku of new Set([...Object.keys(cat), ...Object.keys(sub)])) {
+    const p = bySku.get(sku) ?? { sku };
+    bySku.set(sku, { ...p, category: cat[sku] ?? p.category, subcategory: sub[sku] ?? p.subcategory });
+  }
+  return { ...dataset, products: Array.from(bySku.values()), costSettings: settings };
 }

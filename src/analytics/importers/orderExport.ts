@@ -173,7 +173,6 @@ const PII_HEADERS = ['Tên Người nhận', 'Số điện thoại', 'Địa ch�
 
 export type DetectedReport =
   | { kind: 'orders'; platform: Platform; spec: PlatformSpec; sheet: SheetInput; headerRow: number; columns: Partial<Record<Field, number>> }
-  | { kind: 'cogs'; sheet: SheetInput; headerRow: number; skuCol: number; cogsCol: number; nameCol?: number }
   | { kind: 'shopee_summary' }
   | { kind: 'unknown'; reason: Bilingual };
 
@@ -217,14 +216,6 @@ export function detectReport(input: WorkbookInput): DetectedReport {
         const score = Object.keys(columns).length + (spec.key === 'generic' ? 0 : 3);
         if (!best || score > best.score) best = { spec, sheet, headerRow: r, columns, score };
       }
-
-      // Cost sheet: SKU + COGS, no order ID.
-      const skuCol = headers.findIndex((h) => ['sku', 'masku', 'skuphanloaihang', 'sellersku'].includes(normalizeHeader(h)));
-      const cogsCol = headers.findIndex((h) => ['giavon', 'giavondonvi', 'cogs', 'unitcogs', 'cost', 'unitcost'].includes(normalizeHeader(h)));
-      if (!best && skuCol >= 0 && cogsCol >= 0 && !norm.has('orderid') && !norm.has('madonhang')) {
-        const nameCol = headers.findIndex((h) => ['tensanpham', 'productname', 'ten'].includes(normalizeHeader(h)));
-        return { kind: 'cogs', sheet, headerRow: r, skuCol, cogsCol, nameCol: nameCol >= 0 ? nameCol : undefined };
-      }
     }
   }
 
@@ -241,8 +232,8 @@ export function detectReport(input: WorkbookInput): DetectedReport {
   return {
     kind: 'unknown',
     reason: {
-      vi: 'Không nhận diện được file. Hỗ trợ: file xuất đơn hàng Shopee / TikTok Shop / Lazada, báo cáo Phân tích bán hàng Shopee, file giá vốn (SKU + Giá vốn) hoặc mẫu EcomPulse.',
-      en: 'Unrecognized file. Supported: Shopee / TikTok Shop / Lazada order exports, Shopee sales analysis, COGS sheet (SKU + COGS) or the EcomPulse template.',
+      vi: 'Không nhận diện được file. Hỗ trợ: file xuất đơn hàng, báo cáo Quảng cáo, Livestream, Hiệu quả sản phẩm (traffic), Affiliate/Video của Shopee / TikTok Shop / Lazada; báo cáo Phân tích bán hàng Shopee; danh mục sản phẩm (SKU + Ngành hàng / Giá vốn) hoặc mẫu EcomPulse.',
+      en: 'Unrecognized file. Supported: order, ads, live, product traffic and affiliate/video exports of Shopee / TikTok Shop / Lazada, Shopee sales analysis, product catalog (SKU + category / COGS) or the EcomPulse templates.',
     },
   };
 }
@@ -500,30 +491,4 @@ function platformOf(value: string): Platform {
   if (s.includes('lazada')) return 'lazada';
   if (s.includes('shopee')) return 'shopee';
   return 'other';
-}
-
-export interface CogsImportResult {
-  skuCogs: Record<string, number>;
-  names: Record<string, string>;
-  rows: number;
-  skipped: number;
-}
-
-export function importCogsSheet(detected: Extract<DetectedReport, { kind: 'cogs' }>): CogsImportResult {
-  const skuCogs: Record<string, number> = {};
-  const names: Record<string, string> = {};
-  let skipped = 0;
-  const rows = detected.sheet.rows.slice(detected.headerRow + 1);
-  for (const row of rows) {
-    const sku = text(row?.[detected.skuCol]);
-    const cogs = toNumber(row?.[detected.cogsCol]);
-    if (!sku) continue;
-    if (cogs === undefined || cogs < 0) {
-      skipped++;
-      continue;
-    }
-    skuCogs[sku] = cogs;
-    if (detected.nameCol !== undefined) names[sku] = text(row[detected.nameCol]);
-  }
-  return { skuCogs, names, rows: rows.length, skipped };
 }

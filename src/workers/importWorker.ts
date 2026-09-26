@@ -4,14 +4,15 @@
  * Cancel = the caller terminates the worker.
  */
 import * as XLSX from 'xlsx';
-import { detectReport, importCogsSheet, importOrderExport, type SheetInput } from '../analytics/importers/orderExport';
+import { detectReport, importOrderExport, type SheetInput } from '../analytics/importers/orderExport';
+import { detectTableReport, importTableReport } from '../analytics/importers/reportImporters';
 
 export type ImportWorkerRequest = { file: File };
 
 export type ImportWorkerMessage =
   | { type: 'progress'; stage: 'reading' | 'parsing' | 'mapping'; fraction: number }
   | { type: 'orders'; result: ReturnType<typeof importOrderExport> }
-  | { type: 'cogs'; result: ReturnType<typeof importCogsSheet> }
+  | { type: 'report'; result: ReturnType<typeof importTableReport> }
   | { type: 'shopee_summary' }
   | { type: 'error'; message: { vi: string; en: string } };
 
@@ -52,12 +53,17 @@ ctx.onmessage = async (e: MessageEvent<ImportWorkerRequest>) => {
         post({ type: 'progress', stage: 'mapping', fraction: 0.4 + f * 0.6 }),
       );
       post({ type: 'orders', result });
-    } else if (detected.kind === 'cogs') {
-      post({ type: 'cogs', result: importCogsSheet(detected) });
     } else if (detected.kind === 'shopee_summary') {
       post({ type: 'shopee_summary' });
     } else {
-      post({ type: 'error', message: detected.reason });
+      // Ads / live / traffic / affiliate reports and product catalogs.
+      const table = detectTableReport({ fileName: file.name, sheets });
+      if (table) {
+        post({ type: 'progress', stage: 'mapping', fraction: 0.7 });
+        post({ type: 'report', result: importTableReport({ fileName: file.name, sheets }, table) });
+      } else {
+        post({ type: 'error', message: detected.reason });
+      }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

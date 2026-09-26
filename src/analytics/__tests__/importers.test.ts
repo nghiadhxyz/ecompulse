@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { detectReport, importCogsSheet, importOrderExport, type WorkbookInput } from '../importers/orderExport';
+import { detectReport, importOrderExport, type WorkbookInput } from '../importers/orderExport';
+import { detectTableReport, importTableReport } from '../importers/reportImporters';
 import { mergeIntoWorkspace } from '../workspace';
 import { computeKpis } from '../kpiEngine';
 import { pseudonymize, toIsoDate } from '../parse';
@@ -140,13 +141,14 @@ describe('order export detection & import', () => {
     expect(r.dataset.products[0]).toMatchObject({ sku: 'X', category: 'Làm đẹp', unitCogs: 60_000 });
   });
 
-  it('detects a COGS sheet and the Shopee summary report', () => {
+  it('reads a COGS sheet as a product catalog, and detects the Shopee summary report', () => {
     const cogs: WorkbookInput = { fileName: 'gia_von.xlsx', sheets: [{ name: 'Giá vốn', rows: [['SKU', 'Tên sản phẩm', 'Giá vốn'], ['SERUM-B5', 'Serum', '68.000'], ['BAD', 'x', 'abc']] }] };
-    const d = detectReport(cogs);
-    expect(d.kind).toBe('cogs');
-    const res = importCogsSheet(d as Extract<typeof d, { kind: 'cogs' }>);
-    expect(res.skuCogs).toEqual({ 'SERUM-B5': 68_000 });
-    expect(res.skipped).toBe(1);
+    expect(detectReport(cogs).kind).toBe('unknown'); // not an order export
+    const t = detectTableReport(cogs)!;
+    expect(t.spec.kind).toBe('catalog');
+    const res = importTableReport(cogs, t);
+    expect(res.dataset.products.find((p) => p.sku === 'SERUM-B5')?.unitCogs).toBe(68_000);
+    expect(res.dataset.products.find((p) => p.sku === 'BAD')?.unitCogs).toBeUndefined();
 
     const summary: WorkbookInput = { fileName: 'x.xlsx', sheets: [{ name: 'Đơn hàng đã đặt', rows: [['Ngày', 'Tổng doanh số (VND)', 'Tổng số đơn hàng']] }] };
     expect(detectReport(summary).kind).toBe('shopee_summary');
