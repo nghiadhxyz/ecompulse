@@ -35,6 +35,11 @@ import { LiveAuditor } from './views/LiveAuditor';
 import { VideoAffiliateView } from './views/VideoAffiliateView';
 import { RootCauseView } from './views/RootCauseView';
 import { AnomalyOpportunityView } from './views/AnomalyOpportunityView';
+import { ChangeImpactView } from './views/ChangeImpactView';
+import { MonthlyPlanningView } from './views/MonthlyPlanningView';
+import { ActionCenterView } from './views/ActionCenterView';
+import { ReportCenterView } from './views/ReportCenterView';
+import { PlanningProvider, usePlanningState } from '../workspace/usePlanning';
 
 interface Props {
   language: Lang;
@@ -88,11 +93,11 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
       { key: 'rootCause', vi: 'Root Cause', en: 'Root Cause' },
       { key: 'anomaly', vi: 'Anomaly & Opportunity', en: 'Anomaly & Opportunity' },
       { key: 'whatIf', vi: 'What-If (dashboard cổ điển)', en: 'What-If (classic)', classic: true },
-      { key: 'changeImpact', vi: 'Change Impact', en: 'Change Impact', phase: 6 },
+      { key: 'changeImpact', vi: 'Change Impact', en: 'Change Impact' },
     ],
   },
-  { vi: 'Kế hoạch', en: 'Planning', items: [{ key: 'planning', vi: 'Monthly Planning', en: 'Monthly Planning', phase: 6 }, { key: 'actions', vi: 'Action Center', en: 'Action Center', phase: 6 }] },
-  { vi: 'Báo cáo', en: 'Reports', items: [{ key: 'reports', vi: 'Report Center', en: 'Report Center', phase: 6 }] },
+  { vi: 'Kế hoạch', en: 'Planning', items: [{ key: 'planning', vi: 'Monthly Planning', en: 'Monthly Planning' }, { key: 'actions', vi: 'Action Center', en: 'Action Center' }] },
+  { vi: 'Báo cáo', en: 'Reports', items: [{ key: 'reports', vi: 'Report Center', en: 'Report Center' }] },
   {
     vi: 'Dữ liệu',
     en: 'Data',
@@ -105,7 +110,7 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
   },
 ];
 
-const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'live', 'video', 'rootCause', 'anomaly', 'mapping', 'dataQuality'];
+const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'live', 'video', 'rootCause', 'anomaly', 'changeImpact', 'planning', 'actions', 'reports', 'mapping', 'dataQuality'];
 
 export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted, onOpenClassic }) => {
   const vi = lang === 'vi';
@@ -120,6 +125,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
+  const planning = usePlanningState(dataset, ws.sourceKind === 'demo' ? 'demo' : 'imported', bounds?.end ?? null);
 
   const resolved = useMemo(() => {
     if (!bounds) return null;
@@ -199,8 +205,9 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
       goTo,
       focus,
     };
-    const showFilters = ANALYTICS_VIEWS.includes(view) && view !== 'alerts' && view !== 'mapping' && view !== 'dataQuality';
+    const showFilters = ANALYTICS_VIEWS.includes(view) && view !== 'alerts' && view !== 'mapping' && view !== 'dataQuality' && view !== 'changeImpact' && view !== 'actions';
     return (
+      <PlanningProvider value={planning}>
       <WorkspaceProvider value={ctx}>
         <div className="space-y-4">
           {ws.sourceKind === 'demo' && (
@@ -251,11 +258,16 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
             {view === 'video' && <VideoAffiliateView />}
             {view === 'rootCause' && <RootCauseView />}
             {view === 'anomaly' && <AnomalyOpportunityView />}
+            {view === 'changeImpact' && <ChangeImpactView />}
+            {view === 'planning' && <MonthlyPlanningView />}
+            {view === 'actions' && <ActionCenterView />}
+            {view === 'reports' && <ReportCenterView />}
             {view === 'dataQuality' && <DataQualityPanel dataset={dataset} language={lang} />}
             {view === 'mapping' && <DataMapping />}
           </ViewErrorBoundary>
         </div>
       </WorkspaceProvider>
+      </PlanningProvider>
     );
   };
 

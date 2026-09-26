@@ -566,7 +566,7 @@ export function buildDemoCanonicalDataset(): CanonicalDataset {
   }
 
   const changeEvents: ChangeEvent[] = [
-    { id: 'chg-1', date: '2025-08-20', type: 'price', sku: 'SERUM-B5', platform: 'shopee', description: 'Giảm giá Serum B5 từ 259.000đ xuống 249.000đ trên tất cả các sàn' },
+    { id: 'chg-1', date: '2025-08-20', type: 'price', sku: 'SERUM-B5', description: 'Giảm giá Serum B5 từ 259.000đ xuống 249.000đ trên tất cả các sàn' },
     { id: 'chg-2', date: '2025-09-01', type: 'ads_budget', sku: 'NOI-CHIEN-5L', platform: 'tiktok', description: 'Tăng ngân sách GMV Max Nồi chiên 5L thêm 50%' },
     { id: 'chg-3', date: '2025-09-02', type: 'live_time', platform: 'tiktok', description: 'Dời giờ live TikTok từ 20h sang 21h' },
     { id: 'chg-4', date: '2025-09-10', type: 'product', sku: 'SERUM-VC', description: 'Mở bán Serum Vitamin C 15% (chưa nhập giá vốn)' },

@@ -36,3 +36,6 @@ export * from './growthEngines';
 export * from './rootCauseEngine';
 export * from './anomalyScan';
 export * from './dolphinEvidence';
+export * from './changeImpact';
+export * from './planningEngine';
+export * from './reportEngine';

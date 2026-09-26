@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle2, AlertTriangle, ClipboardCheck, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ClipboardCheck, ShieldCheck, ListPlus } from 'lucide-react';
 import { DolphinAsk } from '../DolphinAsk';
+import { usePlanning } from '../../workspace/usePlanning';
 import { addDays, buildDailyBrief, fmtDay, type AlertSeverity, type BriefItem } from '../../../analytics';
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, KpiCard, NotEnoughData, Section, SeverityBadge, SEVERITY_STYLE, tr } from '../ui';
@@ -15,6 +16,9 @@ export const DolphinView: React.FC = () => {
   const [severity, setSeverity] = useState<AlertSeverity | 'all'>('all');
   const brief = useMemo(() => buildDailyBrief(dataset, day, platforms), [dataset, day, platforms]);
   const alerts = severity === 'all' ? brief.alerts : brief.alerts.filter((a) => a.severity === severity);
+  // Only inside the Analyst workspace (Action Center); Seller mode has no planning context.
+  const planning = usePlanning();
+  const [added, setAdded] = useState<Set<string>>(new Set());
 
   const itemList = (items: BriefItem[], icon: React.ReactNode, empty: string) =>
     items.length === 0 ? (
@@ -137,11 +141,30 @@ export const DolphinView: React.FC = () => {
                   <b>{vi ? 'Nên kiểm tra: ' : 'Check: '}</b>
                   {tr(lang, a.check)}
                 </p>
-                {a.evidence.some((e) => e.filter) && (
-                  <div className="mt-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {a.evidence.some((e) => e.filter) && (
                     <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: tr(lang, a.title), filter: a.evidence.find((e) => e.filter)!.filter!, evidence: a.evidence })} />
-                  </div>
-                )}
+                  )}
+                  {planning && (
+                    <button
+                      disabled={added.has(a.id)}
+                      onClick={() => {
+                        planning.addAction({
+                          title: tr(lang, a.check),
+                          insight: `${tr(lang, a.title)} — ${tr(lang, a.message)}`,
+                          metric: a.type.includes('cancel') ? 'cancelRate' : a.type.includes('loss') || a.type.includes('profit') ? 'profit' : 'gmv',
+                          scope: { skus: a.sku ? [a.sku] : undefined, platforms: a.platform ? [a.platform] : platforms },
+                          evidence: a.evidence.find((e) => e.filter)?.filter,
+                        });
+                        setAdded(new Set(added).add(a.id));
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border border-white/15 text-slate-300 hover:bg-white/[0.06] disabled:opacity-60"
+                    >
+                      <ListPlus className="w-3.5 h-3.5" aria-hidden />
+                      {added.has(a.id) ? (vi ? 'Đã thêm vào Action Center' : 'Added') : vi ? 'Thêm vào Action Center' : 'Add to Action Center'}
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

@@ -207,7 +207,13 @@ Nguyên tắc:
 **Kết quả Phase 5 (2026-09-26):** `tsc` ✅ · `npm test` 242/242 ✅ · build ✅ · Edge headless: Root Cause GMV đi TikTok → Nhà cửa & Đời sống → Đồ bếp → Nồi chiên 5L, Tỷ lệ hủy báo "thay đổi rất nhỏ", Anomaly chỉ đánh dấu 9.9 (ngày sale), Dolphin trả lời 9.9/tốt nhất/GMV, nút diễn đạt AI ẩn ở Local Only, hộp đồng ý Cloud AI chặn khi chưa tick, 0 request `/api/ai` trong toàn bộ phiên, mobile không tràn.
 
 ### Phase 6 — Planning
-Change log & impact · Monthly planning · Action Center có đo kết quả · Report Center + export
+- [x] Change log & Change Impact (`changeImpact.ts`): nhật ký từ dữ liệu + người dùng thêm, so sánh 7/14/30 ngày trước/sau (tự rút ngắn khi thiếu dữ liệu), đối chứng với phần còn lại của shop, cảnh báo số ngày sale khác nhau, sản phẩm mới không bịa so sánh, câu chữ "Sau thay đổi…"
+- [x] Monthly Planning (`planningEngine.ts`): mục tiêu GMV tháng + theo sàn, chia theo tỷ lệ loại ngày của 90 ngày trước (thiếu mẫu → như ngày thường, có ghi chú), ngày đôi tương lai tự nhận, sự kiện kế hoạch, tiến độ, ước tính cuối tháng (gắn nhãn ước tính), GMV cần/ngày; xuất lịch .ics (Google Calendar/Outlook)
+- [x] Action Center: nhận định → bằng chứng → hành động → phụ trách → hạn → trạng thái → đo kết quả 14 ngày trước/sau ngày áp dụng; quá hạn theo ngày dữ liệu; "Thêm vào Action Center" từ cảnh báo
+- [x] Report Center (`reportEngine.ts` + `utils/reportExport.ts`): báo cáo ngày/tuần/tháng/chiến dịch/live/kế hoạch; xuất Excel (số giữ dạng số, % định dạng), CSV UTF-8 BOM, PDF qua hộp thoại in, .ics. Google Sheets: nhập file Excel/CSV (không có API ghi trực tiếp — không cần gửi dữ liệu lên máy chủ)
+- [x] Kế hoạch/nhật ký/hành động lưu IndexedDB theo nguồn (demo / dữ liệu thật), xóa cùng dữ liệu nhập
+
+**Kết quả Phase 6 (2026-09-26):** `tsc` ✅ · `npm test` 256/256 ✅ · build ✅ · Edge headless: thêm thay đổi, lưu kế hoạch 09 & 10/2025 (10.10 được tính ngày đôi), xuất .ics/.xlsx/.csv, cửa sổ in PDF, hành động từ cảnh báo + đo kết quả, dữ liệu còn sau khi tải lại trang, mobile không tràn, 0 lỗi console.
 
 ### Phase 7 — Advanced
 Customer/RFM (chỉ khi có customer id) · What-If dùng chi phí thật · thống kê nâng cao · code-split bundle

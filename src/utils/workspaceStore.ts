@@ -5,7 +5,8 @@
  * browser. If IndexedDB is unavailable the workspace lives in memory for the session.
  * Cost settings are small and fall back to LocalStorage.
  */
-import type { CanonicalDataset, CostSettings } from '../analytics/model';
+import type { CanonicalDataset, ChangeEvent, CostSettings } from '../analytics/model';
+import type { ActionItem, MonthlyPlan } from '../analytics/planningEngine';
 
 export const WORKSPACE_DB_NAME = 'EcomPulse_Workspace_DB';
 const DB_VERSION = 1;
@@ -84,6 +85,8 @@ export async function saveWorkspace(value: StoredWorkspace): Promise<boolean> {
 export async function clearWorkspace(): Promise<void> {
   try {
     await del('workspace');
+    // The user's plan, change log and actions belong to the imported data.
+    await del('planning:imported');
   } catch {
     // nothing stored
   }
@@ -122,5 +125,35 @@ export function deleteWorkspaceDatabase(): void {
     indexedDB.deleteDatabase(WORKSPACE_DB_NAME);
   } catch {
     // unavailable
+  }
+}
+
+// ─── Planning state (change log, monthly plans, actions) ────────────────────
+// Kept per data source so demo notes never mix with the user's own plan.
+
+export interface PlanningState {
+  changeEvents: ChangeEvent[];
+  plans: MonthlyPlan[];
+  actions: ActionItem[];
+}
+
+export const EMPTY_PLANNING: PlanningState = { changeEvents: [], plans: [], actions: [] };
+
+export async function loadPlanning(scope: 'demo' | 'imported'): Promise<PlanningState> {
+  try {
+    const v = await get<PlanningState>(`planning:${scope}`);
+    if (v) return { ...EMPTY_PLANNING, ...v };
+  } catch {
+    // unavailable
+  }
+  return EMPTY_PLANNING;
+}
+
+export async function savePlanning(scope: 'demo' | 'imported', state: PlanningState): Promise<boolean> {
+  try {
+    await put(`planning:${scope}`, state);
+    return true;
+  } catch {
+    return false;
   }
 }
