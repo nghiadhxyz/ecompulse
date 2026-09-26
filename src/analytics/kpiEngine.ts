@@ -318,13 +318,17 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
   const totals = usablePeriodTotals(slice, stage);
   const placedTotals = usablePeriodTotals(slice, 'placed');
   const paidTotals = usablePeriodTotals(slice, 'paid');
+  // The source is chosen once per set of totals: the period row when it covers the range,
+  // the days otherwise. A field the period row lacks is missing — never filled from the days,
+  // so a ratio never takes its numerator and denominator from two sources (canonicalSources.ts).
+  const NOT_IN_PERIOD_ROW: Bilingual = { vi: 'Dòng tổng cả kỳ của sàn không có chỉ số này.', en: "The platform's period row lacks this figure." };
   const pick = (
     tot: ShopPeriodTotal[] | null,
     tPick: (t: ShopPeriodTotal) => number | undefined,
     dPick: (d: DailyMetric) => number | undefined,
     unit: MetricUnit,
     field: string,
-  ) => fromPeriodTotals(slice, tot, tPick, dPick, unit) ?? dailySum(slice, dPick, unit, ORDER_LEVEL, field);
+  ) => (tot ? fromPeriodTotals(slice, tot, tPick, dPick, unit) ?? missing(unit, NOT_IN_PERIOD_ROW, [field]) : dailySum(slice, dPick, unit, ORDER_LEVEL, field));
   const gmvRaw = pick(totals, (t) => t.gmv, (d) => day(d).gmv, 'vnd', `daily.${stage}Gmv`);
   const orders = pick(totals, (t) => t.orders, (d) => day(d).orders, 'count', `daily.${stage}Orders`);
   const cancelled = pick(totals, (t) => t.cancelledOrders, (d) => day(d).cancelledOrders, 'count', 'daily.cancelledOrders');

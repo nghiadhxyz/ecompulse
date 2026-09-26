@@ -139,13 +139,10 @@ export function channelMix(dataset: CanonicalDataset, filter: DatasetFilter, sta
   const total = channels.reduce((s, c) => s + c.gmv, 0);
   for (const c of channels) c.share = total ? c.gmv / total : null;
 
-  const adsRows = rows.filter((r) => r.dimension === 'channel' && r.channel === 'ads');
+  // Canonical Ads sales = the sum of the ad rows (canonicalSources.ts), never the sheet header.
+  // Ad rows exist for placed orders only.
   const slicedAds = sliceDataset(dataset, filter).ads;
-  const adsGmv = adsRows.length
-    ? adsRows.reduce((s, r) => s + (r.gmv ?? 0), 0)
-    : slicedAds.some((a) => a.attributedRevenue !== undefined)
-      ? slicedAds.reduce((s, a) => s + (a.attributedRevenue ?? 0), 0)
-      : null;
+  const adsGmv = stage === 'placed' && slicedAds.some((a) => a.attributedRevenue !== undefined) ? slicedAds.reduce((s, a) => s + (a.attributedRevenue ?? 0), 0) : null;
 
   const whole = usesPeriodRows(rows);
   const partialPeriod = (dataset.salesSummaries ?? []).some(

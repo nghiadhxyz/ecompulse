@@ -4,6 +4,7 @@ import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { ChangeCell, Th } from '../ui';
 import { FunnelView } from './TrafficFunnel';
+import { sourceChecks } from '../../../analytics';
 import { ChannelWeekdayPanel } from '../../workspace/SummaryInsightPanels';
 
 const label = (r: LiveSessionRow) => `${sessionDateLabel(r.session)} · ${PLATFORM_LABELS[r.session.platform]}`;
@@ -12,6 +13,7 @@ export const LiveAuditor: React.FC = () => {
   const { lang, dataset, baseFilter, range, openEvidence, goTo } = useWorkspace();
   const vi = lang === 'vi';
   const la = useMemo(() => liveAudit(dataset, baseFilter), [dataset, baseFilter]);
+  const liveInvalid = useMemo(() => sourceChecks(dataset, baseFilter.platforms).filter((c) => c.metric === 'liveSessions' && c.invalid), [dataset, baseFilter.platforms]);
   const [aId, setAId] = useState<string | null>(null);
   const [bId, setBId] = useState<string | null>(null);
 
@@ -91,6 +93,12 @@ export const LiveAuditor: React.FC = () => {
           {vi ? `Top ${la.sessions.length} phiên live theo báo cáo Shopee — Shopee chỉ liệt kê Top 5, không phải tất cả phiên live.` : `Top ${la.sessions.length} live sessions from the Shopee report — not all sessions.`}
         </p>
       )}
+      {liveInvalid.map((c) => (
+        <p key={c.id} className="text-xs font-semibold text-[#f08080] rounded-xl border border-[#d03b3b]/40 bg-[#d03b3b]/10 px-3 py-2">
+          {vi ? 'Không hợp lệ: ' : 'Invalid: '}
+          {tr(lang, c.invalid!)}
+        </p>
+      ))}
       {la.notes.map((n, i) => (
         <p key={i} className="text-xs text-[#fab219]">{tr(lang, n)}</p>
       ))}

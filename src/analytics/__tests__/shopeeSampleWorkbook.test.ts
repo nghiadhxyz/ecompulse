@@ -18,6 +18,8 @@ import { mergeIntoWorkspace } from '../workspace';
 import { buildDailyBrief } from '../dailyBrief';
 import { questionUnavailable } from '../dolphinEvidence';
 import { funnel } from '../funnelEngine';
+import { sourceChecks, type SourceCheck } from '../canonicalSources';
+import { channelMix } from '../summaryEngine';
 import { anomalyScan } from '../anomalyScan';
 import { calendarPerformance } from '../campaignEngine';
 import { advancedStats } from '../statsEngine';
@@ -190,5 +192,50 @@ describe.skipIf(!existsSync(WORKBOOK))('Clean Shopee export (golden, order stage
     expect(stageFunnel(ds, { range }).rows.some((r) => r.crossPeriod)).toBe(false);
     expect(funnel(ds, { range }).stages.paid).toBeNull();
     expect(orderHealth(ds, { range }).returnRate).toBeCloseTo(7 / 519, 10);
+  });
+});
+
+describe('0.3 — canonical sources', () => {
+  const find = (checks: SourceCheck[], id: string) => checks.find((c) => c.id.startsWith(id))!;
+  const other = (c: SourceCheck, source: string) => c.others.find((o) => o.source === source)?.value;
+
+  it.skipIf(!existsSync(NEW_WORKBOOK))('uses one source per figure and flags every other copy (inconsistent file)', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    // Ads layer = sum of the ad rows, not the sheet header (76.096.018 = 108,7%).
+    const mix = channelMix(ds, { range });
+    expect(mix.adsGmv).toBe(62_864_872);
+    expect(mix.adsAssistedShare).toBeCloseTo(62_864_872 / 70_013_491, 10);
+    // Subsidy share: numerator and denominator both from the period row.
+    expect(subsidyDependence(ds, { range }).total!.share).toBeCloseTo((78_626_020 - 63_173_888) / 78_626_020, 12);
+
+    const checks = sourceChecks(ds);
+    const card = find(checks, 'channel|shopee|2026-07-24|placed|product_card');
+    expect(card.canonical.value).toBe(51_310_459);
+    expect([other(card, 'product_header'), other(card, 'traffic_header'), other(card, 'daily_sheet_total')]).toEqual([60_198_730, 45_821_352, 40_851_945]);
+    const spend = find(checks, 'ad|shopee|2026-07-24|Quảng cáo GMV tối đa ROAS tùy chỉnh cho sản phẩm|spend');
+    expect([spend.canonical.value, other(spend, 'daily_sheet_total'), other(spend, 'daily_sum')]).toEqual([5_229_292, 4_404_537, 4_454_077]);
+    const sales = find(checks, 'ad|shopee|2026-07-24|Quảng cáo GMV tối đa ROAS tùy chỉnh cho sản phẩm|gmv');
+    expect([sales.canonical.value, other(sales, 'daily_sheet_total'), other(sales, 'daily_sum')]).toEqual([55_227_941, 64_581_695, 56_963_603]);
+    expect(other(find(checks, 'ads_total'), 'traffic_header')).toBe(76_096_018);
+    const live = find(checks, 'channel|shopee|2026-07-24|placed|live');
+    expect([live.canonical.value, other(live, 'traffic_header'), other(live, 'daily_sheet_total'), other(live, 'daily_sum')]).toEqual([21_673, 29_859, 25_335, 32_048]);
+    const sessions = find(checks, 'live_sessions');
+    expect(other(sessions, 'live_sessions')).toBe(22_223);
+    expect(sessions.invalid?.vi).toContain('không thể xảy ra');
+    expect(other(find(checks, 'shop|shopee|2026-07-24|placed|gmv'), 'daily_sum')).toBe(63_713_950);
+    const cancelled = find(checks, 'shop|shopee|2026-07-24|placed|cancelledGmv');
+    expect([cancelled.canonical.value, other(cancelled, 'daily_sum')]).toEqual([22_421_831, 19_935_288]);
+    expect(checks.filter((c) => c.invalid).map((c) => c.metric)).toEqual(['liveSessions']);
+  });
+
+  it.skipIf(!existsSync(WORKBOOK))('finds no disagreement in a clean export', async () => {
+    const ds = await summaryWorkspace(WORKBOOK);
+    const checks = sourceChecks(ds);
+    expect(checks.length).toBeGreaterThan(30);
+    expect(checks.filter((c) => c.mismatch)).toEqual([]);
+    expect(checks.filter((c) => c.invalid)).toEqual([]);
+    const sessions = find(checks, 'live_sessions');
+    expect([sessions.canonical.value, other(sessions, 'live_sessions')]).toEqual([27_000, 27_000]);
   });
 });

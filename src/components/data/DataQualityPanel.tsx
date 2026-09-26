@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ShieldCheck, AlertTriangle, XCircle, Info, CheckCircle2, CircleDashed, ChevronDown } from 'lucide-react';
 import { assessDataQuality, formatRangeVi, PLATFORM_LABELS, type CanonicalDataset, type Capability, type DataIssue } from '../../analytics';
 import { formatNumber } from '../../utils/formatters';
+import { SourceChecksPanel } from './SourceChecksPanel';
 
 interface DataQualityPanelProps {
   dataset: CanonicalDataset;
@@ -125,6 +126,11 @@ export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ dataset, lan
           )}
         </div>
       )}
+      {dataset.reportedFigures?.length ? (
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <SourceChecksPanel dataset={dataset} lang={language} />
+        </div>
+      ) : null}
     </section>
   );
 };

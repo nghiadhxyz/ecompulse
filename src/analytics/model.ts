@@ -254,6 +254,26 @@ export interface ShopPeriodTotal {
   reportedCvr?: number;
 }
 
+/**
+ * A figure the report prints somewhere other than its canonical place (see
+ * canonicalSources.ts): the header row of a sheet, the undated total row of a daily sheet.
+ * Kept only to warn when the file disagrees with itself — never used as a value.
+ */
+export interface ReportedFigure {
+  platform: Platform;
+  stage: SummaryStage;
+  /** Report period the figure covers. */
+  start: string;
+  end: string;
+  source: 'traffic_header' | 'product_header' | 'daily_sheet_total';
+  /** shop = all sales, channel = one of the four channels, ads_total = all Shopee Ads, ad = one ad type. */
+  scope: 'shop' | 'channel' | 'ads_total' | 'ad';
+  /** Channel id, ad name, or "shop" / "ads". */
+  key: string;
+  field: 'gmv' | 'spend' | 'orders';
+  value: number;
+}
+
 /** Order stage a summary report counts: placed, confirmed, or paid orders. */
 export type SummaryStage = 'placed' | 'confirmed' | 'paid';
 
@@ -370,6 +390,8 @@ export interface CanonicalDataset {
   salesSummaries?: SalesSummaryRow[];
   /** Whole-period shop totals from summary reports (optional). */
   periodTotals?: ShopPeriodTotal[];
+  /** Non-canonical copies of figures, only for "the file disagrees with itself" checks. */
+  reportedFigures?: ReportedFigure[];
   costSettings?: CostSettings;
   /** Field names the source reported only as estimates; engines treat them as missing. */
   estimatedFields?: string[];

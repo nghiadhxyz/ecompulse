@@ -111,7 +111,7 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
           </div>
           {mix.adsGmv !== null && (
             <div className="mt-2 rounded-xl border border-dashed border-white/15 px-3 py-2 text-xs text-slate-300">
-              <span className="font-semibold text-white">{vi ? 'Lớp Quảng cáo Shopee (không phải kênh riêng): ' : 'Shopee Ads layer (not a separate channel): '}</span>
+              <span className="font-semibold text-white">{vi ? 'Lớp Quảng cáo Shopee (không phải kênh riêng, tổng các dòng quảng cáo): ' : 'Shopee Ads layer (not a separate channel, sum of the ad rows): '}</span>
               <b className="text-white">{fmtMoneyCompact(mix.adsGmv, lang)}</b> — <b className="text-white">{fmtRate(mix.adsAssistedShare, lang)}</b> {vi ? 'doanh số có ads hỗ trợ' : 'of sales ads-assisted'} ({vi ? 'đã nằm trong 4 kênh trên' : 'already inside the 4 channels'}). {vi ? 'Xem chi phí và ROAS ở mục Quảng cáo.' : 'See spend and ROAS in Ads.'}
             </div>
           )}
