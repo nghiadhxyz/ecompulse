@@ -20,6 +20,7 @@ import { campaignCalendar, dayTypeOf, weekdayIndex } from './campaignEngine';
 import { dailySummaryRows, summaryRowsInRange, SUMMARY_CHANNEL_LABELS, SUMMARY_STACKED_CHANNELS } from './summaryEngine';
 import { usablePeriodTotals } from './kpiEngine';
 import { moneyTolerance } from './periodRows';
+import { crossStageRate } from './orderStage';
 
 export type SeriesGrain = 'day' | 'week';
 
@@ -237,6 +238,8 @@ export interface StageFunnelRow {
   confirmedRateGmv: number | null;
   /** Placed sales lost before payment. */
   lostGmv: number | null;
+  /** Paid exceeds placed: the stages counted different orders, rates are not shown. */
+  crossPeriod: boolean;
 }
 
 export interface StageFunnel {
@@ -271,9 +274,11 @@ export function stageFunnel(dataset: CanonicalDataset, filter: DatasetFilter): S
         placed: p,
         confirmed: { gmv: c?.gmv ?? null, orders: c?.orders ?? null },
         paid: { gmv: d?.gmv ?? null, orders: d?.orders ?? null },
-        paidRateGmv: d ? safeDivide(d.gmv, p.gmv) : null,
-        paidRateOrders: d && d.orders !== null && p.orders !== null ? safeDivide(d.orders, p.orders) : null,
-        confirmedRateGmv: c ? safeDivide(c.gmv, p.gmv) : null,
+        // Above 100% the two stages counted different orders (paid on another day): no rate.
+        paidRateGmv: crossStageRate(d?.gmv, p.gmv).rate,
+        paidRateOrders: crossStageRate(d?.orders, p.orders).rate,
+        confirmedRateGmv: crossStageRate(c?.gmv, p.gmv).rate,
+        crossPeriod: crossStageRate(d?.gmv, p.gmv).crossPeriod || crossStageRate(d?.orders, p.orders).crossPeriod,
         lostGmv: d ? p.gmv - d.gmv : null,
       });
     }
@@ -283,7 +288,7 @@ export function stageFunnel(dataset: CanonicalDataset, filter: DatasetFilter): S
     rows,
     notes: [
       { vi: 'Tỷ lệ giữ = đơn đã thanh toán / đơn đã đặt của cùng kênh, cùng nguồn (tính lại từ tổng, không lấy trung bình các ngày). Phần rơi gồm đơn hủy, đơn chưa thanh toán trong kỳ.', en: 'Retention = paid / placed for the same channel and source.' },
-      { vi: 'Đơn đã thanh toán trong kỳ có thể gồm đơn đặt trước kỳ, nên tỷ lệ theo từng ngày có thể dao động; xem theo trọn kỳ sẽ ổn định hơn.', en: 'Paid orders in a window can include orders placed before it.' },
+      { vi: 'Đơn đã thanh toán trong kỳ có thể gồm đơn đặt trước kỳ, nên tỷ lệ theo từng ngày có thể dao động; xem theo trọn kỳ sẽ ổn định hơn. Tỷ lệ trên 100% không hiện ("—"): hai mức đơn đang đếm khác kỳ.', en: 'Paid orders in a window can include orders placed before it; rates above 100% are not shown.' },
     ],
   };
 }

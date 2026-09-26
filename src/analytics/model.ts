@@ -208,6 +208,9 @@ export interface DailyMetric {
   /** Refunds of paid orders (paid-order sheet) — the ones deducted from paid GMV. */
   paidRefundedOrders?: number;
   paidRefundedGmv?: number;
+  /** Cancellations as the paid-order sheet reports them. */
+  paidCancelledOrders?: number;
+  paidCancelledGmv?: number;
   units?: number;
   /** Distinct buyers of the day — not additive across days. */
   buyers?: number;

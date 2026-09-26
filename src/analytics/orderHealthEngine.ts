@@ -5,6 +5,7 @@
 import type { CanonicalDataset, OrderStatus, Platform } from './model';
 import { sliceDataset, type DatasetFilter } from './filters';
 import { isCancelled, isCompleted, isReturnOrRefund } from './status';
+import { stageDay, stageOf } from './orderStage';
 import { enumerateDays } from './period';
 
 export interface LifecycleCounts {
@@ -96,27 +97,31 @@ export function orderHealth(dataset: CanonicalDataset, filter: DatasetFilter): O
   let withoutReason = 0;
 
   // Summary reports: rates per day / platform from the daily rows (no statuses, no reasons).
+  // Every count is of ONE order stage (placed by default): cancel and refund rates are
+  // both "of those orders" — never refunds of one stage over orders of another.
   if (slice.orders.length === 0 && slice.dailyMetrics.length > 0) {
+    const stage = stageOf(filter);
     let placed = 0;
     let cancelled = 0;
     let valid = 0;
     let returned = 0;
     for (const d of slice.dailyMetrics) {
+      const s = stageDay(d, stage);
       const add = (row: RateRow) => {
-        row.placed += d.placedOrders ?? 0;
-        row.cancelled += d.cancelledOrders ?? 0;
-        row.valid += d.paidOrders ?? 0;
-        row.returned += d.refundedOrders ?? 0;
+        row.placed += s.orders ?? 0;
+        row.cancelled += s.cancelledOrders ?? 0;
+        row.valid += (s.orders ?? 0) - (s.cancelledOrders ?? 0);
+        row.returned += s.refundedOrders ?? 0;
       };
       const day = byDate.get(d.date);
       if (day) add(day);
       let p = byPlatform.get(d.platform);
       if (!p) byPlatform.set(d.platform, (p = newRate(d.platform)));
       add(p);
-      placed += d.placedOrders ?? 0;
-      cancelled += d.cancelledOrders ?? 0;
-      valid += d.paidOrders ?? 0;
-      returned += d.refundedOrders ?? 0;
+      placed += s.orders ?? 0;
+      cancelled += s.cancelledOrders ?? 0;
+      valid += (s.orders ?? 0) - (s.cancelledOrders ?? 0);
+      returned += s.refundedOrders ?? 0;
     }
     lifecycle.total = placed;
     lifecycle.cancelled = cancelled;
@@ -124,7 +129,7 @@ export function orderHealth(dataset: CanonicalDataset, filter: DatasetFilter): O
     return {
       lifecycle,
       cancelRate: placed > 0 ? cancelled / placed : null,
-      returnRate: valid > 0 ? returned / valid : null,
+      returnRate: placed > 0 ? returned / placed : null,
       completionRate: null,
       bySku: [],
       byPlatform: finish(byPlatform),

@@ -15,6 +15,7 @@ import { getDatasetIndex, sliceDataset, type DatasetFilter, type DatasetSlice } 
 import { computeProfitByGroup, type ProfitResult } from './profitEngine';
 import { computeContribution } from './contributionEngine';
 import { computeKpis } from './kpiEngine';
+import { stageDay, stageOf } from './orderStage';
 import { compareValues, type Comparison } from './comparisonEngine';
 import { isCancelled, isReturnOrRefund } from './status';
 import { addDays, isInRange, toDayNumber, type DateRange } from './period';
@@ -316,24 +317,25 @@ const DAILY_DIMS: BreakdownDimension[] = ['day', 'week', 'month', 'platform'];
 
 /**
  * Member metrics from daily summary rows (Shopee "Phân tích bán hàng" etc.), mirroring the
- * daily-grain KPI rules: GMV = paid-order sales, placed = placed orders, valid = paid orders.
- * Profit and units stay unknown — the report does not have them.
+ * daily-grain KPI rules: every figure counts ONE order stage (placed unless filter.stage
+ * says otherwise, see orderStage.ts). placed = orders of the stage, valid = those not
+ * cancelled, AOV = sales ÷ orders (Shopee's definition). Profit stays unknown.
  */
 function dailyMemberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<string, MemberMetrics> {
   if (dim === 'platform') return dailyPlatformMetrics(slice);
   const keyOf = (d: DatasetSlice['dailyMetrics'][number]) =>
     dim === 'day' ? d.date : dim === 'week' ? weekStart(d.date) : dim === 'month' ? d.date.slice(0, 7) : d.platform;
-  const acc = new Map<string, { gmv: number; refunded: number | null; placed: number; valid: number; cancelled: number; returned: number; clicks: number | null; units: number }>();
+  const stage = stageOf(slice.filter);
+  const acc = new Map<string, { gmv: number; refunded: number | null; placed: number; cancelled: number; returned: number; clicks: number | null; units: number }>();
   for (const d of slice.dailyMetrics) {
     const k = keyOf(d);
-    const a = acc.get(k) ?? { gmv: 0, refunded: 0, placed: 0, valid: 0, cancelled: 0, returned: 0, clicks: null, units: 0 };
-    a.gmv += d.paidGmv ?? 0;
-    // Refunds of paid orders, the same orders as the paid GMV they are deducted from.
-    a.refunded = a.refunded === null || d.paidRefundedGmv === undefined ? null : a.refunded + d.paidRefundedGmv;
-    a.placed += d.placedOrders ?? 0;
-    a.valid += d.paidOrders ?? 0;
-    a.cancelled += d.cancelledOrders ?? 0;
-    a.returned += d.paidRefundedOrders ?? 0;
+    const s = stageDay(d, stage);
+    const a = acc.get(k) ?? { gmv: 0, refunded: 0, placed: 0, cancelled: 0, returned: 0, clicks: null, units: 0 };
+    a.gmv += s.gmv ?? 0;
+    a.refunded = a.refunded === null || s.refundedGmv === undefined ? null : a.refunded + s.refundedGmv;
+    a.placed += s.orders ?? 0;
+    a.cancelled += s.cancelledOrders ?? 0;
+    a.returned += s.refundedOrders ?? 0;
     a.units += d.units ?? 0;
     if (d.productClicks !== undefined) a.clicks = (a.clicks ?? 0) + d.productClicks;
     acc.set(k, a);
@@ -348,12 +350,12 @@ function dailyMemberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<s
       profitComplete: false,
       units: a.units,
       placed: a.placed,
-      valid: a.valid,
+      valid: a.placed - a.cancelled,
       cancelled: a.cancelled,
       returned: a.returned,
-      aov: a.valid > 0 ? a.gmv / a.valid : null,
+      aov: a.placed > 0 ? a.gmv / a.placed : null,
       cancelRate: a.placed > 0 ? a.cancelled / a.placed : null,
-      refundRate: a.valid > 0 ? a.returned / a.valid : null,
+      refundRate: a.placed > 0 ? a.returned / a.placed : null,
       clicks: a.clicks,
       cvr: a.clicks ? a.placed / a.clicks : null,
       profitDetail: null,
@@ -374,8 +376,7 @@ function dailyPlatformMetrics(slice: DatasetSlice): Map<string, MemberMetrics> {
     const m = computeKpis(slice.dataset, { ...slice.filter, platforms: [p] }).metrics;
     const placed = m.orders.value ?? 0;
     const valid = m.validOrders.value ?? 0;
-    // refundRate = paid-order refunds ÷ paid orders, so this gives the refunded paid orders back.
-    const refunded = m.refundRate.value !== null ? Math.round(m.refundRate.value * valid) : 0;
+    const refunded = m.refundedOrders.value ?? 0;
     out.set(p, {
       gmv: m.gmv.value ?? 0,
       netRevenue: m.netRevenue.value,

@@ -11,6 +11,7 @@ export * from './parse';
 export * from './filters';
 export * from './profitEngine';
 export * from './kpiEngine';
+export * from './orderStage';
 export * from './comparisonEngine';
 export * from './contributionEngine';
 export * from './dataQuality';

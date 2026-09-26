@@ -197,7 +197,7 @@ describe('summary reports that disagree with themselves', () => {
       { date: '2025-09-03', platform: 'shopee', placedGmv: 1000, placedNoSubsidyGmv: 900, placedOrders: 10, paidGmv: 950, paidOrders: 9, paidRefundedGmv: 5 },
     ],
     periodTotals: [
-      { platform: 'shopee', start: '2025-09-01', end: '2025-09-03', stage: 'placed', gmv: 3000, noSubsidyGmv: 2300, orders: 25 },
+      { platform: 'shopee', start: '2025-09-01', end: '2025-09-03', stage: 'placed', gmv: 3000, noSubsidyGmv: 2300, orders: 25, refundedGmv: 20 },
       { platform: 'shopee', start: '2025-09-01', end: '2025-09-03', stage: 'paid', gmv: 2290, orders: 22, refundedGmv: 12 },
     ],
   });
@@ -223,9 +223,9 @@ describe('summary reports that disagree with themselves', () => {
   it('platform table uses the same period totals as the KPI cards', () => {
     const row = breakdown(ds, { range: RANGE }, 'platform').rows[0];
     const kpi = computeKpis(ds, { range: RANGE }).metrics;
-    expect(row.current.gmv).toBe(2290); // period row, not the 2.300 sum of days
+    expect(row.current.gmv).toBe(3000); // placed period row, not the 2.500 sum of days
     expect(row.current.gmv).toBe(kpi.gmv.value);
-    expect(row.current.netRevenue).toBe(2290 - 12);
+    expect(row.current.netRevenue).toBe(3000 - 20);
     expect(row.current.netRevenue).toBe(kpi.netRevenue.value);
   });
 });

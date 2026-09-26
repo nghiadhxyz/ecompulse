@@ -87,7 +87,7 @@ describe.skipIf(!FILE)('Shopee sales-analysis workbook — every sheet', async (
     it('breakdown by day / platform uses the daily rows', () => {
       const day = breakdown(ds, FULL, 'day');
       expect(day.rows).toHaveLength(30);
-      expect(day.totalGmv).toBe(51_302_716);
+      expect(day.totalGmv).toBe(67_348_702); // placed orders, the daily default
       expect(breakdown(ds, FULL, 'platform').rows[0].current.placed).toBe(519);
       expect(breakdown(ds, FULL, 'sku').unavailable).toBeDefined();
     });
@@ -149,8 +149,11 @@ describe.skipIf(!FILE)('Shopee sales-analysis workbook — every sheet', async (
       expect(ds.dailyMetrics.reduce((s, d) => s + (d.confirmedGmv ?? 0), 0)).toBe(57_006_822);
       expect(ds.dailyMetrics.reduce((s, d) => s + (d.confirmedOrders ?? 0), 0)).toBe(466);
       expect(channelMix(ds, FULL, 'confirmed').total).toBe(57_006_822);
-      expect(k.gmv.value).toBe(51_302_716);
-      expect(k.validOrders.value).toBe(422);
+      // "Tiền về" is its own labelled figure; GMV counts placed orders.
+      expect(k.paidGmv.value).toBe(51_302_716);
+      expect(k.paidOrders.value).toBe(422);
+      expect(k.paidGmv.basis?.vi).toBe('Đơn đã thanh toán');
+      expect(k.gmv.value).toBe(67_348_702);
     });
 
     it('A1 — four channels add up to total sales; Ads is a layer, not a fifth channel', () => {
@@ -241,7 +244,7 @@ describe.skipIf(!FILE)('Shopee sales-analysis workbook — every sheet', async (
       const days = ds.dailyMetrics.filter((d) => d.date >= '2026-08-01' && d.date <= '2026-08-07');
       const sum = (f: (d: (typeof days)[number]) => number | undefined) => days.reduce((s, d) => s + (f(d) ?? 0), 0);
       expect(part.cvr.value).toBeCloseTo(sum((d) => d.placedOrders) / sum((d) => d.productClicks), 12);
-      expect(part.aov.value).toBeCloseTo(sum((d) => d.paidGmv) / sum((d) => d.paidOrders), 8);
+      expect(part.aov.value).toBeCloseTo(sum((d) => d.placedGmv) / sum((d) => d.placedOrders), 8);
       // Channel table over part of the period = the shop's daily sales, nothing counted twice.
       expect(channelMix(ds, { range: { start: '2026-08-01', end: '2026-08-07' } }).total).toBe(sum((d) => d.placedGmv));
       expect(channelMix(ds, { range: { start: '2026-08-01', end: '2026-08-07' } }).uniqueIsDistinct).toBe(false);
@@ -348,8 +351,10 @@ describe.skipIf(!FILE)('Shopee sales-analysis workbook — every sheet', async (
     it('additive figures are sums of the 8 days', () => {
       expect(m.placedGmv.value).toBe(14_074_320);
       expect(m.orders.value).toBe(119);
-      expect(m.gmv.value).toBe(13_394_344);
-      expect(m.validOrders.value).toBe(114);
+      expect(m.gmv.value).toBe(14_074_320);
+      expect(m.paidGmv.value).toBe(13_394_344);
+      expect(m.paidOrders.value).toBe(114);
+      expect(m.validOrders.value).toBe(119 - 24);
       expect(m.cancelledOrders.value).toBe(24);
       expect(m.refundedOrders.value).toBe(1);
       const days = ds.dailyMetrics.filter((d) => d.date >= '2026-07-24' && d.date <= '2026-07-31');
@@ -363,7 +368,7 @@ describe.skipIf(!FILE)('Shopee sales-analysis workbook — every sheet', async (
     it('conversion = orders / clicks = 119 / 2.530 = 4,70%', () => {
       expect(m.cvr.value).toBe(119 / 2530);
       expect(Math.round(m.cvr.value! * 10_000) / 100).toBe(4.7);
-      expect(m.aov.value).toBe(13_394_344 / 114);
+      expect(m.aov.value).toBe(14_074_320 / 119); // same stage: placed sales ÷ placed orders
       expect(m.cancelRate.value).toBe(24 / 119);
     });
 

@@ -11,6 +11,7 @@ import { sliceDataset, type DatasetFilter } from './filters';
 import { isCancelled, isCompleted } from './status';
 import type { Bilingual } from './metric';
 import type { DateRange } from './period';
+import { CROSS_PERIOD_NOTE } from './orderStage';
 
 export type FunnelStageKey = 'impressions' | 'views' | 'clicks' | 'addToCart' | 'orders' | 'paid' | 'completed';
 
@@ -87,9 +88,12 @@ export function funnel(dataset: CanonicalDataset, filter: DatasetFilter): Funnel
   const skuTraffic = slice.traffic.filter((t) => t.sku);
   const hasOrders = dataset.orders.length > 0;
   const orders = hasOrders ? slice.orders.length : sumOrNull(slice.dailyMetrics, (d) => d.placedOrders);
-  const paid = hasOrders ? slice.orders.filter((o) => !isCancelled(o.status) && o.status !== 'placed').length : sumOrNull(slice.dailyMetrics, (d) => d.paidOrders);
+  // Summary reports count paid orders on the payment day: not a subset of the placed orders
+  // of the same window, so they are not a funnel step (see orderStage.ts).
+  const paid = hasOrders ? slice.orders.filter((o) => !isCancelled(o.status) && o.status !== 'placed').length : null;
   const completed = hasOrders ? slice.orders.filter((o) => isCompleted(o.status)).length : null;
   const notes: Bilingual[] = [];
+  if (!hasOrders && slice.dailyMetrics.some((d) => d.paidOrders !== undefined)) notes.push(CROSS_PERIOD_NOTE);
   if (hasOrders && slice.orders.some((o) => o.status === 'placed' || o.status === 'paid' || o.status === 'shipped')) {
     notes.push({
       vi: 'Một số đơn gần đây vẫn đang xử lý/giao — tỷ lệ "Hoàn tất" của kỳ này sẽ còn tăng.',

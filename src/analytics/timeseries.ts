@@ -5,6 +5,7 @@
 import type { CanonicalDataset } from './model';
 import { sliceDataset, type DatasetFilter } from './filters';
 import { enumerateDays } from './period';
+import { stageDay, stageOf } from './orderStage';
 import { isCancelled } from './status';
 
 export interface DailyPoint {
@@ -34,13 +35,16 @@ export function dailySeries(dataset: CanonicalDataset, filter: DatasetFilter): D
     }
     return days.map((d) => map.get(d)!);
   }
+  const stage = stageOf(filter);
   const byDate = new Map(days.map((d) => [d, { date: d, gmv: null, orders: null, cancelled: null } as DailyPoint]));
   for (const m of slice.dailyMetrics) {
     const p = byDate.get(m.date);
     if (!p) continue;
-    if (m.paidGmv !== undefined) p.gmv = (p.gmv ?? 0) + m.paidGmv;
-    if (m.placedOrders !== undefined) p.orders = (p.orders ?? 0) + m.placedOrders;
-    if (m.cancelledOrders !== undefined) p.cancelled = (p.cancelled ?? 0) + m.cancelledOrders;
+    // One order stage (placed by default) for sales, orders and cancellations of the day.
+    const s = stageDay(m, stage);
+    if (s.gmv !== undefined) p.gmv = (p.gmv ?? 0) + s.gmv;
+    if (s.orders !== undefined) p.orders = (p.orders ?? 0) + s.orders;
+    if (s.cancelledOrders !== undefined) p.cancelled = (p.cancelled ?? 0) + s.cancelledOrders;
   }
   return days.map((d) => byDate.get(d)!);
 }

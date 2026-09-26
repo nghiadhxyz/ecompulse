@@ -101,23 +101,27 @@ interface DayFacts {
   date: string;
   gmv: number;
   placed: number;
-  valid: number;
+  /** Orders AOV divides by: valid orders (order exports), or every order of the stage (summary reports, Shopee's definition). */
+  aovOrders: number;
   cancelled: number;
   profit: number | null;
 }
 
-function dayFacts(rows: BreakdownRow[]): Map<string, DayFacts> {
+function dayFacts(rows: BreakdownRow[], summary: boolean): Map<string, DayFacts> {
   return new Map(
-    rows.map((r) => [r.key, { date: r.key, gmv: r.current.gmv, placed: r.current.placed, valid: r.current.valid, cancelled: r.current.cancelled, profit: r.current.profit }]),
+    rows.map((r) => [
+      r.key,
+      { date: r.key, gmv: r.current.gmv, placed: r.current.placed, aovOrders: summary ? r.current.placed : r.current.valid, cancelled: r.current.cancelled, profit: r.current.profit },
+    ]),
   );
 }
 
 function bucket(key: string, label: Bilingual, days: string[], facts: Map<string, DayFacts>): BucketStats {
-  const f = days.map((d) => facts.get(d) ?? { date: d, gmv: 0, placed: 0, valid: 0, cancelled: 0, profit: 0 });
+  const f = days.map((d) => facts.get(d) ?? { date: d, gmv: 0, placed: 0, aovOrders: 0, cancelled: 0, profit: 0 });
   const n = f.length;
   const gmv = f.reduce((s, x) => s + x.gmv, 0);
   const placed = f.reduce((s, x) => s + x.placed, 0);
-  const valid = f.reduce((s, x) => s + x.valid, 0);
+  const aovOrders = f.reduce((s, x) => s + x.aovOrders, 0);
   const cancelled = f.reduce((s, x) => s + x.cancelled, 0);
   const profitKnown = f.every((x) => x.profit !== null);
   const profit = profitKnown ? f.reduce((s, x) => s + (x.profit ?? 0), 0) : null;
@@ -128,7 +132,7 @@ function bucket(key: string, label: Bilingual, days: string[], facts: Map<string
     gmvPerDay: n ? gmv / n : null,
     ordersPerDay: n ? placed / n : null,
     profitPerDay: n && profit !== null ? profit / n : null,
-    aov: valid ? gmv / valid : null,
+    aov: aovOrders ? gmv / aovOrders : null,
     cancelRate: placed ? cancelled / placed : null,
     upliftVsWeekday: null,
   };
@@ -153,7 +157,7 @@ export function calendarPerformance(dataset: CanonicalDataset, filter: DatasetFi
   const days = enumerateDays(range);
   const calendar = campaignCalendar(dataset, range);
   const autoCalendar = calendar.length > 0 && calendar.every((c) => c.auto);
-  const facts = dayFacts(breakdown(dataset, filter, 'day').rows);
+  const facts = dayFacts(breakdown(dataset, filter, 'day').rows, dataset.orders.length === 0);
   const typeOf = new Map(days.map((d) => [d, dayTypeOf(d, calendar)]));
 
   const types: DayType[] = ['mega_sale', 'double_day', 'payday', 'weekend', 'weekday'];
@@ -228,7 +232,7 @@ export function campaignResult(dataset: CanonicalDataset, entry: CalendarEntry, 
     const t = dayTypeOf(d, calendar);
     return t === 'weekday' || t === 'weekend';
   });
-  const facts = dayFacts(breakdown(dataset, { range: { start: addDays(entry.range.start, -14), end: addDays(entry.range.start, -1) }, platforms }, 'day').rows);
+  const facts = dayFacts(breakdown(dataset, { range: { start: addDays(entry.range.start, -14), end: addDays(entry.range.start, -1) }, platforms }, 'day').rows, dataset.orders.length === 0);
   const covered = computeKpis(dataset, { range: { start: addDays(entry.range.start, -14), end: addDays(entry.range.start, -1) }, platforms }).coverage === 'full';
   const baseline = covered && before.length ? before.reduce((s, d) => s + (facts.get(d)?.gmv ?? 0), 0) / before.length : null;
   const days = rangeLength(entry.range);

@@ -96,7 +96,9 @@ describe('ParsedStoreData adapter', () => {
     expect(ds.dailyMetrics[0].date).toBe('2025-08-01');
     const k = computeKpis(ds, { range: { start: '2025-08-01', end: '2025-08-03' } });
     expect(k.grain).toBe('daily');
-    expect(k.metrics.gmv.value).toBe(15_200_000 + 14_800_000 + 16_500_000);
+    // GMV counts placed orders; the paid ("tiền về") figure is kept apart.
+    expect(k.metrics.gmv.value).toBe(ds.dailyMetrics.slice(0, 3).reduce((s, d) => s + (d.placedGmv ?? 0), 0));
+    expect(k.metrics.paidGmv.value).toBe(15_200_000 + 14_800_000 + 16_500_000);
     expect(k.metrics.profit.status).toBe('missing');
   });
 

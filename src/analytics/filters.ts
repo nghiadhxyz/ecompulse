@@ -1,4 +1,4 @@
-import type { CanonicalDataset, Order, OrderLine, Platform } from './model';
+import type { CanonicalDataset, Order, OrderLine, Platform, SummaryStage } from './model';
 import { isInRange, type DateRange } from './period';
 import { selectPeriodOrDaily } from './periodRows';
 
@@ -14,6 +14,8 @@ export interface DatasetFilter {
   // Order-level filters
   campaignIds?: string[];
   liveSessionIds?: string[];
+  /** Summary reports: order stage to count (default: placed, see orderStage.ts). */
+  stage?: SummaryStage;
 }
 
 const nonEmpty = (a?: unknown[]) => !!a && a.length > 0;

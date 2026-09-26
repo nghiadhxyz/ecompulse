@@ -17,7 +17,8 @@ import { comparePeriods, type MetricComparison } from './comparisonEngine';
 import { productPerformance, productLeaders } from './productEngine';
 import { detectAlerts, type SmartAlert } from './anomalyEngine';
 import { addDays } from './period';
-import { computeKpis, STAGE_BASIS } from './kpiEngine';
+import { computeKpis } from './kpiEngine';
+import { STAGE_BASIS } from './orderStage';
 import { MIN_RATE_ORDERS, revenueBaseline, type Baseline } from './summaryAlerts';
 import { fmtChange, fmtCount, fmtDay, fmtMoneyCompact, fmtPp, fmtRate } from './format';
 import type { Bilingual } from './metric';
@@ -74,7 +75,7 @@ export function buildDailyBrief(dataset: CanonicalDataset, day: string, platform
   const summaryGrain = cmp.current.grain === 'daily';
   const headline = { revenue: summaryGrain ? m.placedGmv : m.gmv, profit: m.profit, orders: m.orders, cancelRate: m.cancelRate };
   const stage = summaryGrain ? STAGE_BASIS.placed : null;
-  const paid = summaryGrain && m.gmv.current !== null ? { revenue: m.gmv, orders: m.validOrders } : null;
+  const paid = summaryGrain && m.paidGmv.current !== null ? { revenue: m.paidGmv, orders: m.paidOrders } : null;
   const base = revenueBaseline(dataset, day, platforms);
   const limitations: Bilingual[] = [];
   if (cmp.current.coverage !== 'full') {

@@ -126,6 +126,8 @@ function fromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platform: 
         row.paidOrders = num(col.orders);
         row.paidRefundedOrders = num(col.refunded);
         row.paidRefundedGmv = num(col.refundedGmv);
+        row.paidCancelledOrders = num(col.cancelled);
+        row.paidCancelledGmv = num(col.cancelledGmv);
       } else {
         row.confirmedGmv = num(col.gmv);
         row.confirmedOrders = num(col.orders);

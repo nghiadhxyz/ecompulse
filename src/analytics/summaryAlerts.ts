@@ -12,7 +12,8 @@
  *  - rates: pooled over the previous 7 days, and only judged with ≥ MIN_RATE_ORDERS orders
  */
 import type { CanonicalDataset, DailyMetric, Platform, SummaryChannel } from './model';
-import { computeKpis, STAGE_BASIS, type KpiSet } from './kpiEngine';
+import { computeKpis, type KpiSet } from './kpiEngine';
+import { STAGE_BASIS } from './orderStage';
 import { datasetDateBounds, sliceDataset } from './filters';
 import { dailySummaryRows, SUMMARY_CHANNEL_LABELS, SUMMARY_STACKED_CHANNELS } from './summaryEngine';
 import { addDays, type DateRange } from './period';

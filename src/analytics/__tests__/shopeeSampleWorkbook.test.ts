@@ -17,6 +17,9 @@ import { importShopeeSalesAnalysis } from '../importers/shopeeSalesAnalysis';
 import { mergeIntoWorkspace } from '../workspace';
 import { buildDailyBrief } from '../dailyBrief';
 import { questionUnavailable } from '../dolphinEvidence';
+import { funnel } from '../funnelEngine';
+import { stageFunnel } from '../summaryInsights';
+import { orderHealth } from '../orderHealthEngine';
 
 const WORKBOOK = resolve(__dirname, '../../../Báo cáo mẫu.xlsx');
 /** A later export whose period rows disagree with its own days (samples/ is not committed). */
@@ -37,16 +40,20 @@ describe.skipIf(!existsSync(NEW_WORKBOOK))('Shopee workbook with inconsistent ro
     const range = datasetDateBounds(ds)!;
     const m = computeKpis(ds, { range }).metrics;
 
-    // (1) Every card says which orders it counts.
-    expect(m.gmv.basis?.vi).toBe('Đơn đã thanh toán');
-    expect(m.aov.basis?.vi).toBe('Đơn đã thanh toán');
-    expect(m.orders.basis?.vi).toBe('Đơn đặt');
-    expect(m.cancelRate.basis?.vi).toBe('Đơn đặt');
-    expect(m.cvr.basis?.vi).toBe('Đơn đặt');
+    // (1) Every card counts placed orders and says so; "tiền về" is its own labelled figure.
+    for (const k of ['gmv', 'netRevenue', 'aov', 'orders', 'cancelRate', 'refundRate', 'cvr'] as const) expect(m[k].basis?.vi).toBe('Đơn đặt');
+    expect(m.paidGmv.value).toBe(50_505_501);
+    expect(m.paidGmv.basis?.vi).toBe('Đơn đã thanh toán');
 
-    // (2) Net revenue deducts refunds of paid orders, not of placed orders.
-    expect(m.gmv.value).toBe(50_505_501);
-    expect(m.netRevenue.value).toBe(50_505_501 - 321_918);
+    // (2) Net revenue deducts refunds of the same orders as GMV.
+    expect(m.gmv.value).toBe(78_626_020);
+    expect(m.netRevenue.value).toBe(78_626_020 - 780_572);
+    expect(m.aov.value).toBeCloseTo(78_626_020 / 519, 6);
+    expect(m.refundRate.value).toBeCloseTo(7 / 519, 10);
+    const paid = computeKpis(ds, { range, stage: 'paid' }).metrics;
+    expect(paid.gmv.value).toBe(50_505_501);
+    expect(paid.netRevenue.value).toBe(50_505_501 - 321_918);
+    expect(paid.refundRate.value).toBeCloseTo(4 / 422, 10);
 
     // (3) CVR is recomputed (519 / 10.601) and the file's 5,97% is flagged.
     expect(m.cvr.value).toBeCloseTo(519 / 10_601, 10);
@@ -63,8 +70,24 @@ describe.skipIf(!existsSync(NEW_WORKBOOK))('Shopee workbook with inconsistent ro
 
     // (6) The platform table uses the same period total as the GMV card.
     const byPlatform = breakdown(ds, { range }, 'platform');
-    expect(byPlatform.rows[0].current.gmv).toBe(50_505_501);
-    expect(byPlatform.rows[0].current.netRevenue).toBe(50_183_583);
+    expect(byPlatform.rows[0].current.gmv).toBe(78_626_020);
+    expect(byPlatform.rows[0].current.netRevenue).toBe(78_626_020 - 780_572);
+  });
+
+  it('0.2 — paid orders are not a subset of placed orders', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    // No "placed → paid" funnel step and no share of placed orders.
+    const f = funnel(ds, { range });
+    expect(f.stages.paid).toBeNull();
+    expect(f.steps.some((s) => s.to === 'paid')).toBe(false);
+    // Affiliate: 94,21 placed vs 102,5 paid orders → above 100%, shown as "—".
+    const aff = stageFunnel(ds, { range }).rows.find((r) => r.channel === 'affiliate' && r.source === null)!;
+    expect(aff.paidRateOrders).toBeNull();
+    expect(aff.crossPeriod).toBe(true);
+    expect(stageFunnel(ds, { range }).rows.every((r) => (r.paidRateOrders ?? 0) <= 1 && (r.paidRateGmv ?? 0) <= 1)).toBe(true);
+    // Refund rate of the same orders: 7 / 519.
+    expect(orderHealth(ds, { range }).returnRate).toBeCloseTo(7 / 519, 10);
   });
 });
 
@@ -131,12 +154,23 @@ describe.skipIf(!existsSync(WORKBOOK))('Shopee sample workbook (golden)', () => 
     expect(m.orders.value).toBe(519);
     expect(m.cancelledOrders.value).toBe(102);
     expect(m.cancelRate.value).toBeCloseTo(102 / 519, 10);
-    expect(m.gmv.value).toBe(51_302_716);
-    expect(m.validOrders.value).toBe(422);
+    expect(m.gmv.value).toBe(67_348_702); // placed orders
+    expect(m.paidGmv.value).toBe(51_302_716);
+    expect(m.paidOrders.value).toBe(422);
     expect(m.cvr.value).toBeCloseTo(0.049, 3); // Shopee shows 4,90%
     // Unique visitors are not additive: the whole period uses Shopee's own total (daily sum is 9.622).
     expect(m.visits.value).toBe(7362);
     expect(m.buyers.value).toBe(453);
     expect(m.profit.status).toBe('missing'); // summary report has no COGS / order lines
+  });
+});
+
+describe.skipIf(!existsSync(WORKBOOK))('Clean Shopee export (golden, order stages)', () => {
+  it('has no stage rate above 100% and no placed → paid funnel step', async () => {
+    const ds = await summaryWorkspace(WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    expect(stageFunnel(ds, { range }).rows.some((r) => r.crossPeriod)).toBe(false);
+    expect(funnel(ds, { range }).stages.paid).toBeNull();
+    expect(orderHealth(ds, { range }).returnRate).toBeCloseTo(7 / 519, 10);
   });
 });

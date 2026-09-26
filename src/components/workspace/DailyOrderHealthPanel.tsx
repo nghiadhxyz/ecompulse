@@ -3,7 +3,7 @@
  * refunded counts per day. Statuses per order, reasons and per-SKU rates need an order export.
  */
 import React, { useMemo } from 'react';
-import { fmtCount, fmtDay, fmtRate, formatRangeVi, orderHealth, PLATFORM_LABELS, type Platform } from '../../analytics';
+import { computeKpis, fmtCount, fmtDay, fmtRate, formatRangeVi, orderHealth, PLATFORM_LABELS, type Platform } from '../../analytics';
 import { useWorkspace } from '../seller/SellerContext';
 import { GhostButton, Section } from '../seller/ui';
 import { Th } from '../analyst/ui';
@@ -15,7 +15,8 @@ export const DailyOrderHealthPanel: React.FC = () => {
   const days = h.byDate.filter((d) => d.placed > 0);
   const maxRate = Math.max(0.0001, ...days.map((d) => d.cancelRate ?? 0));
   const placed = h.lifecycle.total;
-  const paid = days.reduce((s, d) => s + d.valid, 0);
+  // "Tiền về" orders of the window — counted on the payment day, not a share of placed orders.
+  const paid = useMemo(() => computeKpis(dataset, { range, platforms }).metrics.paidOrders.value, [dataset, range, platforms]);
 
   return (
     <div className="space-y-4">
@@ -23,7 +24,7 @@ export const DailyOrderHealthPanel: React.FC = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           {[
             { l: vi ? 'Đơn đã đặt' : 'Placed', v: fmtCount(placed, lang) },
-            { l: vi ? 'Đơn đã thanh toán' : 'Paid', v: fmtCount(paid, lang), sub: placed ? `${fmtRate(paid / placed, lang)} ${vi ? 'số đơn đặt' : 'of placed'}` : undefined },
+            { l: vi ? 'Đơn thanh toán trong kỳ' : 'Paid in period', v: fmtCount(paid, lang), sub: vi ? 'Tính theo ngày tiền về — không phải tập con của đơn đặt' : 'Counted on payment day' },
             { l: vi ? 'Đơn hủy' : 'Cancelled', v: fmtCount(h.lifecycle.cancelled, lang), sub: `${vi ? 'Tỷ lệ hủy' : 'Cancel rate'} ${fmtRate(h.cancelRate, lang)}` },
             { l: vi ? 'Trả hàng / hoàn tiền' : 'Returns / refunds', v: fmtCount(h.lifecycle.refunded, lang), sub: `${vi ? 'Tỷ lệ' : 'Rate'} ${fmtRate(h.returnRate, lang)}` },
           ].map((x) => (

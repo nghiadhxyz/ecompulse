@@ -8,6 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   channelWeekday,
+  CROSS_PERIOD_NOTE,
   customerTrend,
   fmtCount,
   fmtDay,
@@ -228,8 +229,10 @@ export const StageFunnelPanel: React.FC = () => {
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.placed.gmv, lang)} <span className="text-slate-500">· {fmtOrders(r.placed.orders, lang)}</span></td>
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.confirmed.gmv, lang)}</td>
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.paid.gmv, lang)} <span className="text-slate-500">· {fmtOrders(r.paid.orders, lang)}</span></td>
-                      <td className="px-2.5 py-1.5 whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtRate(r.paidRateGmv, lang)}<ShareBar share={r.paidRateGmv} /></div></td>
-                      <td className="px-2.5 py-1.5 text-right">{fmtRate(r.paidRateOrders, lang)}</td>
+                      <td className="px-2.5 py-1.5 whitespace-nowrap" title={r.paidRateGmv === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>
+                        <div className="flex items-center justify-end gap-2">{fmtRate(r.paidRateGmv, lang)}<ShareBar share={r.paidRateGmv} /></div>
+                      </td>
+                      <td className="px-2.5 py-1.5 text-right" title={r.paidRateOrders === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>{fmtRate(r.paidRateOrders, lang)}</td>
                       <td className="px-2.5 py-1.5 text-right text-[#f08080]">{r.lostGmv === null ? '—' : fmtMoneyCompact(r.lostGmv, lang)}</td>
                     </tr>
                   );
