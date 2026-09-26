@@ -318,7 +318,9 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
   const placedGmv = pick(placedTotals, (t) => t.gmv, (d) => d.placedGmv, 'vnd', 'daily.placedGmv');
   const cancelled = pick(placedTotals, (t) => t.cancelledOrders, (d) => d.cancelledOrders, 'count', 'daily.cancelledOrders');
   const refundedOrders = pick(placedTotals, (t) => t.refundedOrders, (d) => d.refundedOrders, 'count', 'daily.refundedOrders');
-  const refundedGmv = pick(placedTotals, (t) => t.refundedGmv, (d) => d.refundedGmv, 'vnd', 'daily.refundedGmv');
+  // Refunds of paid orders: deducted from paid GMV, so both figures count the same orders.
+  const paidRefundedOrders = pick(paidTotals, (t) => t.refundedOrders, (d) => d.paidRefundedOrders, 'count', 'daily.paidRefundedOrders');
+  const paidRefundedGmv = pick(paidTotals, (t) => t.refundedGmv, (d) => d.paidRefundedGmv, 'vnd', 'daily.paidRefundedGmv');
   const units = dailySum(slice, (d) => d.units, 'count', ORDER_LEVEL, 'daily.units');
   const clicks = fromPeriodTotals(slice, placedTotals, (t) => t.productClicks, (d) => d.productClicks, 'count') ?? productClicks(slice);
   // Distinct buyers are not additive across days (a buyer can order on several days).
@@ -342,13 +344,33 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
       : paidGmv;
 
   const netRevenue: MetricResult =
-    paidGmv.value !== null && refundedGmv.value !== null
-      ? partial(paidGmv.value - refundedGmv.value, 'vnd', [
-          { vi: 'Chưa trừ voucher shop chịu (báo cáo tổng hợp không có).', en: 'Seller vouchers not deducted (not in summary report).' },
-        ])
-      : missing('vnd', ORDER_LEVEL, ['orderLines.sellerDiscount', 'daily.refundedGmv']);
+    paidGmv.value !== null && paidRefundedGmv.value !== null
+      ? {
+          ...partial(paidGmv.value - paidRefundedGmv.value, 'vnd', [
+            {
+              vi: `Doanh số đơn đã thanh toán ${fmtVnd(paidGmv.value)} − tiền hoàn của đơn đã thanh toán ${fmtVnd(paidRefundedGmv.value)}. Chưa trừ voucher shop chịu (báo cáo tổng hợp không có).`,
+              en: 'Paid-order sales − refunds of paid orders. Seller vouchers not deducted (not in summary report).',
+            },
+          ]),
+          warning: paidGmv.warning ?? paidRefundedGmv.warning,
+        }
+      : missing('vnd', ORDER_LEVEL, ['orderLines.sellerDiscount', 'daily.paidRefundedGmv']);
 
-  return {
+  // Recomputed from numerator and denominator — never the platform's rate or an average of days.
+  // The platform's own figure is only compared, so a report that disagrees with itself is visible.
+  const cvr = ratioMetric(placedOrders, clicks, 'ratio', ZERO_DENOM);
+  const reportedCvr = placedTotals && placedTotals.length === 1 ? placedTotals[0].reportedCvr : undefined;
+  if (cvr.value !== null && reportedCvr !== undefined && Math.abs(cvr.value - reportedCvr) > CVR_TOLERANCE) {
+    const pct = (v: number) => new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+    const count = (v: number | null) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(v ?? 0);
+    const gap = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Math.abs(cvr.value - reportedCvr) * 100);
+    cvr.warning = {
+      vi: `File ghi CVR ${pct(reportedCvr)}, tính lại Đơn đặt ÷ Lượt nhấp sản phẩm = ${count(placedOrders.value)} ÷ ${count(clicks.value)} = ${pct(cvr.value)} (lệch ${gap} điểm %). Đang dùng số tính lại.`,
+      en: `The file states CVR ${pct(reportedCvr)} but placed orders ÷ product clicks = ${pct(cvr.value)}. Using the recomputed value.`,
+    };
+  }
+
+  const metrics: Record<KpiKey, MetricResult> = {
     gmv,
     placedGmv,
     netRevenue,
@@ -361,18 +383,47 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
     units,
     aov: ratioMetric(paidGmv, paidOrders, 'vnd', ZERO_DENOM),
     cancelRate: ratioMetric(cancelled, placedOrders, 'ratio', ZERO_DENOM),
-    refundRate: ratioMetric(refundedOrders, paidOrders, 'ratio', ZERO_DENOM),
+    refundRate: ratioMetric(paidRefundedOrders, paidOrders, 'ratio', ZERO_DENOM),
     completionRate: missing('ratio', ORDER_LEVEL, ['order.status']),
     visits,
-    // Recomputed from numerator and denominator — never the platform's rate or an average of days.
-    cvr: ratioMetric(placedOrders, clicks, 'ratio', ZERO_DENOM),
+    cvr,
     buyers,
     adSpend,
     roas,
     profit: profit.profit,
     margin: profit.margin,
   };
+  for (const k of KPI_KEYS) {
+    const stage = DAILY_KPI_STAGE[k];
+    if (stage && metrics[k].value !== null) metrics[k] = { ...metrics[k], basis: STAGE_BASIS[stage] };
+  }
+  return metrics;
 }
+
+const CVR_TOLERANCE = 0.0005; // 0,05 điểm %: the platform prints rates with 2 decimals
+
+const fmtVnd = (v: number) => `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(v)}đ`;
+
+export const STAGE_BASIS: Record<SummaryStage, Bilingual> = {
+  placed: { vi: 'Đơn đặt', en: 'Placed orders' },
+  confirmed: { vi: 'Đơn xác nhận', en: 'Confirmed orders' },
+  paid: { vi: 'Đơn đã thanh toán', en: 'Paid orders' },
+};
+
+/** Order stage each daily-grain KPI counts (summary reports only). */
+const DAILY_KPI_STAGE: Partial<Record<KpiKey, SummaryStage>> = {
+  gmv: 'paid',
+  netRevenue: 'paid',
+  validOrders: 'paid',
+  aov: 'paid',
+  refundRate: 'paid',
+  placedGmv: 'placed',
+  orders: 'placed',
+  cancelledOrders: 'placed',
+  refundedOrders: 'placed',
+  cancelRate: 'placed',
+  cvr: 'placed',
+};
 
 /** Marks every computed metric as partial when the range is only partly covered by data. */
 function withPartialCoverage(metrics: Record<KpiKey, MetricResult>, dataset: CanonicalDataset, range: DateRange): Record<KpiKey, MetricResult> {

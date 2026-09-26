@@ -80,6 +80,7 @@ function fromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platform: 
       existingBuyers: findHeader(h, ['số người mua hiện tại']),
       potentialBuyers: findHeader(h, ['số người mua tiềm năng']),
       repeatRate: findHeader(h, ['Tỉ lệ quay lại của người mua', 'Tỉ lệ quay lại', 'Tỷ lệ quay lại']),
+      cvr: findHeader(h, ['Tỷ lệ chuyển đổi đơn hàng', 'Tỉ lệ chuyển đổi đơn hàng']),
     };
     if (!col.date) continue;
 
@@ -108,6 +109,7 @@ function fromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platform: 
           existingBuyers: num(col.existingBuyers),
           potentialBuyers: num(col.potentialBuyers),
           repeatRate: rate(col.repeatRate),
+          reportedCvr: rate(col.cvr),
         });
         continue;
       }
@@ -122,6 +124,8 @@ function fromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platform: 
       } else if (kind === 'paid') {
         row.paidGmv = num(col.gmv);
         row.paidOrders = num(col.orders);
+        row.paidRefundedOrders = num(col.refunded);
+        row.paidRefundedGmv = num(col.refundedGmv);
       } else {
         row.confirmedGmv = num(col.gmv);
         row.confirmedOrders = num(col.orders);

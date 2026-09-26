@@ -33,6 +33,11 @@ export interface MetricResult {
    * differs from the sum of its daily rows.
    */
   warning?: Bilingual;
+  /**
+   * Which orders the figure counts when a summary report gives several stages (placed,
+   * paid…), e.g. "Đơn đã thanh toán". Shown on the card so mixed stages are not compared.
+   */
+  basis?: Bilingual;
 }
 
 export function ok(value: number, unit: MetricUnit): MetricResult {

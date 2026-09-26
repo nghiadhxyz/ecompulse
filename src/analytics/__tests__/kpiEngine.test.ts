@@ -161,8 +161,8 @@ describe('KPI engine — edge cases', () => {
 describe('KPI engine — daily grain (summary reports)', () => {
   const ds = dataset([], [], {
     dailyMetrics: [
-      { date: '2025-09-01', platform: 'shopee', placedOrders: 10, paidOrders: 8, paidGmv: 800, cancelledOrders: 2, refundedOrders: 1, refundedGmv: 100, visits: 150, productClicks: 200, buyers: 7 },
-      { date: '2025-09-02', platform: 'shopee', placedOrders: 20, paidOrders: 16, paidGmv: 1600, cancelledOrders: 3, refundedOrders: 0, refundedGmv: 0, visits: 250, productClicks: 300, buyers: 15 },
+      { date: '2025-09-01', platform: 'shopee', placedOrders: 10, paidOrders: 8, paidGmv: 800, cancelledOrders: 2, refundedOrders: 1, refundedGmv: 100, paidRefundedOrders: 1, paidRefundedGmv: 40, visits: 150, productClicks: 200, buyers: 7 },
+      { date: '2025-09-02', platform: 'shopee', placedOrders: 20, paidOrders: 16, paidGmv: 1600, cancelledOrders: 3, refundedOrders: 0, refundedGmv: 0, paidRefundedOrders: 0, paidRefundedGmv: 0, visits: 250, productClicks: 300, buyers: 15 },
     ],
   });
   const m = computeKpis(ds, { range: SEPT_1_2 }).metrics;
@@ -173,6 +173,24 @@ describe('KPI engine — daily grain (summary reports)', () => {
     expect(m.aov.value).toBe(100);
     expect(m.cancelRate.value).toBeCloseTo(5 / 30, 10);
     expect(m.cvr.value).toBeCloseTo(30 / 500, 10);
+  });
+
+  it('deducts refunds of paid orders from paid GMV, and names the stage of each figure', () => {
+    expect(m.netRevenue.value).toBe(2400 - 40); // not the placed-order refunds (100)
+    expect(m.refundRate.value).toBeCloseTo(1 / 24, 10);
+    expect(m.gmv.basis?.vi).toBe('Đơn đã thanh toán');
+    expect(m.netRevenue.basis?.vi).toBe('Đơn đã thanh toán');
+    expect(m.orders.basis?.vi).toBe('Đơn đặt');
+    expect(m.cvr.basis?.vi).toBe('Đơn đặt');
+  });
+
+  it("flags a platform CVR that its own orders and clicks do not give", () => {
+    const withTotal = { ...ds, periodTotals: [{ platform: 'shopee' as const, start: '2025-09-01', end: '2025-09-02', stage: 'placed' as const, orders: 30, productClicks: 500, reportedCvr: 0.08 }] };
+    const cvr = computeKpis(withTotal, { range: SEPT_1_2 }).metrics.cvr;
+    expect(cvr.value).toBeCloseTo(0.06, 10);
+    expect(cvr.warning?.vi).toContain('File ghi CVR 8,00%');
+    const agreeing = { ...withTotal, periodTotals: [{ ...withTotal.periodTotals[0], reportedCvr: 0.06 }] };
+    expect(computeKpis(agreeing, { range: SEPT_1_2 }).metrics.cvr.warning).toBeUndefined();
   });
 
   it('does not present summed daily buyers as distinct buyers', () => {

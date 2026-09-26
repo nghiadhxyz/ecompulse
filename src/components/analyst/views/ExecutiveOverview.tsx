@@ -52,6 +52,7 @@ export const ExecutiveOverview: React.FC = () => {
   const cur = useMemo(() => dailySeries(dataset, baseFilter), [dataset, baseFilter]);
   const prev = useMemo(() => dailySeries(dataset, { ...baseFilter, range: previousRange }), [dataset, baseFilter, previousRange]);
   const byPlatform = useMemo(() => breakdown(dataset, baseFilter, 'platform', previousRange, lang), [dataset, baseFilter, previousRange, lang]);
+  const gmvBasis = cmp.current.metrics.gmv.basis;
   const byCategory = useMemo(() => breakdown(dataset, baseFilter, 'category', previousRange, lang), [dataset, baseFilter, previousRange, lang]);
 
   const compareLabel = vi ? `so với ${formatRangeVi(previousRange)}` : `vs ${formatRangeVi(previousRange)}`;
@@ -90,6 +91,9 @@ export const ExecutiveOverview: React.FC = () => {
               <span key={s} className="text-xs px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-slate-100">{s}</span>
             ))}
           </div>
+        )}
+        {chart.length > 1 && gmvBasis && (
+          <p className="text-[11px] text-slate-400 mt-4">{vi ? `Biểu đồ: GMV theo ngày, ${gmvBasis.vi.toLowerCase()}.` : `Chart: daily GMV, ${gmvBasis.en.toLowerCase()}.`}</p>
         )}
         {chart.length > 1 && (
           <div className="h-60 mt-4" role="img" aria-label={vi ? 'GMV theo ngày: kỳ này và kỳ so sánh' : 'Daily GMV: current vs comparison'}>

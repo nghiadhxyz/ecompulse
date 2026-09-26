@@ -14,6 +14,7 @@ import { PLATFORM_LABELS } from './model';
 import { getDatasetIndex, sliceDataset, type DatasetFilter, type DatasetSlice } from './filters';
 import { computeProfitByGroup, type ProfitResult } from './profitEngine';
 import { computeContribution } from './contributionEngine';
+import { computeKpis } from './kpiEngine';
 import { compareValues, type Comparison } from './comparisonEngine';
 import { isCancelled, isReturnOrRefund } from './status';
 import { addDays, isInRange, toDayNumber, type DateRange } from './period';
@@ -319,6 +320,7 @@ const DAILY_DIMS: BreakdownDimension[] = ['day', 'week', 'month', 'platform'];
  * Profit and units stay unknown — the report does not have them.
  */
 function dailyMemberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<string, MemberMetrics> {
+  if (dim === 'platform') return dailyPlatformMetrics(slice);
   const keyOf = (d: DatasetSlice['dailyMetrics'][number]) =>
     dim === 'day' ? d.date : dim === 'week' ? weekStart(d.date) : dim === 'month' ? d.date.slice(0, 7) : d.platform;
   const acc = new Map<string, { gmv: number; refunded: number | null; placed: number; valid: number; cancelled: number; returned: number; clicks: number | null; units: number }>();
@@ -326,11 +328,12 @@ function dailyMemberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<s
     const k = keyOf(d);
     const a = acc.get(k) ?? { gmv: 0, refunded: 0, placed: 0, valid: 0, cancelled: 0, returned: 0, clicks: null, units: 0 };
     a.gmv += d.paidGmv ?? 0;
-    a.refunded = a.refunded === null || d.refundedGmv === undefined ? null : a.refunded + d.refundedGmv;
+    // Refunds of paid orders, the same orders as the paid GMV they are deducted from.
+    a.refunded = a.refunded === null || d.paidRefundedGmv === undefined ? null : a.refunded + d.paidRefundedGmv;
     a.placed += d.placedOrders ?? 0;
     a.valid += d.paidOrders ?? 0;
     a.cancelled += d.cancelledOrders ?? 0;
-    a.returned += d.refundedOrders ?? 0;
+    a.returned += d.paidRefundedOrders ?? 0;
     a.units += d.units ?? 0;
     if (d.productClicks !== undefined) a.clicks = (a.clicks ?? 0) + d.productClicks;
     acc.set(k, a);
@@ -353,6 +356,42 @@ function dailyMemberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<s
       refundRate: a.valid > 0 ? a.returned / a.valid : null,
       clicks: a.clicks,
       cvr: a.clicks ? a.placed / a.clicks : null,
+      profitDetail: null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Per-platform figures from the KPI engine, so the platform table matches the KPI cards:
+ * the platform's period totals when the range covers the whole report period
+ * (periodRows.ts rule), the daily rows otherwise.
+ */
+function dailyPlatformMetrics(slice: DatasetSlice): Map<string, MemberMetrics> {
+  const out = new Map<string, MemberMetrics>();
+  const platforms = [...new Set(slice.dailyMetrics.map((d) => d.platform))];
+  for (const p of platforms) {
+    const m = computeKpis(slice.dataset, { ...slice.filter, platforms: [p] }).metrics;
+    const placed = m.orders.value ?? 0;
+    const valid = m.validOrders.value ?? 0;
+    // refundRate = paid-order refunds ÷ paid orders, so this gives the refunded paid orders back.
+    const refunded = m.refundRate.value !== null ? Math.round(m.refundRate.value * valid) : 0;
+    out.set(p, {
+      gmv: m.gmv.value ?? 0,
+      netRevenue: m.netRevenue.value,
+      profit: null,
+      margin: null,
+      profitComplete: false,
+      units: m.units.value ?? 0,
+      placed,
+      valid,
+      cancelled: m.cancelledOrders.value ?? 0,
+      returned: refunded,
+      aov: m.aov.value,
+      cancelRate: m.cancelRate.value,
+      refundRate: m.refundRate.value,
+      clicks: null,
+      cvr: m.cvr.value,
       profitDetail: null,
     });
   }

@@ -64,14 +64,20 @@ export const SubsidyPanel: React.FC = () => {
         <NotEnoughData lang={lang} reason={tr(lang, s.notes[0])} />
       ) : (
         <>
+          {s.warnings.map((w) => (
+            <p key={w.vi} className="text-[11px] text-[#fab219] leading-snug mb-2">
+              ⚠ {w[lang]}
+            </p>
+          ))}
           <div className="h-48" role="img" aria-label={vi ? '% phụ thuộc trợ giá theo thời gian' : 'Subsidy share over time'}>
             <ResponsiveContainer width="100%" height="100%">
+              {/* Invalid days have no share: the line breaks there instead of dipping below zero. */}
               <LineChart data={s.points.map((p) => ({ label: bucketLabel(p.key, grain, vi), share: p.share }))}>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
                 <XAxis dataKey="label" tick={axisTick} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
                 <YAxis tickFormatter={(v: number) => fmtRate(v, lang, 0)} tick={axisTick} width={40} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [fmtRate(v, lang), vi ? '% trợ giá' : 'Subsidy share']} />
-                <Line isAnimationActive={false} type="monotone" dataKey="share" stroke={BAR} strokeWidth={2} dot={grain === 'week'} connectNulls />
+                <Line isAnimationActive={false} type="monotone" dataKey="share" stroke={BAR} strokeWidth={2} dot={grain === 'week'} connectNulls={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

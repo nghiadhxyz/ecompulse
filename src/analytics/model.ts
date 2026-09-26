@@ -202,8 +202,12 @@ export interface DailyMetric {
   placedNoSubsidyGmv?: number;
   cancelledOrders?: number;
   cancelledGmv?: number;
+  /** Refunds of placed orders (placed-order sheet). */
   refundedOrders?: number;
   refundedGmv?: number;
+  /** Refunds of paid orders (paid-order sheet) — the ones deducted from paid GMV. */
+  paidRefundedOrders?: number;
+  paidRefundedGmv?: number;
   units?: number;
   /** Distinct buyers of the day — not additive across days. */
   buyers?: number;
@@ -243,6 +247,8 @@ export interface ShopPeriodTotal {
   existingBuyers?: number;
   potentialBuyers?: number;
   repeatRate?: number;
+  /** Conversion rate as the platform prints it (ratio). Only compared with the recomputed CVR. */
+  reportedCvr?: number;
 }
 
 /** Order stage a summary report counts: placed, confirmed, or paid orders. */

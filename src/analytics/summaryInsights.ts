@@ -19,6 +19,7 @@ import { safeDivide, type Bilingual } from './metric';
 import { campaignCalendar, dayTypeOf, weekdayIndex } from './campaignEngine';
 import { dailySummaryRows, summaryRowsInRange, SUMMARY_CHANNEL_LABELS, SUMMARY_STACKED_CHANNELS } from './summaryEngine';
 import { usablePeriodTotals } from './kpiEngine';
+import { moneyTolerance } from './periodRows';
 
 export type SeriesGrain = 'day' | 'week';
 
@@ -44,42 +45,88 @@ export interface SubsidyDependence {
   total: SubsidyPoint | null;
   points: SubsidyPoint[];
   notes: Bilingual[];
+  /** Data problems the reader must see (days that do not add up, impossible days). */
+  warnings: Bilingual[];
+  /** Days where sales excluding subsidy exceed sales: impossible, left out of every figure. */
+  invalidDays: string[];
 }
+
+const fmtInt = (v: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(v);
+const fmtDdMm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 /**
  * Share of placed sales funded by the platform ("Doanh số" − "Doanh số không bao gồm trợ
  * giá bởi Shopee"), per day or week, recomputed from the sums — never averaged.
+ *
+ * A day whose sales excluding subsidy exceed its sales would mean a negative subsidy; the
+ * report is wrong for that day, so it is flagged and left out rather than drawn below zero.
  */
 export function subsidyDependence(dataset: CanonicalDataset, filter: DatasetFilter, grain: SeriesGrain = 'day'): SubsidyDependence {
   const slice = sliceDataset(dataset, filter);
   const rows = slice.dailyMetrics.filter((d) => d.placedGmv !== undefined && d.placedNoSubsidyGmv !== undefined);
   if (rows.length === 0) {
-    return { available: false, total: null, points: [], notes: [{ vi: 'Báo cáo không có cột "Doanh số không bao gồm trợ giá bởi Shopee".', en: 'The report has no sales-excluding-subsidy column.' }] };
+    return {
+      available: false,
+      total: null,
+      points: [],
+      notes: [{ vi: 'Báo cáo không có cột "Doanh số không bao gồm trợ giá bởi Shopee".', en: 'The report has no sales-excluding-subsidy column.' }],
+      warnings: [],
+      invalidDays: [],
+    };
   }
+  const isInvalid = (d: DailyMetric) => d.placedNoSubsidyGmv! > d.placedGmv!;
+  const invalidDays = [...new Set(rows.filter(isInvalid).map((d) => d.date))].sort();
   const buckets = new Map<string, SubsidyPoint>();
   for (const d of rows) {
     const k = bucketKey(d.date, grain);
     const b = buckets.get(k) ?? { key: k, days: 0, gmv: 0, noSubsidyGmv: 0, subsidy: 0, share: null };
+    buckets.set(k, b);
+    if (isInvalid(d)) continue;
     b.days++;
     b.gmv += d.placedGmv!;
     b.noSubsidyGmv += d.placedNoSubsidyGmv!;
-    buckets.set(k, b);
   }
-  const finish = (b: SubsidyPoint): SubsidyPoint => ({ ...b, subsidy: b.gmv - b.noSubsidyGmv, share: safeDivide(b.gmv - b.noSubsidyGmv, b.gmv) });
+  const finish = (b: SubsidyPoint): SubsidyPoint =>
+    b.days === 0 ? { ...b, subsidy: 0, share: null } : { ...b, subsidy: b.gmv - b.noSubsidyGmv, share: safeDivide(b.gmv - b.noSubsidyGmv, b.gmv) };
   const points = [...buckets.values()].map(finish).sort((a, b) => a.key.localeCompare(b.key));
+  const validDays = rows.length - rows.filter(isInvalid).length;
   const totals = usablePeriodTotals(slice, 'placed');
-  const total =
-    totals && totals.every((t) => t.gmv !== undefined && t.noSubsidyGmv !== undefined)
-      ? finish({ key: 'total', days: rows.length, gmv: totals.reduce((s, t) => s + t.gmv!, 0), noSubsidyGmv: totals.reduce((s, t) => s + t.noSubsidyGmv!, 0), subsidy: 0, share: null })
-      : finish({ key: 'total', days: rows.length, gmv: points.reduce((s, p) => s + p.gmv, 0), noSubsidyGmv: points.reduce((s, p) => s + p.noSubsidyGmv, 0), subsidy: 0, share: null });
+  const useTotals = !!totals && totals.every((t) => t.gmv !== undefined && t.noSubsidyGmv !== undefined);
+  const total = useTotals
+    ? finish({ key: 'total', days: rows.length, gmv: totals!.reduce((s, t) => s + t.gmv!, 0), noSubsidyGmv: totals!.reduce((s, t) => s + t.noSubsidyGmv!, 0), subsidy: 0, share: null })
+    : finish({ key: 'total', days: validDays, gmv: points.reduce((s, p) => s + p.gmv, 0), noSubsidyGmv: points.reduce((s, p) => s + p.noSubsidyGmv, 0), subsidy: 0, share: null });
+
+  const warnings: Bilingual[] = [];
+  if (invalidDays.length > 0) {
+    warnings.push({
+      vi: `Dữ liệu không hợp lệ ở ${invalidDays.length} ngày (${invalidDays.map(fmtDdMm).join(', ')}): doanh số không gồm trợ giá lớn hơn doanh số, tức trợ giá âm. Các ngày này bị bỏ khỏi biểu đồ và bảng${useTotals ? '' : ' và tổng'}.`,
+      en: `Invalid data on ${invalidDays.length} day(s): sales excluding subsidy exceed sales. These days are left out.`,
+    });
+  }
+  if (useTotals) {
+    // The period row and the days describe the same placed orders; say so when they disagree.
+    const dayGmv = rows.reduce((s, d) => s + d.placedGmv!, 0);
+    const dayNoSub = rows.reduce((s, d) => s + d.placedNoSubsidyGmv!, 0);
+    const diffs: string[] = [];
+    if (Math.abs(dayGmv - total.gmv) > moneyTolerance(total.gmv)) diffs.push(`doanh số đơn đặt ${fmtInt(total.gmv)} theo dòng tổng, ${fmtInt(dayGmv)} khi cộng ngày (lệch ${fmtInt(Math.abs(total.gmv - dayGmv))})`);
+    if (Math.abs(dayNoSub - total.noSubsidyGmv) > moneyTolerance(total.noSubsidyGmv))
+      diffs.push(`không gồm trợ giá ${fmtInt(total.noSubsidyGmv)} theo dòng tổng, ${fmtInt(dayNoSub)} khi cộng ngày (lệch ${fmtInt(Math.abs(total.noSubsidyGmv - dayNoSub))})`);
+    if (diffs.length > 0) {
+      warnings.push({
+        vi: `File tự mâu thuẫn: ${diffs.join('; ')}. Số "Cả khoảng" dùng dòng tổng; biểu đồ theo ngày/tuần dùng số từng ngày nên không khớp với nó.`,
+        en: "The file's period row and its daily rows disagree. The whole-range figure uses the period row; the chart uses the days.",
+      });
+    }
+  }
+
   const notes: Bilingual[] = [
     {
       vi: 'Phần trợ giá = Doanh số − Doanh số không bao gồm trợ giá bởi Shopee (đơn đã đặt). Tỷ lệ cao nghĩa là doanh số phụ thuộc nhiều vào voucher/trợ giá của sàn — khi sàn giảm trợ giá, doanh số có thể giảm theo.',
       en: 'Subsidy = sales − sales excluding Shopee subsidy (placed orders).',
     },
   ];
-  if (grain === 'week' && points.some((p) => p.days < 7)) notes.push({ vi: 'Tuần ở đầu/cuối kỳ không đủ 7 ngày — cột "Số ngày" cho biết cỡ mẫu.', en: 'Edge weeks have fewer than 7 days.' });
-  return { available: true, total, points, notes };
+  if (grain === 'week' && points.some((p) => p.days < 7)) notes.push({ vi: 'Tuần ở đầu/cuối kỳ hoặc có ngày bị loại không đủ 7 ngày — cột "Số ngày" cho biết cỡ mẫu.', en: 'Some weeks have fewer than 7 usable days.' });
+  return { available: true, total, points, notes, warnings, invalidDays };
 }
 
 // ------------------------------------------------------------------ B2 source drivers
