@@ -12,7 +12,7 @@
  * share of GMV. Each comes with the numbers that support it.
  */
 import type { CanonicalDataset } from './model';
-import type { DatasetFilter } from './filters';
+import { datasetDateBounds, type DatasetFilter } from './filters';
 import { breakdown, type BreakdownRow } from './breakdownEngine';
 import { computeKpis } from './kpiEngine';
 import { campaignCalendar, dayTypeOf } from './campaignEngine';
@@ -67,7 +67,10 @@ function dayValue(rows: Map<string, BreakdownRow>, date: string, metric: ScanMet
 
 export function anomalyScan(dataset: CanonicalDataset, filter: DatasetFilter, metric: ScanMetric): AnomalyScanResult {
   const notes: Bilingual[] = [];
-  if (dataset.orders.length === 0) return { metric, points: [], flagged: [], notes: [{ vi: 'Cần file xuất đơn hàng.', en: 'An order export is required.' }] };
+  if (dataset.orders.length === 0 && dataset.dailyMetrics.length === 0) return { metric, points: [], flagged: [], notes: [{ vi: 'Cần dữ liệu doanh thu theo ngày hoặc file xuất đơn hàng.', en: 'Daily sales or an order export is required.' }] };
+  if (metric === 'profit' && dataset.orders.length === 0) {
+    return { metric, points: [], flagged: [], notes: [{ vi: 'Lợi nhuận theo ngày cần file xuất đơn hàng và giá vốn — báo cáo tổng hợp không có.', en: 'Daily profit needs an order export with COGS.' }] };
+  }
   const start = addDays(filter.range.start, -40);
   const wide = breakdown(dataset, { ...filter, range: { start, end: filter.range.end } }, 'day');
   const rows = new Map(wide.rows.map((r) => [r.key, r]));
@@ -77,7 +80,7 @@ export function anomalyScan(dataset: CanonicalDataset, filter: DatasetFilter, me
     return t !== 'weekday' && t !== 'weekend';
   };
   const bounds = computeKpis(dataset, { range: { start, end: filter.range.end } });
-  const firstDataDay = dataset.orders.reduce((m, o) => (o.orderDate < m ? o.orderDate : m), filter.range.end);
+  const firstDataDay = datasetDateBounds(dataset)?.start ?? filter.range.end;
 
   const points: AnomalyPoint[] = enumerateDays(filter.range).map((date) => {
     const value = dayValue(rows, date, metric);

@@ -129,6 +129,8 @@ export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, 
 
   const meanTest = (key: string, label: Bilingual, unit: MetricUnit, f: (r: BreakdownRow) => number) => {
     const fill = (rows: BreakdownRow[], range: DateRange) => {
+      // No data at all for a period → no sample (never a run of zero days).
+      if (rows.length === 0) return [];
       const m = new Map(rows.map((r) => [r.key, f(r)]));
       return enumerateDays(range).map((d) => m.get(d) ?? 0);
     };

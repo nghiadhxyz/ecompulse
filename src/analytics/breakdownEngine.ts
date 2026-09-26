@@ -310,19 +310,71 @@ function memberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<string
   return out;
 }
 
+/** Dimensions a daily summary report can be split by (no order lines needed). */
+const DAILY_DIMS: BreakdownDimension[] = ['day', 'week', 'month', 'platform'];
+
+/**
+ * Member metrics from daily summary rows (Shopee "Phân tích bán hàng" etc.), mirroring the
+ * daily-grain KPI rules: GMV = paid-order sales, placed = placed orders, valid = paid orders.
+ * Profit and units stay unknown — the report does not have them.
+ */
+function dailyMemberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<string, MemberMetrics> {
+  const keyOf = (d: DatasetSlice['dailyMetrics'][number]) =>
+    dim === 'day' ? d.date : dim === 'week' ? weekStart(d.date) : dim === 'month' ? d.date.slice(0, 7) : d.platform;
+  const acc = new Map<string, { gmv: number; refunded: number | null; placed: number; valid: number; cancelled: number; returned: number; clicks: number | null; units: number }>();
+  for (const d of slice.dailyMetrics) {
+    const k = keyOf(d);
+    const a = acc.get(k) ?? { gmv: 0, refunded: 0, placed: 0, valid: 0, cancelled: 0, returned: 0, clicks: null, units: 0 };
+    a.gmv += d.paidGmv ?? 0;
+    a.refunded = a.refunded === null || d.refundedGmv === undefined ? null : a.refunded + d.refundedGmv;
+    a.placed += d.placedOrders ?? 0;
+    a.valid += d.paidOrders ?? 0;
+    a.cancelled += d.cancelledOrders ?? 0;
+    a.returned += d.refundedOrders ?? 0;
+    a.units += d.units ?? 0;
+    if (d.productClicks !== undefined) a.clicks = (a.clicks ?? 0) + d.productClicks;
+    acc.set(k, a);
+  }
+  const out = new Map<string, MemberMetrics>();
+  for (const [k, a] of acc) {
+    out.set(k, {
+      gmv: a.gmv,
+      netRevenue: a.refunded === null ? null : a.gmv - a.refunded,
+      profit: null,
+      margin: null,
+      profitComplete: false,
+      units: a.units,
+      placed: a.placed,
+      valid: a.valid,
+      cancelled: a.cancelled,
+      returned: a.returned,
+      aov: a.valid > 0 ? a.gmv / a.valid : null,
+      cancelRate: a.placed > 0 ? a.cancelled / a.placed : null,
+      refundRate: a.valid > 0 ? a.returned / a.valid : null,
+      clicks: a.clicks,
+      cvr: a.clicks ? a.placed / a.clicks : null,
+      profitDetail: null,
+    });
+  }
+  return out;
+}
+
 export function breakdown(dataset: CanonicalDataset, filter: DatasetFilter, dimension: BreakdownDimension, previousRange?: DateRange, lang: 'vi' | 'en' = 'vi'): Breakdown {
   const lineLevel = LINE_LEVEL.includes(dimension);
   const base: Breakdown = { dimension, lineLevel, range: filter.range, previousRange, previousCovered: false, rows: [], totalGmv: 0, totalGmvDelta: null };
-  if (dataset.orders.length === 0) {
+  const dailyGrain = dataset.orders.length === 0 && dataset.dailyMetrics.length > 0 && DAILY_DIMS.includes(dimension);
+  if (dataset.orders.length === 0 && !dailyGrain) {
     return { ...base, unavailable: { vi: 'Cần file xuất đơn hàng để phân tích theo chiều này.', en: 'An order export is required for this breakdown.' } };
   }
   if ((dimension === 'category' || dimension === 'subcategory') && !dataset.products.some((p) => (dimension === 'category' ? p.category : p.subcategory))) {
     return { ...base, unavailable: { vi: 'Chưa có thông tin ngành hàng/nhóm hàng cho SKU. Bổ sung cột Ngành hàng trong file hoặc danh mục sản phẩm.', en: 'No category data for SKUs.' } };
   }
 
-  const cur = memberMetrics(sliceDataset(dataset, filter), dimension);
-  const previousCovered = !!previousRange && dataset.orders.some((o) => isInRange(o.orderDate, previousRange));
-  const prev = previousRange && previousCovered ? memberMetrics(sliceDataset(dataset, { ...filter, range: previousRange }), dimension) : null;
+  const members = dailyGrain ? dailyMemberMetrics : memberMetrics;
+  const cur = members(sliceDataset(dataset, filter), dimension);
+  const previousCovered =
+    !!previousRange && (dailyGrain ? dataset.dailyMetrics.some((d) => isInRange(d.date, previousRange)) : dataset.orders.some((o) => isInRange(o.orderDate, previousRange)));
+  const prev = previousRange && previousCovered ? members(sliceDataset(dataset, { ...filter, range: previousRange }), dimension) : null;
   // Time dimensions do not repeat across periods — comparing member-to-member makes no sense.
   const timeDim = dimension === 'day' || dimension === 'week' || dimension === 'month';
 

@@ -95,6 +95,46 @@ export function orderHealth(dataset: CanonicalDataset, filter: DatasetFilter): O
   const returnReasons = new Map<string, number>();
   let withoutReason = 0;
 
+  // Summary reports: rates per day / platform from the daily rows (no statuses, no reasons).
+  if (slice.orders.length === 0 && slice.dailyMetrics.length > 0) {
+    let placed = 0;
+    let cancelled = 0;
+    let valid = 0;
+    let returned = 0;
+    for (const d of slice.dailyMetrics) {
+      const add = (row: RateRow) => {
+        row.placed += d.placedOrders ?? 0;
+        row.cancelled += d.cancelledOrders ?? 0;
+        row.valid += d.paidOrders ?? 0;
+        row.returned += d.refundedOrders ?? 0;
+      };
+      const day = byDate.get(d.date);
+      if (day) add(day);
+      let p = byPlatform.get(d.platform);
+      if (!p) byPlatform.set(d.platform, (p = newRate(d.platform)));
+      add(p);
+      placed += d.placedOrders ?? 0;
+      cancelled += d.cancelledOrders ?? 0;
+      valid += d.paidOrders ?? 0;
+      returned += d.refundedOrders ?? 0;
+    }
+    lifecycle.total = placed;
+    lifecycle.cancelled = cancelled;
+    lifecycle.refunded = returned;
+    return {
+      lifecycle,
+      cancelRate: placed > 0 ? cancelled / placed : null,
+      returnRate: valid > 0 ? returned / valid : null,
+      completionRate: null,
+      bySku: [],
+      byPlatform: finish(byPlatform),
+      byDate: finish(byDate),
+      cancelReasons: [],
+      returnReasons: [],
+      withoutReason: 0,
+    };
+  }
+
   const skusByOrder = new Map<string, Set<string>>();
   for (const l of slice.lines) {
     let set = skusByOrder.get(l.orderId);

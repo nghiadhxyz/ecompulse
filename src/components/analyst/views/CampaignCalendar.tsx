@@ -32,7 +32,7 @@ export const CampaignCalendar: React.FC = () => {
   const b = all.find((c) => c.campaignId === bId) ?? majors[majors.length - 1] ?? all[1];
   const cmp = useMemo(() => (a && b && a !== b ? compareCampaigns(dataset, a, b, baseFilter.platforms) : null), [dataset, a, b, baseFilter.platforms]);
 
-  if (dataset.orders.length === 0) {
+  if (dataset.orders.length === 0 && dataset.dailyMetrics.length === 0) {
     return (
       <Section title="Campaign & Calendar">
         <NotEnoughData lang={lang} reason={vi ? 'Cần file xuất đơn hàng để phân tích theo ngày.' : 'Needs an order export.'} />

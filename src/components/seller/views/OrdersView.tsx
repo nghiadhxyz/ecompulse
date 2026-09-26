@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { addDays, detectAlerts, fmtCount, fmtDay, fmtRate, formatRangeVi, orderHealth, PLATFORM_LABELS, type Platform, type RateRow } from '../../../analytics';
 import { useSeller } from '../SellerContext';
+import { DailyOrderHealthPanel } from '../../workspace/DailyOrderHealthPanel';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, SeverityBadge, tr } from '../ui';
 
 export const OrdersView: React.FC = () => {
@@ -13,6 +14,7 @@ export const OrdersView: React.FC = () => {
     [dataset, asOf, platforms],
   );
 
+  if (dataset.orders.length === 0 && dataset.dailyMetrics.length > 0) return <DailyOrderHealthPanel />;
   if (dataset.orders.length === 0) {
     return (
       <Section title={vi ? 'Đơn hàng' : 'Orders'}>

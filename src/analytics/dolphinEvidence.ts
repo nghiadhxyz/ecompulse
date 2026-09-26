@@ -14,6 +14,7 @@ import { productLeaders, productPerformance, applyShortcut } from './productEngi
 import { findOpportunities } from './anomalyScan';
 import { campaignCalendar, campaignResult, dayTypeOf, type CalendarEntry } from './campaignEngine';
 import { liveAudit, adsIntelligence } from './growthEngines';
+import { summaryProducts } from './summaryEngine';
 import { detectAlerts } from './anomalyEngine';
 import { breakdown } from './breakdownEngine';
 import { orderHealth } from './orderHealthEngine';
@@ -126,8 +127,14 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
   const periodEn = `${formatRangeVi(ctx.range)} vs ${formatRangeVi(ctx.previousRange)}`;
   const baseEv = { range: ctx.range, platforms: ctx.platforms };
 
-  if (dataset.orders.length === 0 && intent !== 'unknown') {
-    return noData(intent, question, { vi: 'Cần file xuất đơn hàng (cấp đơn) — báo cáo tổng hợp không đủ để phân tích câu hỏi này.', en: 'An order-level export is required.' });
+  // Summary reports (daily totals, channels, ads, live, top products) answer the overview,
+  // ads, live and best-product questions; the rest needs order-level rows.
+  const ORDER_ONLY: DolphinIntent[] = ['growing_skus', 'losing_products', 'campaign_cancel', 'cost_increase'];
+  if (dataset.orders.length === 0 && (ORDER_ONLY.includes(intent) || (dataset.dailyMetrics.length === 0 && intent !== 'unknown' && intent !== 'best_product'))) {
+    return noData(intent, question, {
+      vi: 'Câu hỏi này cần file xuất đơn hàng (từng đơn, có SKU và giá vốn) — báo cáo tổng hợp của sàn không có số liệu đó.',
+      en: 'This question needs an order-level export.',
+    });
   }
 
   switch (intent) {
@@ -140,13 +147,17 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
       const alerts = detectAlerts(dataset, { day: addDays(ctx.range.end, -1), platforms: ctx.platforms }).filter((a) => a.severity !== 'info');
       return answer(intent, question, {
         insight: {
-          vi: `${period}: GMV ${fmtMoneyCompact(m.gmv.current)} (${fmtChange(m.gmv.percentageDelta)}), lợi nhuận ước tính ${fmtMoneyCompact(m.profit.current)} (${fmtChange(m.profit.percentageDelta)}), ${m.orders.current} đơn (${fmtChange(m.orders.percentageDelta)}), tỷ lệ hủy ${fmtRate(m.cancelRate.current)} (${fmtPp(m.cancelRate.percentagePointDelta ?? null)}).`,
+          vi: `${period}: GMV ${fmtMoneyCompact(m.gmv.current)} (${fmtChange(m.gmv.percentageDelta)})${m.profit.current !== null ? `, lợi nhuận ước tính ${fmtMoneyCompact(m.profit.current)} (${fmtChange(m.profit.percentageDelta)})` : ''}, ${m.orders.current} đơn (${fmtChange(m.orders.percentageDelta)}), tỷ lệ hủy ${fmtRate(m.cancelRate.current)} (${fmtPp(m.cancelRate.percentagePointDelta ?? null)})${m.adSpend.current ? `, chi phí Ads ${fmtMoneyCompact(m.adSpend.current)} (ROAS ${fmtMultiple(m.roas.current)})` : ''}.${m.profit.current === null ? ' Chưa tính được lợi nhuận (cần file đơn hàng và giá vốn).' : ''}`,
           en: `${periodEn}: GMV ${fmtMoneyCompact(m.gmv.current, 'en')} (${fmtChange(m.gmv.percentageDelta, 'en')}), profit ${fmtMoneyCompact(m.profit.current, 'en')}, ${m.orders.current} orders.`,
         },
         evidence: [
           { label: { vi: 'GMV', en: 'GMV' }, unit: 'vnd', current: m.gmv.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.gmv.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' }, filter: baseEv },
-          { label: { vi: 'Lợi nhuận ước tính', en: 'Est. profit' }, unit: 'vnd', current: m.profit.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.profit.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } },
-          { label: { vi: 'Margin', en: 'Margin' }, unit: 'ratio', current: m.margin.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.margin.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } },
+          ...(m.profit.current !== null
+            ? [
+                { label: { vi: 'Lợi nhuận ước tính', en: 'Est. profit' }, unit: 'vnd' as const, current: m.profit.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.profit.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } },
+                { label: { vi: 'Margin', en: 'Margin' }, unit: 'ratio' as const, current: m.margin.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.margin.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } },
+              ]
+            : [{ label: { vi: 'Số đơn', en: 'Orders' }, unit: 'count' as const, current: m.orders.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.orders.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } }]),
           { label: { vi: 'Tỷ lệ hủy', en: 'Cancel rate' }, unit: 'ratio', current: m.cancelRate.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.cancelRate.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' }, filter: { ...baseEv, cancelledOnly: true } },
         ],
         interpretation: top
@@ -232,6 +243,24 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
     }
 
     case 'best_product': {
+      if (dataset.orders.length === 0) {
+        const sp = summaryProducts(dataset, filter);
+        if (!sp.available) return noData(intent, question, sp.notes[0] ?? { vi: 'Chưa có số liệu sản phẩm.', en: 'No product data.' });
+        const by = (f: (r: (typeof sp.rows)[number]) => number | null) => [...sp.rows].filter((r) => f(r) !== null).sort((a, b) => (f(b) ?? 0) - (f(a) ?? 0))[0];
+        const top = by((r) => r.gmv);
+        const units = by((r) => r.units);
+        const cvr = by((r) => ((r.clicks ?? 0) >= 100 ? r.cvr : null));
+        return answer(intent, question, {
+          insight: { vi: `"Tốt nhất" tùy tiêu chí — theo báo cáo Shopee ${sp.period ? formatRangeVi(sp.period) : ''}:`, en: '"Best" depends on the criterion:' },
+          evidence: [
+            { label: { vi: `Doanh số cao nhất: ${top?.name ?? '—'}`, en: `Top sales: ${top?.name ?? '—'}` }, unit: 'vnd' as const, current: top?.gmv ?? null, currentLabel: { vi: 'Doanh số (đơn đã đặt)', en: 'Placed sales' } },
+            { label: { vi: `Bán nhiều nhất: ${units?.name ?? '—'}`, en: `Most units: ${units?.name ?? '—'}` }, unit: 'count' as const, current: units?.units ?? null, currentLabel: { vi: 'Sản phẩm bán ra', en: 'Units' } },
+            { label: { vi: `Chuyển đổi cao nhất (từ 100 lượt nhấp): ${cvr?.name ?? '—'}`, en: `Best conversion: ${cvr?.name ?? '—'}` }, unit: 'ratio' as const, current: cvr?.cvr ?? null, currentLabel: { vi: 'Đơn / lượt nhấp', en: 'Orders / clicks' } },
+          ],
+          interpretation: { vi: `${sp.notes[0]?.vi ?? ''} Chưa xếp hạng được theo lợi nhuận vì chưa có giá vốn theo đơn.`, en: 'Profit ranking needs an order export.' },
+          nextChecks: [{ vi: 'Nhập file xuất đơn hàng và giá vốn để biết sản phẩm nào lời nhất.', en: 'Import orders and COGS to rank by profit.' }],
+        });
+      }
       const leaders = productLeaders(productPerformance(dataset, filter, ctx.previousRange));
       const items: [string, string, string | undefined, string][] = [
         ['Bán nhiều nhất', 'Most units', leaders.bestSelling?.name, leaders.bestSelling ? `${leaders.bestSelling.units} sp` : ''],
@@ -300,7 +329,15 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
     case 'live_conversion': {
       const la = liveAudit(dataset, filter);
       const rows = la.sessions.filter((r) => r.conversion !== null && (r.session.viewers ?? 0) >= 200).sort((a, b) => (a.conversion ?? 0) - (b.conversion ?? 0));
-      if (rows.length === 0) return noData(intent, question, { vi: 'Chưa có dữ liệu phiên live (người xem và đơn) trong khoảng này.', en: 'No live session data.' });
+      if (rows.length === 0) {
+        return noData(
+          intent,
+          question,
+          la.sessions.length > 0
+            ? { vi: `Có ${la.sessions.length} phiên live nhưng phiên nào cũng dưới 200 người xem — quá ít để so tỷ lệ chuyển đổi. Xem chi tiết ở mục Livestream.`, en: 'Sessions have too few viewers to compare conversion.' }
+            : { vi: 'Chưa có dữ liệu phiên live (người xem và đơn) trong khoảng này.', en: 'No live session data.' },
+        );
+      }
       const avg = rows.reduce((s, r) => s + (r.session.orders ?? 0), 0) / rows.reduce((s, r) => s + (r.session.viewers ?? 0), 0);
       const low = rows.slice(0, 3);
       return answer(intent, question, {
@@ -351,10 +388,17 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
       if (!ai.available || ai.campaigns.length === 0) return noData(intent, question, { vi: 'Chưa có dữ liệu quảng cáo trong khoảng này.', en: 'No ads data.' });
       const bad = ai.campaigns.filter((c) => c.efficiency === 'below_break_even');
       return answer(intent, question, {
-        insight: { vi: `Chi phí Ads ${fmtMoneyCompact(ai.totals.spend)}, ROAS ${fmtMultiple(ai.totals.roas)}${ai.totals.breakEvenRoas !== null ? ` (hòa vốn ${fmtMultiple(ai.totals.breakEvenRoas)})` : ''}. ${bad.length} chiến dịch dưới hòa vốn, chiếm ${fmtRate(ai.totals.spend ? ai.spendBelowBreakEven / ai.totals.spend : null, 'vi', 0)} ngân sách.`, en: `Ad spend ${fmtMoneyCompact(ai.totals.spend, 'en')}, ${bad.length} campaigns below break-even.` },
+        insight: {
+          vi: `Chi phí Ads ${fmtMoneyCompact(ai.totals.spend)}, doanh thu từ Ads ${fmtMoneyCompact(ai.totals.attributedRevenue)}, ROAS ${fmtMultiple(ai.totals.roas)}${ai.totals.breakEvenRoas !== null ? ` (hòa vốn ${fmtMultiple(ai.totals.breakEvenRoas)})` : ''}. ${
+            ai.campaigns.some((c) => c.breakEvenRoas !== null)
+              ? `${bad.length} chiến dịch dưới hòa vốn, chiếm ${fmtRate(ai.totals.spend ? ai.spendBelowBreakEven / ai.totals.spend : null, 'vi', 0)} ngân sách.`
+              : 'Chưa biết chiến dịch nào có lời vì chưa có giá vốn để tính ROAS hòa vốn.'
+          }`, en: `Ad spend ${fmtMoneyCompact(ai.totals.spend, 'en')}, ${bad.length} campaigns below break-even.` },
         evidence: ai.campaigns.slice(0, 4).map((c) => ({ label: { vi: c.name, en: c.name }, unit: 'multiple' as const, current: c.roas, currentLabel: { vi: 'ROAS', en: 'ROAS' }, baseline: c.breakEvenRoas, baselineLabel: { vi: 'ROAS hòa vốn', en: 'Break-even' }, filter: { ...baseEv, campaignId: c.key.split('|')[1] } })),
         interpretation: { vi: 'ROAS cao chưa chắc có lời — chỉ chiến dịch có ROAS trên mức hòa vốn của SKU mới tạo lợi nhuận sau Ads.', en: 'ROAS only matters against break-even.' },
-        nextChecks: bad.slice(0, 2).map((c) => ({ vi: `Kiểm tra giá thầu và ngân sách "${c.name}".`, en: `Check bids and budget of "${c.name}".` })),
+        nextChecks: ai.campaigns.some((c) => c.breakEvenRoas !== null)
+          ? bad.slice(0, 2).map((c) => ({ vi: `Kiểm tra giá thầu và ngân sách "${c.name}".`, en: `Check bids and budget of "${c.name}".` }))
+          : [{ vi: 'Nhập giá vốn (và file đơn hàng) để tính ROAS hòa vốn — khi đó mới biết Ads có lời không.', en: 'Enter COGS to compute break-even ROAS.' }],
       });
     }
 

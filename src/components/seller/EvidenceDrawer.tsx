@@ -86,7 +86,15 @@ export const EvidenceDrawer: React.FC<{ dataset: CanonicalDataset; request: Evid
         </div>
 
         {data.total === 0 ? (
-          <p className="text-sm text-slate-400 mt-2">{vi ? 'Không có đơn hàng nào khớp bộ lọc này.' : 'No orders match this filter.'}</p>
+          <p className="text-sm text-slate-400 mt-2">
+            {dataset.orders.length === 0
+              ? vi
+                ? 'Dữ liệu hiện tại là báo cáo tổng hợp của sàn — không có danh sách từng đơn để đối chiếu. Các con số ở trên lấy trực tiếp từ báo cáo. Nhập file xuất đơn hàng để xem từng đơn.'
+                : 'The current data is a platform summary report — there is no order list. Import an order export to see orders.'
+              : vi
+                ? 'Không có đơn hàng nào khớp bộ lọc này.'
+                : 'No orders match this filter.'}
+          </p>
         ) : (
           <div className="mt-2 overflow-x-auto rounded-xl border border-white/10">
             <table className="w-full text-xs">

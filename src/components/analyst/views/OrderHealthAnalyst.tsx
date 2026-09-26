@@ -15,6 +15,7 @@ import {
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, KpiCard, NotEnoughData, Section, tr } from '../../seller/ui';
+import { DailyOrderHealthPanel } from '../../workspace/DailyOrderHealthPanel';
 import { BreakdownTable } from '../ui';
 
 const DIMS: BreakdownDimension[] = ['platform', 'category', 'subcategory', 'sku', 'combo', 'campaign', 'liveSession', 'channel'];
@@ -52,6 +53,7 @@ export const OrderHealthAnalyst: React.FC = () => {
   const health = useMemo(() => (focusFilter ? orderHealth(dataset, focusFilter) : null), [dataset, focusFilter]);
   const prevHealth = useMemo(() => (focusFilter ? orderHealth(dataset, { ...focusFilter, range: previousRange }) : null), [dataset, focusFilter, previousRange]);
 
+  if (dataset.orders.length === 0 && dataset.dailyMetrics.length > 0) return <DailyOrderHealthPanel />;
   if (dataset.orders.length === 0) {
     return (
       <Section title={vi ? 'Sức khỏe đơn hàng' : 'Order health'}>

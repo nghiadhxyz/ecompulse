@@ -99,7 +99,10 @@ export function beforeAfter(
   windows: number[] = [7, 14, 30],
 ): { windows: ImpactWindow[]; unavailable?: Bilingual } {
   const bounds = datasetDateBounds(dataset);
-  if (!bounds || dataset.orders.length === 0) return { windows: [], unavailable: { vi: 'Cần file xuất đơn hàng để so sánh trước/sau.', en: 'An order export is required.' } };
+  if (!bounds || (dataset.orders.length === 0 && dataset.dailyMetrics.length === 0)) return { windows: [], unavailable: { vi: 'Cần dữ liệu doanh thu theo ngày hoặc file xuất đơn hàng để so sánh trước/sau.', en: 'Daily sales or an order export is required.' } };
+  if (dataset.orders.length === 0 && scope.skus?.length) {
+    return { windows: [], unavailable: { vi: 'Báo cáo tổng hợp không có số theo ngày của từng sản phẩm — so sánh trước/sau cho SKU cần file xuất đơn hàng. Chọn "Toàn shop" để so sánh tổng.', en: 'Per-SKU before/after needs an order export.' } };
+  }
   if (date > bounds.end) return { windows: [], unavailable: { vi: 'Chưa có dữ liệu sau ngày thay đổi.', en: 'No data after the change date yet.' } };
   if (date <= bounds.start) return { windows: [], unavailable: { vi: 'Chưa có dữ liệu trước ngày thay đổi để so sánh.', en: 'No data before the change date.' } };
 

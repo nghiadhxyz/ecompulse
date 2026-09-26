@@ -69,7 +69,7 @@ export function campaignCalendar(dataset: CanonicalDataset, within?: DateRange):
 }
 
 function dataRange(dataset: CanonicalDataset): DateRange | null {
-  const dates = dataset.orders.map((o) => o.orderDate);
+  const dates = dataset.orders.length ? dataset.orders.map((o) => o.orderDate) : dataset.dailyMetrics.map((d) => d.date);
   if (dates.length === 0) return null;
   dates.sort();
   return { start: dates[0], end: dates[dates.length - 1] };

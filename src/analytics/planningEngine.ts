@@ -14,7 +14,7 @@
  * of a finished action is a before/after comparison of its metric in its scope.
  */
 import type { CanonicalDataset, Platform } from './model';
-import type { DatasetFilter, } from './filters';
+import { datasetDateBounds, type DatasetFilter } from './filters';
 import type { EvidenceFilter } from './evidence';
 import { breakdown } from './breakdownEngine';
 import { campaignCalendar, dayTypeOf, DAY_TYPE_LABELS, type DayType } from './campaignEngine';
@@ -124,8 +124,7 @@ export function planProgress(dataset: CanonicalDataset, plan: MonthlyPlan, platf
 
   const actualRows = breakdown(dataset, { range, platforms }, 'day').rows;
   const actualBy = new Map(actualRows.map((r) => [r.key, r.current.gmv]));
-  const orderDates = dataset.orders.map((o) => o.orderDate).filter((d) => d <= range.end);
-  const dataEnd = orderDates.length ? orderDates.reduce((m, d) => (d > m ? d : m)) : null;
+  const dataEnd = datasetDateBounds(dataset)?.end ?? null;
   const lastDataDay = dataEnd && dataEnd >= range.start ? (dataEnd > range.end ? range.end : dataEnd) : null;
 
   let cumT = 0;

@@ -228,3 +228,11 @@ Nguyên tắc:
 - Importer đơn hàng dựng theo định dạng công khai của sàn — cần chỉnh khi có file thật của TikTok/Lazada.
 - `server.ts` và `api/index.ts` vẫn là hai bản route song song (đã thêm cùng route mới); câu trả lời "fallback" mẫu của server không còn được hiển thị ở client nhưng vẫn nằm trong code server.
 - Tải lại trang luôn về trang giới thiệu (hành vi có sẵn); dữ liệu, kế hoạch và hành động vẫn được giữ.
+
+
+### Bổ sung — Báo cáo "Phân tích bán hàng" Shopee (file thật, 2026-09-26)
+- [x] Đọc đủ 21/21 sheet: kênh & nguồn truy cập (cả kỳ + theo ngày), chi phí Shopee Ads theo ngày, sản phẩm đứng đầu, live, video, affiliate
+- [x] Dữ liệu tổng hợp theo ngày dùng được cho: phân tách theo ngày/tuần/tháng/sàn, Sức khỏe đơn hàng (tỷ lệ hủy/hoàn theo ngày), Anomaly, Campaign & Calendar, Monthly Planning, Change Impact (toàn shop), Thống kê nâng cao, Dolphin (tổng quan, Ads, sản phẩm tốt nhất)
+- [x] Sửa lỗi: Thống kê nâng cao tính GMV/ngày = 0 khi thiếu dữ liệu (nay báo "Chưa đủ mẫu")
+- [x] "Xem dữ liệu" giải thích khi báo cáo tổng hợp không có danh sách đơn
+- Vẫn cần file đơn hàng: lợi nhuận, Root Cause theo SKU, lý do hủy, khách hàng/RFM, What-If, câu hỏi SKU tăng trưởng/lỗ/chi phí
