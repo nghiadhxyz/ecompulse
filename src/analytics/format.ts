@@ -85,3 +85,9 @@ export function fmtMetric(m: MetricResult, lang: Lang = 'vi', compact = true): s
 export function fmtDay(iso: string): string {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 }
+
+/** Date label for a live session: its day, or the report period when the report has no date. */
+export function sessionDateLabel(s: { date: string; periodStart?: string; startTime?: string }, lang: Lang = 'vi'): string {
+  if (s.periodStart) return `${fmtDay(s.periodStart)}–${fmtDay(s.date)} (${lang === 'vi' ? 'cả kỳ, không rõ ngày' : 'period, no date'})`;
+  return `${fmtDay(s.date)}${s.startTime ? ` ${s.startTime}` : ''}`;
+}

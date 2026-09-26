@@ -17,6 +17,7 @@ import {
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { NotEnoughData, Section, tr } from '../../seller/ui';
+import { SummaryChannelsPanel } from '../../workspace/SummaryPanels';
 import { Th } from '../ui';
 
 type Segment = 'platform' | 'category' | 'sku';
@@ -84,6 +85,7 @@ export const TrafficFunnel: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <SummaryChannelsPanel title={vi ? 'Doanh thu theo kênh & nguồn truy cập' : 'Revenue by channel & source'} />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Section title={vi ? 'Phễu chuyển đổi' : 'Conversion funnel'} subtitle={`${formatRangeVi(range)} · ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}>
           {noTraffic && (

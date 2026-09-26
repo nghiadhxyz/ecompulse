@@ -13,6 +13,7 @@ import {
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { NotEnoughData, Section, tr } from '../../seller/ui';
+import { SummaryProductsPanel } from '../../workspace/SummaryPanels';
 import { ChangeCell, Th } from '../ui';
 import { Product360Panel } from '../Product360Panel';
 
@@ -34,6 +35,9 @@ export const ProductsCombo: React.FC = () => {
   const pi = useMemo(() => productIntelligence(dataset, baseFilter, previousRange), [dataset, baseFilter, previousRange]);
   const combos = useMemo(() => comboAnalytics(dataset, baseFilter, previousRange), [dataset, baseFilter, previousRange]);
 
+  if (dataset.orders.length === 0 && dataset.salesSummaries?.some((r) => r.dimension === 'sku')) {
+    return <SummaryProductsPanel />;
+  }
   if (dataset.orders.length === 0) {
     return (
       <Section title={vi ? 'Sản phẩm & Combo' : 'Products & Combo'}>

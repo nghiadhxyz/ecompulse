@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { compareSessions, fmtCount, fmtDay, fmtMoneyCompact, fmtRate, formatRangeVi, liveAudit, PLATFORM_LABELS, type LiveGroupStats, type LiveSessionRow } from '../../../analytics';
+import { sessionDateLabel, compareSessions, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi, liveAudit, PLATFORM_LABELS, type LiveGroupStats, type LiveSessionRow } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { ChangeCell, Th } from '../ui';
 import { FunnelView } from './TrafficFunnel';
 
-const label = (r: LiveSessionRow) => `${fmtDay(r.session.date)}${r.session.startTime ? ` ${r.session.startTime}` : ''} · ${PLATFORM_LABELS[r.session.platform]}`;
+const label = (r: LiveSessionRow) => `${sessionDateLabel(r.session)} · ${PLATFORM_LABELS[r.session.platform]}`;
 
 export const LiveAuditor: React.FC = () => {
   const { lang, dataset, baseFilter, range, openEvidence, goTo } = useWorkspace();
@@ -130,7 +130,7 @@ export const LiveAuditor: React.FC = () => {
                   <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.estimatedProfit, lang)}{r.estimatedProfit !== null && !r.profitComplete && <span className="text-[#fab219]">*</span>}</td>
                   <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.profitPerHour, lang)}</td>
                   <td className="px-2.5 py-1.5 text-right">
-                    <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `Live ${label(r)}`, filter: { range: { start: r.session.date, end: r.session.date }, liveSessionId: r.session.sessionId } })} />
+                    <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `Live ${label(r)}`, filter: { range: { start: r.session.periodStart ?? r.session.date, end: r.session.date }, liveSessionId: r.session.sessionId } })} />
                   </td>
                 </tr>
               ))}

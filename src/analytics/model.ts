@@ -135,7 +135,10 @@ export interface AdPerformance {
 export interface LiveSession {
   sessionId: string;
   platform: Platform;
+  /** Day of the session, or the last day of the report period (see periodStart). */
   date: string;
+  /** Set when the report only gives the session's totals for a period, without its date. */
+  periodStart?: string;
   /** Local start time "HH:MM" when the report has it. */
   startTime?: string;
   title?: string;
@@ -201,6 +204,39 @@ export interface DailyMetric {
   newBuyers?: number;
   visits?: number;
   productClicks?: number;
+}
+
+/** Order stage a summary report counts: placed, confirmed, or paid orders. */
+export type SummaryStage = 'placed' | 'confirmed' | 'paid';
+
+export type SummaryChannel = 'product_card' | 'live' | 'video' | 'affiliate' | 'ads';
+
+/**
+ * Pre-aggregated sales from platform summary reports (e.g. Shopee "Phân tích bán hàng"):
+ * revenue by channel, by traffic source inside a channel, or by product. Used when there
+ * are no order-level rows. Ads rows overlap the other channels (an ad click still lands on
+ * a product card), so they are never added to the channel total.
+ */
+export interface SalesSummaryRow {
+  platform: Platform;
+  /** Day of the row, or the last day of a period total (see periodStart). */
+  date: string;
+  periodStart?: string;
+  stage: SummaryStage;
+  dimension: 'channel' | 'source' | 'sku';
+  channel: SummaryChannel;
+  /** Channel key, source name, or SKU / product ID. */
+  key: string;
+  label?: string;
+  gmv?: number;
+  /** Platform-attributed orders — can be fractional when an order is shared by sources. */
+  orders?: number;
+  units?: number;
+  buyers?: number;
+  impressions?: number;
+  clicks?: number;
+  /** Live / video / content views. */
+  views?: number;
 }
 
 export type CostType = 'packaging' | 'staff' | 'rent' | 'tools' | 'shipping' | 'marketing' | 'other';
@@ -279,6 +315,8 @@ export interface CanonicalDataset {
   costs: Cost[];
   settlements: Settlement[];
   changeEvents: ChangeEvent[];
+  /** Summary-report sales by channel / source / product (optional). */
+  salesSummaries?: SalesSummaryRow[];
   costSettings?: CostSettings;
   /** Field names the source reported only as estimates; engines treat them as missing. */
   estimatedFields?: string[];

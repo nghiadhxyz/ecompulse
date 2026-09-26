@@ -1,3 +1,4 @@
+import type { SheetReadInfo } from '../../../analytics/importers/shopeeSalesAnalysis';
 import React, { useRef, useState } from 'react';
 import { UploadCloud, FileSpreadsheet, X, Loader2, ShieldCheck, Trash2, PlayCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { formatRangeVi, PLATFORM_LABELS, REPORT_KIND_LABELS, type CanonicalDataset, type Lang } from '../../../analytics';
@@ -7,7 +8,7 @@ import { GhostButton, PrimaryButton, Section } from '../ui';
 
 export interface ImportLogEntry {
   fileName: string;
-  outcome: ImportOutcome | { type: 'cancelled' } | { type: 'legacy_summary'; ok: boolean; message?: string };
+  outcome: ImportOutcome | { type: 'cancelled' } | { type: 'legacy_summary'; ok: boolean; message?: string; sheets?: SheetReadInfo[]; period?: { start: string; end: string } | null };
 }
 
 interface DataViewProps {
@@ -177,6 +178,19 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
   );
 };
 
+const SHEET_KIND_LABELS: Record<SheetReadInfo['kind'], { vi: string; en: string }> = {
+  daily_shop: { vi: 'số liệu shop theo ngày', en: 'daily shop totals' },
+  sources_period: { vi: 'doanh thu theo kênh & nguồn (cả kỳ) + chi phí Ads', en: 'channels & sources (period) + ad spend' },
+  sources_daily: { vi: 'kênh & nguồn theo ngày + Ads theo ngày', en: 'channels & sources by day + daily ads' },
+  products: { vi: 'sản phẩm đứng đầu mỗi kênh', en: 'top products per channel' },
+  live: { vi: 'phiên livestream', en: 'live sessions' },
+  video: { vi: 'video của shop', en: 'shop videos' },
+  affiliate: { vi: 'đối tác affiliate', en: 'affiliates' },
+  skipped: { vi: 'chưa nhận dạng', en: 'not recognised' },
+};
+
+const STAGE_LABELS = { placed: { vi: 'đơn đã đặt', en: 'placed' }, confirmed: { vi: 'đơn đã xác nhận', en: 'confirmed' }, paid: { vi: 'đơn đã thanh toán', en: 'paid' } };
+
 const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ entry, lang }) => {
   const vi = lang === 'vi';
   const o = entry.outcome;
@@ -192,9 +206,44 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
     );
   }
   if (o.type === 'legacy_summary') {
+    if (!o.ok) {
+      return (
+        <li className="rounded-lg border border-[#d03b3b]/40 px-3 py-2 text-xs text-rose-100">
+          <b>{entry.fileName}</b>: {o.message}
+        </li>
+      );
+    }
+    const read = (o.sheets ?? []).filter((x) => x.kind !== 'skipped');
+    const skipped = (o.sheets ?? []).filter((x) => x.kind === 'skipped');
     return (
-      <li className={`rounded-lg border px-3 py-2 text-xs ${o.ok ? 'border-white/10 text-slate-300' : 'border-[#d03b3b]/40 text-rose-100'}`}>
-        <b>{entry.fileName}</b>: {o.ok ? (vi ? 'Đã nhập báo cáo tổng hợp Shopee (số liệu theo ngày, không có chi tiết đơn).' : 'Imported Shopee summary report (daily totals only).') : o.message}
+      <li className="rounded-lg border border-[#0ca30c]/30 bg-[#0ca30c]/[0.06] px-3 py-2.5 text-xs text-slate-200">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#4ade80]" aria-hidden />
+          <b className="text-white">{entry.fileName}</b>
+          <span>· {vi ? 'Shopee · Phân tích bán hàng' : 'Shopee · Sales analysis'}</span>
+          {o.period && <span>· {formatRangeVi(o.period)}</span>}
+          {o.sheets && <span>· {vi ? `đọc ${read.length}/${o.sheets.length} sheet` : `${read.length}/${o.sheets.length} sheets read`}</span>}
+        </div>
+        <p className="text-slate-400 mt-1">
+          {vi
+            ? 'Báo cáo tổng hợp: có số theo ngày, theo kênh/nguồn, Ads, sản phẩm đứng đầu, live, video, affiliate — không có chi tiết từng đơn nên chưa tính được lợi nhuận theo đơn.'
+            : 'Summary report: daily, channel/source, ads, top products, live, video, affiliate — no order lines, so no per-order profit.'}
+        </p>
+        {o.sheets && (
+          <details className="mt-1.5">
+            <summary className="cursor-pointer text-sky-300">{vi ? 'Xem từng sheet' : 'Sheets'}</summary>
+            <ul className="mt-1 space-y-0.5 text-slate-400">
+              {o.sheets.map((x, i) => (
+                <li key={i}>
+                  {x.kind === 'skipped' ? '○' : '✓'} <span className="text-slate-300">{x.name}</span> — {SHEET_KIND_LABELS[x.kind][lang]}
+                  {x.stage ? ` · ${STAGE_LABELS[x.stage][lang]}` : ''}
+                  {x.kind !== 'skipped' ? ` · ${x.rows.toLocaleString('vi-VN')} ${vi ? 'dòng' : 'rows'}` : ''}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        {skipped.length > 0 && <p className="text-[#fab219] mt-1">{vi ? `${skipped.length} sheet chưa nhận dạng được.` : `${skipped.length} sheets not recognised.`}</p>}
       </li>
     );
   }

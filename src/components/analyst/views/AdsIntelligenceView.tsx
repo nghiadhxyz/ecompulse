@@ -58,7 +58,7 @@ export const AdsIntelligenceView: React.FC = () => {
     { l: 'ROAS', v: fmtMultiple(t.roas, lang) },
     { l: vi ? 'ROAS hòa vốn (shop)' : 'Break-even ROAS', v: fmtMultiple(t.breakEvenRoas, lang) },
     { l: vi ? 'Lời sau Ads (ước tính)' : 'Profit after ads', v: t.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(t.estimatedProfitAfterAds, lang), bad: (t.estimatedProfitAfterAds ?? 0) < 0 },
-    { l: vi ? 'Ngân sách dưới hòa vốn' : 'Spend below break-even', v: `${fmtMoneyCompact(ai.spendBelowBreakEven, lang)} (${fmtRate(t.spend ? ai.spendBelowBreakEven / t.spend : null, lang, 0)})`, bad: ai.spendBelowBreakEven > 0 },
+    { l: vi ? 'Ngân sách dưới hòa vốn' : 'Spend below break-even', v: ai.campaigns.some((c) => c.breakEvenRoas !== null) ? `${fmtMoneyCompact(ai.spendBelowBreakEven, lang)} (${fmtRate(t.spend ? ai.spendBelowBreakEven / t.spend : null, lang, 0)})` : '—', bad: ai.spendBelowBreakEven > 0 },
   ];
 
   return (

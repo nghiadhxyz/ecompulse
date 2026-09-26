@@ -18,7 +18,7 @@ import { detectAlerts } from './anomalyEngine';
 import { breakdown } from './breakdownEngine';
 import { orderHealth } from './orderHealthEngine';
 import { addDays, enumerateDays, formatRangeVi, type DateRange } from './period';
-import { fmtByUnit, fmtChange, fmtDay, fmtMoneyCompact, fmtMultiple, fmtPp, fmtRate } from './format';
+import { fmtByUnit, fmtChange, fmtDay, fmtMoneyCompact, fmtMultiple, fmtPp, fmtRate, sessionDateLabel } from './format';
 import type { Bilingual } from './metric';
 import type { Evidence } from './evidence';
 
@@ -304,15 +304,15 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
       const avg = rows.reduce((s, r) => s + (r.session.orders ?? 0), 0) / rows.reduce((s, r) => s + (r.session.viewers ?? 0), 0);
       const low = rows.slice(0, 3);
       return answer(intent, question, {
-        insight: { vi: `Các phiên live chuyển đổi thấp nhất (đơn/người xem): ${low.map((r) => `${fmtDay(r.session.date)} ${r.session.startTime ?? ''} (${fmtRate(r.conversion, 'vi', 2)})`).join(', ')} — trung bình ${fmtRate(avg, 'vi', 2)}.`, en: `Lowest-converting sessions: ${low.map((r) => fmtDay(r.session.date)).join(', ')}.` },
+        insight: { vi: `Các phiên live chuyển đổi thấp nhất (đơn/người xem): ${low.map((r) => `${sessionDateLabel(r.session)} (${fmtRate(r.conversion, 'vi', 2)})`).join(', ')} — trung bình ${fmtRate(avg, 'vi', 2)}.`, en: `Lowest-converting sessions: ${low.map((r) => fmtDay(r.session.date)).join(', ')}.` },
         evidence: low.map((r) => ({
-          label: { vi: `Live ${fmtDay(r.session.date)}${r.session.startTime ? ` ${r.session.startTime}` : ''}`, en: `Live ${fmtDay(r.session.date)}` },
+          label: { vi: `Live ${sessionDateLabel(r.session)}`, en: `Live ${sessionDateLabel(r.session, 'en')}` },
           unit: 'ratio' as const,
           current: r.conversion,
           currentLabel: { vi: `${r.session.orders} đơn / ${r.session.viewers} người xem`, en: `${r.session.orders} / ${r.session.viewers}` },
           baseline: avg,
           baselineLabel: { vi: 'Trung bình các phiên', en: 'Average' },
-          filter: { range: { start: r.session.date, end: r.session.date }, liveSessionId: r.session.sessionId },
+          filter: { range: { start: r.session.periodStart ?? r.session.date, end: r.session.date }, liveSessionId: r.session.sessionId },
         })),
         interpretation: low.some((r) => r.viewersUpOrdersDown)
           ? { vi: 'Có phiên người xem tăng nhưng đơn giảm so với phiên trước — lượng người xem không đi cùng khả năng chốt đơn.', en: 'Some sessions had more viewers but fewer orders.' }

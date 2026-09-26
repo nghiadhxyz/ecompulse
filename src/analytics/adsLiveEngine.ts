@@ -169,7 +169,8 @@ export function liveSessions(dataset: CanonicalDataset, filter: DatasetFilter): 
     .map((s) => {
       const list = byPlatform.get(s.platform) || [];
       const idx = list.findIndex((x) => x.sessionId === s.sessionId);
-      const previous = idx > 0 ? list[idx - 1] : undefined;
+      // Period-total sessions have no real date, so "previous session" is undefined.
+      const previous = idx > 0 && !s.periodStart && !list[idx - 1].periodStart ? list[idx - 1] : undefined;
       const hours = s.durationMinutes ? s.durationMinutes / 60 : null;
       const p = profits.get(s.sessionId);
       const profit = p && p.profit.value !== null ? p.profit.value : null;

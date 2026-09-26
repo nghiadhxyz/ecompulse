@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 .vercel
+
+# Real sample exports (may contain customer data) — never commit
+samples/

@@ -5,6 +5,7 @@ import {
   fmtChange,
   fmtCount,
   fmtDay,
+  sessionDateLabel,
   fmtMoneyCompact,
   fmtMultiple,
   fmtRate,
@@ -138,11 +139,11 @@ export const AdsLiveView: React.FC = () => {
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-white flex items-center gap-1.5">
                         <Radio className="w-3.5 h-3.5 text-rose-300" aria-hidden />
-                        {fmtDay(s.date)} · {PLATFORM_LABELS[s.platform]}
+                        {sessionDateLabel(s, lang)} · {PLATFORM_LABELS[s.platform]}
                       </div>
                       <div className="text-[11px] text-slate-400 truncate">{s.title}{r.durationHours ? ` · ${r.durationHours.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 1 })}h` : ''}</div>
                     </div>
-                    <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `Live ${fmtDay(s.date)} · ${PLATFORM_LABELS[s.platform]}`, filter: { range: { start: s.date, end: s.date }, liveSessionId: s.sessionId } })} />
+                    <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `Live ${sessionDateLabel(s, lang)} · ${PLATFORM_LABELS[s.platform]}`, filter: { range: { start: s.periodStart ?? s.date, end: s.date }, liveSessionId: s.sessionId } })} />
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mt-2 text-xs">
                     {[

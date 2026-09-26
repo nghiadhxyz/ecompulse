@@ -15,6 +15,7 @@ import {
 } from '../../../analytics';
 import { useSeller } from '../SellerContext';
 import { NotEnoughData, Section, GhostButton, tr } from '../ui';
+import { SummaryProductsPanel } from '../../workspace/SummaryPanels';
 
 const SHORTCUTS: (ProductShortcut | 'all')[] = ['all', 'bestSelling', 'topRevenue', 'topProfit', 'highMargin', 'growing', 'declining', 'losing', 'highCancel'];
 
@@ -26,6 +27,17 @@ export const ProductsView: React.FC = () => {
   const perf = useMemo(() => productPerformance(dataset, { range, platforms }, previousRange), [dataset, range, platforms, previousRange]);
   const leaders = useMemo(() => productLeaders(perf), [perf]);
 
+  if (dataset.orders.length === 0 && dataset.salesSummaries?.some((r) => r.dimension === 'sku')) {
+    return (
+      <div className="space-y-4">
+        <SummaryProductsPanel />
+        <p className="text-xs text-slate-400">
+          {vi ? 'Muốn xem lời/lỗ và bộ lọc theo từng sản phẩm, hãy nhập thêm file xuất đơn hàng (Đơn hàng → Xuất).' : 'Import an order export for per-product profit.'}{' '}
+          <button onClick={() => goTo('data')} className="underline text-sky-300">{vi ? 'Nhập file đơn hàng' : 'Import orders'}</button>
+        </p>
+      </div>
+    );
+  }
   if (dataset.orders.length === 0) {
     return (
       <Section title={vi ? 'Sản phẩm' : 'Products'}>

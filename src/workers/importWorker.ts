@@ -6,6 +6,7 @@
 import * as XLSX from 'xlsx';
 import { detectReport, importOrderExport, type SheetInput } from '../analytics/importers/orderExport';
 import { detectTableReport, importTableReport } from '../analytics/importers/reportImporters';
+import { importShopeeSalesAnalysis } from '../analytics/importers/shopeeSalesAnalysis';
 
 export type ImportWorkerRequest = { file: File };
 
@@ -13,7 +14,7 @@ export type ImportWorkerMessage =
   | { type: 'progress'; stage: 'reading' | 'parsing' | 'mapping'; fraction: number }
   | { type: 'orders'; result: ReturnType<typeof importOrderExport> }
   | { type: 'report'; result: ReturnType<typeof importTableReport> }
-  | { type: 'shopee_summary' }
+  | { type: 'shopee_summary'; extra: ReturnType<typeof importShopeeSalesAnalysis> }
   | { type: 'error'; message: { vi: string; en: string } };
 
 // Minimal worker scope typing (the project compiles against DOM, not the webworker lib).
@@ -54,7 +55,10 @@ ctx.onmessage = async (e: MessageEvent<ImportWorkerRequest>) => {
       );
       post({ type: 'orders', result });
     } else if (detected.kind === 'shopee_summary') {
-      post({ type: 'shopee_summary' });
+      // Daily shop sheets go through the classic parser (main thread); every other sheet
+      // (channels, sources, ads, products, live, video, affiliate) is read here.
+      post({ type: 'progress', stage: 'mapping', fraction: 0.6 });
+      post({ type: 'shopee_summary', extra: importShopeeSalesAnalysis({ fileName: file.name, sheets }) });
     } else {
       // Ads / live / traffic / affiliate reports and product catalogs.
       const table = detectTableReport({ fileName: file.name, sheets });

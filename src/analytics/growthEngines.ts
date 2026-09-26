@@ -292,7 +292,8 @@ export function videoAffiliate(dataset: CanonicalDataset, filter: DatasetFilter,
       commissionRate: gmv && commission !== null ? commission / gmv : null,
       profit: p?.profit.value ?? null,
       margin: p?.margin.value ?? null,
-      gmvChange: compareValues(gmv, prevSlice ? sumOrNull(prevRows, (r) => r.gmv) ?? (previousRange ? 0 : null) : null, 'vnd'),
+      // No content data at all in the previous period → no comparison (not "new").
+      gmvChange: compareValues(gmv, prevSlice && prevSlice.affiliates.length > 0 ? sumOrNull(prevRows, (r) => r.gmv) ?? 0 : null, 'vnd'),
     };
   };
 

@@ -67,6 +67,7 @@ export function mergeIntoWorkspace(base: CanonicalDataset | null, incoming: Cano
   ws.liveSessions = mergeKeyed(ws.liveSessions, incoming.liveSessions, (s) => `${s.platform}|${s.sessionId}`);
   ws.affiliates = mergeKeyed(ws.affiliates, incoming.affiliates, (a) => `${a.periodStart ?? ''}|${a.date ?? ''}|${a.platform}|${a.creatorId}|${a.contentId ?? ''}`);
   ws.traffic = mergeKeyed(ws.traffic, incoming.traffic, (t) => `${t.periodStart ?? ''}|${t.date}|${t.platform}|${t.sku ?? ''}`);
+  ws.salesSummaries = mergeKeyed(ws.salesSummaries ?? [], incoming.salesSummaries ?? [], (r) => `${r.platform}|${r.periodStart ?? ''}|${r.date}|${r.stage}|${r.dimension}|${r.channel}|${r.key}`);
   ws.dailyMetrics = mergeKeyed(ws.dailyMetrics, incoming.dailyMetrics, (d) => `${d.date}|${d.platform}`);
   ws.costs = [...ws.costs, ...incoming.costs];
   ws.settlements = [...ws.settlements, ...incoming.settlements];

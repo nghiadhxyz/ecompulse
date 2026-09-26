@@ -125,8 +125,9 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
       try {
         // The classic parser handles Shopee's 21-sheet summary layout.
         const parsed = await parseShopeeExcelFile(file);
-        await storeImported(mergeIntoWorkspace(importedRef.current, canonicalFromParsedStoreData(parsed, 'shopee')));
-        return { type: 'legacy_summary', ok: true };
+        const daily = mergeIntoWorkspace(importedRef.current, canonicalFromParsedStoreData(parsed, 'shopee'));
+        await storeImported(mergeIntoWorkspace(daily, outcome.extra.dataset));
+        return { type: 'legacy_summary', ok: true, sheets: outcome.extra.sheets, period: outcome.extra.period };
       } catch (e) {
         return { type: 'legacy_summary', ok: false, message: e instanceof Error ? e.message : String(e) };
       }

@@ -42,3 +42,4 @@ export * from './reportEngine';
 export * from './customerEngine';
 export * from './whatIfEngine';
 export * from './statsEngine';
+export * from './summaryEngine';
