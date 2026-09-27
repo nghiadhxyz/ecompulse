@@ -18,6 +18,7 @@ import { mergeIntoWorkspace, withCostSettings } from '../workspace';
 import { buildDailyBrief } from '../dailyBrief';
 import { questionUnavailable } from '../dolphinEvidence';
 import { channelFunnel, funnel, liveFunnel } from '../funnelEngine';
+import { NO_SUMMARY_CHANGE, summaryWhatIf } from '../whatIfEngine';
 import { emptyDataset, type CanonicalDataset } from '../model';
 import { sourceChecks, type SourceCheck } from '../canonicalSources';
 import { channelMix, summaryProducts } from '../summaryEngine';
@@ -512,5 +513,25 @@ describe('Part 9 — anomalies & opportunities', () => {
     expect(high[0].message.vi).toContain('4,03%');
     expect(opps.find((o) => o.kind === 'new_buyers')!.title.vi).toBe('82% người mua là khách mới');
     expect(opps.filter((o) => o.kind === 'strong_koc').map((o) => o.label).sort()).toEqual(['lephuong310797', 'o2pkj3o42u']);
+  });
+});
+
+describe('Part 10 — what-if on a summary report', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('Ads +20% and cancel 28,5% → 20%, without COGS', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const base = summaryWhatIf(ds, { range }, NO_SUMMARY_CHANGE);
+    expect(base.available && base.level).toBe(1);
+    expect(Math.round(base.base.cancelValueRate! * 1000) / 10).toBe(28.5);
+    const ads = summaryWhatIf(ds, { range }, { ...NO_SUMMARY_CHANGE, ads: 0.2 });
+    expect(ads.adsEffect!.spend).toBeCloseTo(1_213_155, 0);
+    expect(ads.adsEffect!.sales.map((v) => Math.round(v / 100_000) / 10)).toEqual([8.2, 12.6]);
+    expect(ads.scenario.roas!.map((v) => Math.round(v * 100) / 100)).toEqual([6.77, 10.36]);
+    const cancel = summaryWhatIf(ds, { range }, { ...NO_SUMMARY_CHANGE, cancelPp: -0.085 });
+    expect(Math.round(cancel.cancelEffect! / 10_000) / 100).toBe(6.68);
+    // Level 2 with the margin and fees from Settings.
+    const l2 = summaryWhatIf(withCostSettings(ds, { estimatedGrossMargin: 0.4, estimatedFeeRate: 0.1 }), { range }, NO_SUMMARY_CHANGE);
+    expect(l2.level).toBe(2);
+    expect(l2.base.profit).toBeCloseTo(55_423_617 * 0.3 - 6_065_775, 0);
   });
 });

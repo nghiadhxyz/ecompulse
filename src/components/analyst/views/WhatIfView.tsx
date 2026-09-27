@@ -1,6 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { FlaskConical, RotateCcw } from 'lucide-react';
-import { fmtByUnit, fmtMoneyCompact, fmtMultiple, fmtRate, formatRangeVi, NO_CHANGE, whatIf, type WhatIfLevers } from '../../../analytics';
+import {
+  fmtByUnit,
+  fmtCount,
+  fmtMoneyCompact,
+  fmtMultiple,
+  fmtRate,
+  formatRangeVi,
+  NO_CHANGE,
+  NO_SUMMARY_CHANGE,
+  summaryWhatIf,
+  whatIf,
+  type Span,
+  type SummaryWhatIfLevers,
+  type WhatIfLevers,
+} from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { Th } from '../ui';
@@ -15,7 +29,158 @@ const LEVERS: { key: keyof WhatIfLevers; vi: string; en: string; min: number; ma
   { key: 'platformFeePp', vi: 'Phí sàn', en: 'Platform fee', min: -5, max: 5, step: 0.5, pp: true, hintVi: 'Điểm % trên doanh thu thuần' },
 ];
 
+/** Levers a summary report can move (10.2); the others need an order file / COGS. */
+const SUMMARY_LEVERS: (keyof WhatIfLevers)[] = ['price', 'volume', 'ads'];
+
 export const WhatIfView: React.FC = () => {
+  const { dataset } = useWorkspace();
+  // No order file: simulate on the summary report, no COGS needed (10.2–10.4).
+  if (dataset.orders.length === 0 && dataset.dailyMetrics.length > 0) return <SummaryWhatIfView />;
+  return <OrderWhatIfView />;
+};
+
+const SummaryWhatIfView: React.FC = () => {
+  const { lang, dataset, baseFilter, range, goTo } = useWorkspace();
+  const vi = lang === 'vi';
+  const [lv, setLv] = useState<SummaryWhatIfLevers>(NO_SUMMARY_CHANGE);
+  const r = useMemo(() => summaryWhatIf(dataset, baseFilter, lv), [dataset, baseFilter, lv]);
+  const changed = (Object.keys(lv) as (keyof SummaryWhatIfLevers)[]).some((k) => lv[k] !== 0);
+  const span = (s: Span | null, fmt: (x: number) => string) => (s === null ? '—' : Math.abs(s[1] - s[0]) < 0.5 ? fmt(s[0]) : `${fmt(s[0])} – ${fmt(s[1])}`);
+  const money = (x: number) => fmtMoneyCompact(x, lang);
+  const signedMoney = (x: number) => `${x >= 0 ? '+' : '−'}${fmtMoneyCompact(Math.abs(x), lang)}`;
+  const cancelNow = r.base.cancelValueRate;
+
+  const sliders: { key: keyof SummaryWhatIfLevers | keyof WhatIfLevers; vi: string; en: string; min: number; max: number; step: number; hint: string; enabled: boolean; value: number; show: string }[] = [
+    ...LEVERS.map((l) => {
+      const enabled = SUMMARY_LEVERS.includes(l.key) && (l.key !== 'ads' || r.base.adSpend !== null);
+      const v = enabled ? (lv[l.key as keyof SummaryWhatIfLevers] ?? 0) * 100 : 0;
+      return {
+        key: l.key,
+        vi: l.vi,
+        en: l.en,
+        min: l.min,
+        max: l.max,
+        step: l.step,
+        hint: enabled ? l.hintVi : l.key === 'ads' ? 'Chưa có số liệu Ads trong khoảng này' : 'Báo cáo tổng hợp không có số này — cần file đơn hàng và giá vốn',
+        enabled,
+        value: v,
+        show: `${v > 0 ? '+' : ''}${v.toFixed(l.step < 1 ? 1 : 0).replace('.', vi ? ',' : '.')}${l.pp ? 'pp' : '%'}`,
+      };
+    }),
+    {
+      key: 'cancelPp',
+      vi: 'Tỷ lệ hủy (theo giá trị)',
+      en: 'Cancel rate (by value)',
+      min: -20,
+      max: 10,
+      step: 0.5,
+      hint: cancelNow === null ? 'Không có doanh số hủy' : `Mốc hiện tại ${fmtRate(cancelNow, lang)} theo giá trị`,
+      enabled: cancelNow !== null,
+      value: lv.cancelPp * 100,
+      show: cancelNow === null ? '—' : `${fmtRate(cancelNow, lang)} → ${fmtRate(Math.max(0, cancelNow + lv.cancelPp), lang)}`,
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Section
+        title={vi ? 'What-If · Mô phỏng / Ước tính' : 'What-If · Simulation / Estimate'}
+        subtitle={
+          vi
+            ? `Dựa trên báo cáo tổng hợp ${formatRangeVi(range)} (đơn đặt), không cần giá vốn — mô phỏng, không phải dự báo.`
+            : `Built on the summary report of ${formatRangeVi(range)} (placed orders) — a simulation, not a forecast.`
+        }
+        right={
+          <label className="text-xs text-slate-300 flex items-center gap-1.5" title={vi ? 'Mô phỏng theo sản phẩm cần file đơn hàng' : 'Per-product needs an order file'}>
+            {vi ? 'Phạm vi' : 'Scope'}
+            <select aria-label={vi ? 'Phạm vi' : 'Scope'} value="" disabled className={inputCls}>
+              <option value="">{vi ? 'Toàn shop' : 'Whole shop'}</option>
+            </select>
+          </label>
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {sliders.map((l) => (
+            <label key={l.key} className={`rounded-xl border border-white/10 bg-white/[0.02] p-3 block ${l.enabled ? '' : 'opacity-40'}`} title={l.enabled ? undefined : l.hint}>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-200">{vi ? l.vi : l.en}</span>
+                <span className={`font-bold ${l.value === 0 ? 'text-slate-400' : 'text-sky-300'}`}>{l.enabled ? l.show : '—'}</span>
+              </div>
+              <input
+                type="range"
+                min={l.min}
+                max={l.max}
+                step={l.step}
+                value={l.value}
+                disabled={!l.enabled}
+                onChange={(e) => setLv({ ...lv, [l.key]: Number(e.target.value) / 100 })}
+                className="w-full mt-2 accent-sky-500 disabled:cursor-not-allowed"
+                aria-label={vi ? l.vi : l.en}
+              />
+              <div className="text-[10px] text-slate-500">{l.hint}</div>
+            </label>
+          ))}
+        </div>
+        <div className="mt-2">
+          <GhostButton onClick={() => setLv(NO_SUMMARY_CHANGE)} disabled={!changed}>
+            <RotateCcw className="w-4 h-4" aria-hidden /> {vi ? 'Đặt lại' : 'Reset'}
+          </GhostButton>
+        </div>
+      </Section>
+
+      {!r.available ? (
+        <NotEnoughData lang={lang} reason={tr(lang, r.unavailable!)} />
+      ) : (
+        <Section
+          title={vi ? `Kết quả mô phỏng · Mức ${r.level}` : `Simulated result · Level ${r.level}`}
+          subtitle={r.level === 1 ? (vi ? 'Doanh số, đơn, Ads, ROAS — không cần giá vốn' : 'Sales, orders, Ads, ROAS') : vi ? 'Thêm lợi nhuận ước tính theo số bạn nhập' : 'Plus an estimated profit'}
+        >
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2">
+            {[
+              { l: vi ? 'Doanh số (đặt)' : 'Sales (placed)', a: money(r.base.gmv), b: span(r.scenario.gmv, money) },
+              { l: vi ? 'Số đơn' : 'Orders', a: fmtCount(r.base.orders, lang), b: span(r.scenario.orders, (x) => fmtCount(Math.round(x), lang)) },
+              { l: vi ? 'Chi phí Ads' : 'Ad spend', a: fmtMoneyCompact(r.base.adSpend, lang), b: fmtMoneyCompact(r.scenario.adSpend, lang) },
+              { l: vi ? 'ROAS (thanh toán – đặt, mức trần)' : 'ROAS (paid – placed, ceiling)', a: fmtMultiple(r.base.roas, lang), b: span(r.scenario.roas, (x) => fmtMultiple(x, lang)) },
+              { l: vi ? 'Doanh số giữ lại' : 'Sales kept', a: fmtMoneyCompact(r.base.keptSales, lang), b: span(r.scenario.keptSales, money) },
+              ...(r.level === 2 ? [{ l: vi ? 'Lợi nhuận (ước tính theo số bạn nhập)' : 'Profit (estimate)', a: fmtMoneyCompact(r.base.profit, lang), b: span(r.scenario.profit, money) }] : []),
+            ].map((x) => (
+              <div key={x.l} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                <div className="text-[11px] text-slate-400 flex items-center gap-1"><FlaskConical className="w-3 h-3" aria-hidden /> {x.l}</div>
+                <div className="text-xs text-slate-400 mt-0.5">{x.a} →</div>
+                <div className={`text-base font-black ${changed ? 'text-sky-200' : 'text-white'}`}>{x.b}</div>
+              </div>
+            ))}
+          </div>
+          {r.adsEffect && (
+            <p className="text-sm text-slate-200 mt-3">
+              {vi
+                ? `Ads ${signedMoney(r.adsEffect.spend)} → doanh số ${signedMoney(r.adsEffect.sales[0])} đến ${signedMoney(r.adsEffect.sales[1])} (mức trần).`
+                : `Ads ${signedMoney(r.adsEffect.spend)} → sales ${signedMoney(r.adsEffect.sales[0])} to ${signedMoney(r.adsEffect.sales[1])} (ceiling).`}
+            </p>
+          )}
+          {r.cancelEffect !== null && (
+            <p className="text-sm text-slate-200 mt-1">
+              {vi ? `Đổi tỷ lệ hủy: ${r.cancelEffect >= 0 ? 'giữ thêm' : 'mất thêm'} khoảng ${fmtMoneyCompact(Math.abs(r.cancelEffect), lang)} doanh số.` : `Cancel-rate change: ${signedMoney(r.cancelEffect)} sales kept.`}
+            </p>
+          )}
+          {r.level === 1 && (
+            <p className="text-xs text-slate-400 mt-2">
+              {vi ? 'Muốn xem lợi nhuận ước tính: nhập Biên lợi nhuận gộp và Phí sàn ở ' : 'For an estimated profit, enter a margin and fees in '}
+              <GhostButton onClick={() => goTo('settings')} className="!py-0.5 !px-2 !text-[11px]">{vi ? 'Cài đặt' : 'Settings'}</GhostButton>
+            </p>
+          )}
+          <ul className="mt-3 space-y-1">
+            {r.notes.map((n, i) => (
+              <li key={i} className="text-xs text-slate-400">• {tr(lang, n)}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </div>
+  );
+};
+
+const OrderWhatIfView: React.FC = () => {
   const { lang, dataset, baseFilter, range } = useWorkspace();
   const vi = lang === 'vi';
   const [sku, setSku] = useState('');
