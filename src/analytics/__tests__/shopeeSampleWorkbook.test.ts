@@ -17,7 +17,8 @@ import { importShopeeSalesAnalysis } from '../importers/shopeeSalesAnalysis';
 import { mergeIntoWorkspace, withCostSettings } from '../workspace';
 import { buildDailyBrief } from '../dailyBrief';
 import { questionUnavailable } from '../dolphinEvidence';
-import { funnel } from '../funnelEngine';
+import { channelFunnel, funnel, liveFunnel } from '../funnelEngine';
+import { emptyDataset, type CanonicalDataset } from '../model';
 import { sourceChecks, type SourceCheck } from '../canonicalSources';
 import { channelMix, summaryProducts } from '../summaryEngine';
 import { adsIntelligence } from '../growthEngines';
@@ -396,5 +397,41 @@ describe('Part 3 — customers', () => {
     const alert = buildDailyBrief(ds, '2026-08-21').alerts.find((a) => a.type === 'repeat_buyers_opportunity')!;
     expect(alert.severity).toBe('opportunity');
     expect(alert.title.vi).toContain('82% người mua là khách mới');
+  });
+});
+
+describe('Part 4 — traffic & funnel', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('Ads layer, 4-channel total check, channel and live funnels', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const mix = channelMix(ds, { range });
+    expect(mix.adsGmv).toBe(62_864_872);
+    expect(Math.round(mix.adsAssistedShare! * 1000) / 10).toBe(89.8);
+    const total = mix.mismatches.find((m) => m.key === 'channels-total|placed')!;
+    expect([total.used.value, total.other.value]).toEqual([70_013_491, 78_626_020]);
+    const card = channelFunnel(ds, { range }, 'product_card')!;
+    expect([card.stages.impressions, card.stages.clicks, card.stages.orders]).toEqual([310_381, 7_687, 398.61]);
+    const live = liveFunnel(ds, range);
+    expect([live.stages.views, live.stages.clicks, live.stages.orders, live.stages.paid]).toEqual([14, 20, 3.31, 2.11]);
+    expect(live.stages.impressions).toBeNull();
+    // 20 clicks > 14 views and placed → paid: no rate shown.
+    expect(live.steps.find((s) => s.to === 'paid')!.rate).toBeNull();
+    expect(live.biggestLeak?.to).not.toBe('clicks');
+  });
+
+  it.skipIf(!existsSync(WORKBOOK))('clean export: the 4 channels add up to the shop', async () => {
+    const ds = await summaryWorkspace(WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    expect(channelMix(ds, { range }).mismatches.find((m) => m.key.startsWith('channels-total'))).toBeUndefined();
+  });
+
+  it('session live funnel leaves out add-to-cart of sessions with no viewers', () => {
+    const ds = { ...emptyDataset('t', 't'), liveSessions: [
+      { sessionId: 'a', platform: 'shopee', date: '2026-08-01', viewers: 0, addToCart: 5, orders: 0 },
+      { sessionId: 'b', platform: 'shopee', date: '2026-08-01', viewers: 10, addToCart: 2, orders: 1 },
+    ] } as unknown as CanonicalDataset;
+    const f = liveFunnel(ds, { start: '2026-08-01', end: '2026-08-01' });
+    expect(f.stages.addToCart).toBe(2);
+    expect(f.labels?.impressions?.vi).toBe('Người xem');
   });
 });

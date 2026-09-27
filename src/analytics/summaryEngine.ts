@@ -16,6 +16,8 @@ import type { Bilingual } from './metric';
 import { moneyTolerance, ORDER_TOLERANCE, periodMismatches, selectPeriodOrDaily } from './periodRows';
 import { byGap, compareCopies, FILE_RATE_LABEL, periodMismatchItems, RECOMPUTED_LABEL, type MismatchItem } from './mismatch';
 import { fmtMoney, fmtOrders } from './format';
+import { computeKpis } from './kpiEngine';
+import { STAGE_BASIS } from './orderStage';
 
 export const SUMMARY_CHANNEL_LABELS: Record<SummaryChannel, Bilingual> = {
   product_card: { vi: 'Thẻ sản phẩm (gồm cả lượt có quảng cáo)', en: 'Product card (incl. ad-driven visits)' },
@@ -190,7 +192,18 @@ export function channelMix(dataset: CanonicalDataset, filter: DatasetFilter, sta
     notes.push({ vi: 'Lượt hiển thị/nhấp duy nhất khi chọn một phần kỳ là cộng từng ngày (một người xem nhiều ngày được đếm nhiều lần). Chọn trọn kỳ để có số người duy nhất.', en: 'Unique counts over part of the period are sums of daily values.' });
   }
   const channelRowGmv = (r: SalesSummaryRow) => rows.find((x) => x.dimension === 'channel' && x.channel === r.channel)?.gmv ?? null;
-  const mismatches = [...summaryMismatches(dataset, filter, stage), ...rateMismatches(rows.filter((r) => r.dimension === 'source'), channelRowGmv)].sort(byGap);
+  const mismatches = [...summaryMismatches(dataset, filter, stage), ...rateMismatches(rows.filter((r) => r.dimension === 'source'), channelRowGmv)];
+  // The 4 channels should add up to the shop's sales of the same stage (4.2).
+  const shopGmv = channels.length ? computeKpis(dataset, { ...filter, stage }).metrics.gmv.value : null;
+  const totalCheck = compareCopies(
+    `channels-total|${stage}`,
+    { vi: `Tổng 4 kênh so với doanh số shop (${STAGE_BASIS[stage].vi.toLowerCase()})`, en: `4-channel total vs shop sales (${STAGE_BASIS[stage].en.toLowerCase()})` },
+    'vnd',
+    { label: { vi: 'tổng 4 kênh', en: '4-channel total' }, value: total },
+    { label: { vi: 'doanh số shop', en: 'shop sales' }, value: shopGmv },
+  );
+  if (totalCheck) mismatches.push(totalCheck);
+  mismatches.sort(byGap);
   return { available: channels.length > 0, stage, total, channels: channels.sort((a, b) => b.gmv - a.gmv), adsGmv, adsAssistedShare: adsGmv !== null && total ? adsGmv / total : null, uniqueIsDistinct: whole, mismatches, notes };
 }
 
