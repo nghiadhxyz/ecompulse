@@ -21,7 +21,7 @@ import { channelFunnel, funnel, liveFunnel } from '../funnelEngine';
 import { emptyDataset, type CanonicalDataset } from '../model';
 import { sourceChecks, type SourceCheck } from '../canonicalSources';
 import { channelMix, summaryProducts } from '../summaryEngine';
-import { adsIntelligence } from '../growthEngines';
+import { adsIntelligence, liveAudit } from '../growthEngines';
 import { dailySeries } from '../timeseries';
 import { describeMismatch, type MismatchItem } from '../mismatch';
 import { fmtPerViewer, fmtShare } from '../format';
@@ -464,5 +464,21 @@ describe('Part 6 — ads intelligence', () => {
     expect(liveAd.efficiency).toBe('likely_loss');
     expect(ai.daily.filter((d) => d.roasOutlier).map((d) => d.date)).toContain('2026-08-02');
     expect(Math.round(ai.daily.find((d) => d.date === '2026-08-02')!.roas! * 10) / 10).toBe(41.3);
+  });
+});
+
+describe('Part 7 — livestream', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('inferred date, one watched session, ranking by GMV, live insight', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const la = liveAudit(ds, { range: datasetDateBounds(ds)! });
+    const mega = la.sessions.find((s) => s.session.title?.includes('MEGA LIVE 25.7'))!;
+    expect(la.inferredDates).toEqual({ [mega.session.sessionId]: '2026-07-25' });
+    expect([la.watchedSessions, la.sessions.length]).toEqual([1, 5]);
+    expect(la.rankedBy).toBe('gmv');
+    expect(la.ranking).toHaveLength(5);
+    // Average viewers leave out the sessions nobody watched.
+    expect(la.undated!.avgViewers).toBe(mega.session.viewers);
+    expect(Math.round(la.liveAdsRoas! * 100) / 100).toBe(1.02);
+    expect(la.insight!.vi).toContain('Kênh Live gần như chưa hoạt động');
   });
 });

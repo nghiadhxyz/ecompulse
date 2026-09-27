@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { sessionDateLabel, compareSessions, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi, liveAudit, PLATFORM_LABELS, type LiveGroupStats, type LiveSessionRow } from '../../../analytics';
+import { sessionDateLabel, compareSessions, fmtCount, fmtDay, fmtMoneyCompact, fmtRate, formatRangeVi, liveAudit, PLATFORM_LABELS, type LiveGroupStats, type LiveSessionRow } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { ChangeCell, Th } from '../ui';
@@ -9,12 +9,18 @@ import { SampleTag } from '../../workspace/SampleSize';
 import { DataNoticesList } from '../../workspace/DataNotices';
 import { ChannelWeekdayPanel } from '../../workspace/SummaryInsightPanels';
 
-const label = (r: LiveSessionRow) => `${sessionDateLabel(r.session)} · ${PLATFORM_LABELS[r.session.platform]}`;
-
 export const LiveAuditor: React.FC = () => {
   const { lang, dataset, baseFilter, range, openEvidence, goTo } = useWorkspace();
   const vi = lang === 'vi';
   const la = useMemo(() => liveAudit(dataset, baseFilter), [dataset, baseFilter]);
+  // An inferred air date is always labelled as such (7.1).
+  const dateOf = (r: LiveSessionRow) => {
+    const d = la.inferredDates[r.session.sessionId];
+    return d ? `${fmtDay(d)} (${vi ? 'ngày suy luận' : 'inferred date'})` : sessionDateLabel(r.session, lang);
+  };
+  const label = (r: LiveSessionRow) => `${dateOf(r)} · ${PLATFORM_LABELS[r.session.platform]}`;
+  // Session picker: title + id, so sessions with the same date stay distinguishable (7.4).
+  const optionLabel = (r: LiveSessionRow) => `${r.session.title ?? (vi ? 'Không tên' : 'Untitled')} · ${r.session.sessionId.replace(/^.*-/, '')}`;
   // Odd live records: grey notes (Shopee's own inconsistencies) and red invalid relations.
   const liveNotices = useMemo(
     () => dataNotices(dataset, baseFilter.range, baseFilter.platforms).filter((n) => n.kind === 'atc_without_viewers' || n.kind === 'sessions_over_channel' || (n.kind === 'unique_clicks_over_viewers' && n.ref.channel === 'live')),
@@ -38,11 +44,14 @@ export const LiveAuditor: React.FC = () => {
     );
   }
   const topListOnly = la.sessions.every((s) => s.session.periodStart !== undefined);
-  const b = la.sessions.find((s) => s.session.sessionId === bId) ?? la.sessions[0];
+  // Sessions with no viewers cannot be compared (7.4).
+  const comparable = la.sessions.filter((s) => (s.session.viewers ?? 0) > 0);
+  const b = comparable.find((s) => s.session.sessionId === bId) ?? comparable[0];
   // Default A = the previous session of B on the same platform (when it is in range).
-  const defaultA = (b.previous && la.sessions.find((s) => s.session.sessionId === b.previous!.sessionId)) || la.sessions.find((s) => s !== b);
-  const a = (aId && la.sessions.find((s) => s.session.sessionId === aId)) || defaultA;
+  const defaultA = b && ((b.previous && comparable.find((s) => s.session.sessionId === b.previous!.sessionId)) || comparable.find((s) => s !== b));
+  const a = (aId && comparable.find((s) => s.session.sessionId === aId)) || defaultA;
   const cmp = a && b && a !== b ? compareSessions(a, b) : null;
+  const byGmv = la.rankedBy === 'gmv';
 
   const groupTable = (title: string, rows: LiveGroupStats[]) => (
     <div>
@@ -94,18 +103,26 @@ export const LiveAuditor: React.FC = () => {
           </div>
         ))}
       </div>
-      {topListOnly && (
-        <p className="text-xs text-slate-300">
-          {vi ? `Top ${la.sessions.length} phiên live theo báo cáo Shopee — Shopee chỉ liệt kê Top 5, không phải tất cả phiên live.` : `Top ${la.sessions.length} live sessions from the Shopee report — not all sessions.`}
-        </p>
+      {la.insight && (
+        <p className="text-sm font-semibold text-[#f08080] rounded-xl border border-[#d03b3b]/40 bg-[#d03b3b]/10 px-3 py-2">{tr(lang, la.insight)}</p>
       )}
-      <DataNoticesList notices={liveNotices} lang={lang} />
-      {la.notes.map((n, i) => (
-        <p key={i} className="text-xs text-[#fab219]">{tr(lang, n)}</p>
-      ))}
+      {/* One box for every note about the session list (7.2). */}
+      <div className="rounded-xl border border-[#fab219]/30 bg-[#fab219]/[0.05] px-3 py-2 space-y-1">
+        <p className="text-sm font-bold text-white">
+          {vi ? `${la.watchedSessions}/${la.sessions.length} phiên có người xem` : `${la.watchedSessions}/${la.sessions.length} sessions had viewers`}
+          {topListOnly && <span className="font-normal text-xs text-slate-300"> · {vi ? `Top ${la.sessions.length} phiên theo báo cáo Shopee (Shopee chỉ liệt kê Top 5)` : `Top ${la.sessions.length} from the Shopee report`}</span>}
+        </p>
+        <DataNoticesList notices={liveNotices} lang={lang} />
+        {la.notes.map((n, i) => (
+          <p key={i} className="text-[11px] text-slate-400">• {tr(lang, n)}</p>
+        ))}
+      </div>
       <ChannelWeekdayPanel channel="live" />
 
-      <Section title={vi ? 'Xếp hạng phiên theo GMV/giờ' : 'Sessions ranked by GMV/hour'} subtitle={`${formatRangeVi(range)} · ${vi ? 'đã chuẩn hóa theo thời lượng' : 'normalized by duration'}`}>
+      <Section
+        title={byGmv ? (vi ? 'Xếp hạng phiên theo GMV' : 'Sessions ranked by GMV') : vi ? 'Xếp hạng phiên theo GMV/giờ' : 'Sessions ranked by GMV/hour'}
+        subtitle={`${formatRangeVi(range)} · ${byGmv ? (vi ? 'báo cáo không có thời lượng phiên nên chưa tính được GMV/giờ' : 'no durations in the report, so no GMV/hour') : vi ? 'đã chuẩn hóa theo thời lượng' : 'normalized by duration'}`}
+      >
         <div className="overflow-x-auto rounded-xl border border-white/10">
           <table className="w-full text-xs">
             <thead className="bg-white/[0.04] text-slate-400">
@@ -122,9 +139,9 @@ export const LiveAuditor: React.FC = () => {
                 <Th>{vi ? 'Đã TT' : 'Paid'}</Th>
                 <Th>{vi ? 'Hủy' : 'Canc.'}</Th>
                 <Th>GMV</Th>
-                <Th>GMV/h</Th>
+                {!byGmv && <Th>GMV/h</Th>}
                 <Th>{vi ? 'LN' : 'Profit'}</Th>
-                <Th>{vi ? 'LN/h' : 'Profit/h'}</Th>
+                {!byGmv && <Th>{vi ? 'LN/h' : 'Profit/h'}</Th>}
                 <th className="px-2.5 py-2" />
               </tr>
             </thead>
@@ -146,9 +163,9 @@ export const LiveAuditor: React.FC = () => {
                   <td className="px-2.5 py-1.5 text-right">{fmtCount(r.session.paidOrders, lang)}</td>
                   <td className="px-2.5 py-1.5 text-right">{fmtCount(r.session.cancelledOrders, lang)}</td>
                   <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.session.gmv, lang)}</td>
-                  <td className="px-2.5 py-1.5 text-right whitespace-nowrap font-semibold">{fmtMoneyCompact(r.gmvPerHour, lang)}</td>
+                  {!byGmv && <td className="px-2.5 py-1.5 text-right whitespace-nowrap font-semibold">{fmtMoneyCompact(r.gmvPerHour, lang)}</td>}
                   <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.estimatedProfit, lang)}{r.estimatedProfit !== null && !r.profitComplete && <span className="text-[#fab219]">*</span>}</td>
-                  <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.profitPerHour, lang)}</td>
+                  {!byGmv && <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.profitPerHour, lang)}</td>}
                   <td className="px-2.5 py-1.5 text-right">
                     <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `Live ${label(r)}`, filter: { range: { start: r.session.periodStart ?? r.session.date, end: r.session.date }, liveSessionId: r.session.sessionId } })} />
                   </td>
@@ -157,13 +174,14 @@ export const LiveAuditor: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {la.ranking.length === 0 && (
-          <p className="text-sm text-slate-400 mt-2">{vi ? 'Báo cáo không có thời lượng phiên nên chưa tính được GMV/giờ.' : 'The report has no session durations, so GMV/hour cannot be computed.'}</p>
-        )}
         <p className="text-[11px] text-slate-500 mt-2">{vi ? 'Dòng tô vàng: người xem tăng nhưng đơn giảm so với phiên trước. Lợi nhuận live = đơn gắn với phiên, chưa trừ chi phí tổ chức live (host, quà tặng) nếu chưa nhập.' : 'Highlighted: more viewers but fewer orders than the previous session.'}</p>
       </Section>
 
-      <Section title={vi ? 'So sánh hai phiên' : 'Compare two sessions'}>
+      <Section title={vi ? 'So sánh hai phiên' : 'Compare two sessions'} subtitle={vi ? 'Chỉ chọn được phiên có người xem' : 'Only sessions with viewers'}>
+        {comparable.length < 2 && (
+          <p className="text-sm text-slate-400 mb-2">{vi ? `Cần ít nhất 2 phiên có người xem để so sánh — hiện có ${comparable.length}.` : `Needs at least 2 sessions with viewers (${comparable.length}).`}</p>
+        )}
+        {comparable.length >= 2 && (
         <div className="flex flex-wrap items-center gap-2 mb-3 text-xs text-slate-300">
           {[
             { l: 'A', v: a?.session.sessionId, set: setAId },
@@ -173,12 +191,15 @@ export const LiveAuditor: React.FC = () => {
               {s.l}
               <select value={s.v} onChange={(e) => s.set(e.target.value)} className="bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-slate-100 [color-scheme:dark] max-w-[260px]">
                 {la.sessions.map((r) => (
-                  <option key={r.session.sessionId} value={r.session.sessionId}>{label(r)}</option>
+                  <option key={r.session.sessionId} value={r.session.sessionId} disabled={(r.session.viewers ?? 0) === 0}>
+                    {optionLabel(r)}{(r.session.viewers ?? 0) === 0 ? (vi ? ' (0 người xem)' : ' (0 viewers)') : ''}
+                  </option>
                 ))}
               </select>
             </label>
           ))}
         </div>
+        )}
         {cmp && (
           <div className="overflow-x-auto rounded-xl border border-white/10">
             <table className="w-full text-xs">

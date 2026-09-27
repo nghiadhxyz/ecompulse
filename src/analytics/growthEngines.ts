@@ -169,6 +169,16 @@ export interface LiveAudit {
   funnel: Funnel;
   totals: { sessions: number; hours: number | null; gmv: number; orders: number; gmvPerHour: number | null };
   notes: Bilingual[];
+  /** Sessions with at least one viewer (7.2). */
+  watchedSessions: number;
+  /** Air date inferred for a period-total session (7.1), by session id — always labelled. */
+  inferredDates: Record<string, string>;
+  /** No session has a duration: the ranking is by GMV and the "/giờ" columns are hidden (7.3). */
+  rankedBy: 'gmvPerHour' | 'gmv';
+  /** ROAS of the live ads (e.g. "Dịch Vụ Hiển Thị Live"), when there are any. */
+  liveAdsRoas: number | null;
+  /** Automatic conclusion (7.6), null when nothing stands out. */
+  insight: Bilingual | null;
 }
 
 const SLOTS: { key: string; label: Bilingual; from: number; to: number }[] = [
@@ -201,7 +211,8 @@ function groupStats(key: string, label: Bilingual, rows: LiveSessionRow[]): Live
   const hours = withHours.reduce((s, r) => s + (r.durationHours || 0), 0);
   const gmv = withHours.reduce((s, r) => s + (r.session.gmv || 0), 0);
   const orders = withHours.reduce((s, r) => s + (r.session.orders || 0), 0);
-  const viewersRows = rows.filter((r) => typeof r.session.viewers === 'number');
+  // Sessions with 0 viewers say nothing about how many people watch (7.5).
+  const viewersRows = rows.filter((r) => typeof r.session.viewers === 'number' && r.session.viewers > 0);
   const viewers = viewersRows.reduce((s, r) => s + (r.session.viewers || 0), 0);
   const ordersAll = viewersRows.reduce((s, r) => s + (r.session.orders || 0), 0);
   const profitRows = withHours.filter((r) => r.estimatedProfit !== null);
@@ -217,9 +228,36 @@ function groupStats(key: string, label: Bilingual, rows: LiveSessionRow[]): Live
   };
 }
 
+/**
+ * Air date of a period-total session (7.1), when exactly one listed session had viewers:
+ * the date in its title ("MEGA LIVE 25.7") if the Live channel had views that day, otherwise
+ * the only day the Live channel had views. Always shown as "ngày suy luận".
+ */
+function inferSessionDates(dataset: CanonicalDataset, filter: DatasetFilter, sessions: LiveSessionRow[]): Record<string, string> {
+  const watched = sessions.filter((r) => isUndatedSession(r.session) && (r.session.viewers ?? 0) > 0);
+  if (watched.length !== 1) return {};
+  const s = watched[0].session;
+  const days = new Set(
+    (dataset.salesSummaries ?? [])
+      .filter((r) => r.channel === 'live' && r.dimension === 'channel' && r.stage === 'placed' && r.periodStart === undefined && r.platform === s.platform)
+      .filter((r) => r.date >= (s.periodStart ?? filter.range.start) && r.date <= s.date && ((r.views ?? 0) > 0 || (r.uniqueImpressions ?? 0) > 0))
+      .map((r) => r.date),
+  );
+  const m = s.title?.match(/(?:^|[^\d])(\d{1,2})[./](\d{1,2})(?![\d./])/);
+  if (m) {
+    const titled = [...days].find((d) => Number(d.slice(8, 10)) === Number(m[1]) && Number(d.slice(5, 7)) === Number(m[2]));
+    if (titled) return { [s.sessionId]: titled };
+  }
+  return days.size === 1 ? { [s.sessionId]: [...days][0] } : {};
+}
+
 export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): LiveAudit {
   const sessions = liveSessions(dataset, filter);
-  const ranking = [...sessions].filter((r) => r.gmvPerHour !== null).sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0));
+  const inferredDates = inferSessionDates(dataset, filter, sessions);
+  const anyDuration = sessions.some((r) => r.gmvPerHour !== null);
+  const ranking = anyDuration
+    ? [...sessions].filter((r) => r.gmvPerHour !== null).sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0))
+    : [...sessions].sort((a, b) => (b.session.gmv ?? 0) - (a.session.gmv ?? 0));
   const hourOf = (s: LiveSession) => (s.startTime ? Number(s.startTime.slice(0, 2)) : null);
   const withTime = sessions.filter((r) => !isUndatedSession(r.session) && hourOf(r.session) !== null);
   const byTimeSlot = SLOTS.map((slot) => groupStats(slot.key, slot.label, withTime.filter((r) => hourOf(r.session)! >= slot.from && hourOf(r.session)! < slot.to))).filter((g) => g.sessions > 0);
@@ -247,6 +285,18 @@ export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): Liv
   if (sessions.length > 0 && sessions.length < 8) {
     notes.push({ vi: 'Số phiên live còn ít — so sánh theo khung giờ/thứ chỉ mang tính tham khảo.', en: 'Few sessions — slot/weekday comparisons are indicative only.' });
   }
+  const watchedSessions = sessions.filter((r) => (r.session.viewers ?? 0) > 0).length;
+  // Live ads: campaigns whose name says Live (Shopee "Dịch Vụ Hiển Thị Live").
+  const liveAds = adsSummary(dataset, filter).rows.filter((r) => /live/i.test(r.name) && r.spend);
+  const liveSpend = liveAds.reduce((s, r) => s + (r.spend ?? 0), 0);
+  const liveAdsRoas = liveAds.length && liveAds.every((r) => r.attributedRevenue !== null) ? safeDivide(liveAds.reduce((s, r) => s + (r.attributedRevenue ?? 0), 0), liveSpend) : null;
+  const insight: Bilingual | null =
+    sessions.length > 0 && watchedSessions <= 1 && liveAdsRoas !== null && liveAdsRoas < LIKELY_LOSS_ROAS
+      ? {
+          vi: `Kênh Live gần như chưa hoạt động (${watchedSessions}/${sessions.length} phiên có người xem, ROAS quảng cáo Live ${liveAdsRoas.toFixed(2).replace('.', ',')}x), cân nhắc dừng quảng cáo Live hoặc lập lịch live đều đặn.`,
+          en: `Live is barely active (${watchedSessions}/${sessions.length} sessions with viewers, live ads ROAS ${liveAdsRoas.toFixed(2)}x): consider pausing live ads or scheduling regular lives.`,
+        }
+      : null;
   return {
     sessions,
     ranking,
@@ -257,6 +307,11 @@ export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): Liv
     funnel: liveFunnel(dataset, filter.range, filter.platforms),
     totals: { sessions: sessions.length, hours, gmv, orders: sessions.reduce((s, r) => s + (r.session.orders || 0), 0), gmvPerHour: hours ? withHours.reduce((s, r) => s + (r.session.gmv || 0), 0) / hours : null },
     notes,
+    watchedSessions,
+    inferredDates,
+    rankedBy: anyDuration ? 'gmvPerHour' : 'gmv',
+    liveAdsRoas,
+    insight,
   };
 }
 
