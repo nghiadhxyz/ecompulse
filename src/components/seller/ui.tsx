@@ -91,8 +91,9 @@ export const KpiCard: React.FC<{
   const missing = metric.value === null;
   return (
     <div className={`rounded-2xl border p-3.5 sm:p-4 flex flex-col gap-1 min-w-0 ${emphasis ? 'border-sky-400/30 bg-sky-500/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
-      <div className="text-xs font-semibold text-slate-400 flex items-center gap-1" title={metric.status === 'ok' ? (metric.notes || []).map((n) => n[lang]).join('\n') || undefined : undefined}>
+      <div className="text-xs font-semibold text-slate-400 flex flex-wrap items-center gap-1" title={metric.status === 'ok' ? (metric.notes || []).map((n) => n[lang]).join('\n') || undefined : undefined}>
         {metric.label ? metric.label[lang] : label}
+        {metric.basis && <span className="text-[10px] font-semibold text-slate-300 bg-white/[0.07] border border-white/10 rounded px-1 py-px whitespace-nowrap">{metric.basis[lang]}</span>}
         {metric.status === 'partial' && (
           <span className="text-[10px] font-bold text-[#fab219]" title={(metric.notes || []).map((n) => n[lang]).join('\n')}>
             • {lang === 'vi' ? 'chưa đầy đủ' : 'partial'}
@@ -101,7 +102,11 @@ export const KpiCard: React.FC<{
       </div>
       <div className={`font-black tracking-tight truncate ${missing ? 'text-base text-slate-500' : 'text-xl sm:text-2xl text-white'}`}>{metricText(metric, lang)}</div>
       {missing && metric.notes?.[0] && <div className="text-[11px] text-slate-500 leading-snug">{metric.notes[0][lang]}</div>}
-      {!missing && metric.warning && <div className="text-[11px] text-[#fab219] leading-snug">⚠ {metric.warning[lang]}</div>}
+      {!missing && metric.warning && (
+        <div className={`text-[11px] leading-snug ${metric.mismatch ? 'text-[#f08080] font-semibold' : 'text-[#fab219]'}`} role={metric.mismatch ? 'alert' : undefined}>
+          ⚠ {metric.warning[lang]}
+        </div>
+      )}
       {!missing && cmp && (
         <div className="leading-snug">
           <DeltaChip cmp={cmp} lang={lang} goodWhenUp={goodWhenUp} />

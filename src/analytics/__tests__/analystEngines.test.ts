@@ -3,6 +3,7 @@ import { breakdown, weekStart, NONE_KEY, type BreakdownDimension } from '../brea
 import { comboAnalytics, product360, productIntelligence } from '../productIntelligence';
 import { compareFunnels, funnel, liveFunnel } from '../funnelEngine';
 import { computeKpis } from '../kpiEngine';
+import { subsidyDependence } from '../summaryInsights';
 import { buildDemoCanonicalDataset } from '../../data/demoCanonicalDataset';
 import { baseFixture, dataset, line, order, SEPT_1_2 } from './fixtures';
 
@@ -183,5 +184,48 @@ describe('funnel engine', () => {
     expect(f.stages.clicks).toBe(200);
     expect(f.stages.orders).toBe(10);
     expect(f.stages.completed).toBeNull();
+  });
+});
+
+describe('summary reports that disagree with themselves', () => {
+  const RANGE = { start: '2025-09-01', end: '2025-09-03' };
+  const ds = dataset([], [], {
+    dailyMetrics: [
+      { date: '2025-09-01', platform: 'shopee', placedGmv: 1000, placedNoSubsidyGmv: 800, placedOrders: 10, paidGmv: 900, paidOrders: 9, paidRefundedGmv: 10 },
+      // Impossible: sales excluding subsidy above sales (negative subsidy).
+      { date: '2025-09-02', platform: 'shopee', placedGmv: 500, placedNoSubsidyGmv: 600, placedOrders: 5, paidGmv: 450, paidOrders: 4, paidRefundedGmv: 0 },
+      { date: '2025-09-03', platform: 'shopee', placedGmv: 1000, placedNoSubsidyGmv: 900, placedOrders: 10, paidGmv: 950, paidOrders: 9, paidRefundedGmv: 5 },
+    ],
+    periodTotals: [
+      { platform: 'shopee', start: '2025-09-01', end: '2025-09-03', stage: 'placed', gmv: 3000, noSubsidyGmv: 2300, orders: 25, cancelledGmv: 100, refundedGmv: 20 },
+      { platform: 'shopee', start: '2025-09-01', end: '2025-09-03', stage: 'paid', gmv: 2290, orders: 22, refundedGmv: 12 },
+    ],
+  });
+
+  it('leaves days with a negative subsidy out instead of drawing them below zero', () => {
+    const s = subsidyDependence(ds, { range: RANGE });
+    expect(s.invalidDays).toEqual(['2025-09-02']);
+    expect(s.points.find((p) => p.key === '2025-09-02')!.share).toBeNull();
+    expect(s.points.every((p) => p.share === null || p.share >= 0)).toBe(true);
+    expect(s.warnings[0].vi).toContain('Dữ liệu không hợp lệ ở 1 ngày (02/09)');
+    // Part of the period: no period row, total from the valid days only.
+    const part = subsidyDependence(ds, { range: { start: '2025-09-01', end: '2025-09-02' } });
+    expect(part.total!.gmv).toBe(1000);
+    expect(part.total!.subsidy).toBe(200);
+  });
+
+  it('warns when the period row and the days give different placed sales', () => {
+    const s = subsidyDependence(ds, { range: RANGE });
+    expect(s.total!.gmv).toBe(3000);
+    expect(s.mismatches.find((m) => m.key === 'subsidy|gmv')).toMatchObject({ used: { value: 3000 }, other: { value: 2500 } });
+  });
+
+  it('platform table uses the same period totals as the KPI cards', () => {
+    const row = breakdown(ds, { range: RANGE }, 'platform').rows[0];
+    const kpi = computeKpis(ds, { range: RANGE }).metrics;
+    expect(row.current.gmv).toBe(3000); // placed period row, not the 2.500 sum of days
+    expect(row.current.gmv).toBe(kpi.gmv.value);
+    expect(row.current.netRevenue).toBe(3000 - 100 - 20);
+    expect(row.current.netRevenue).toBe(kpi.netRevenue.value);
   });
 });

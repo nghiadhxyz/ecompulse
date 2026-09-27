@@ -8,6 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   channelWeekday,
+  CROSS_PERIOD_NOTE,
   customerTrend,
   fmtCount,
   fmtDay,
@@ -26,6 +27,7 @@ import {
 import { useWorkspace } from '../seller/SellerContext';
 import { NotEnoughData, Section, tr } from '../seller/ui';
 import { ShareBar, Th } from '../analyst/ui';
+import { MismatchBox } from './MismatchBox';
 import { SummaryNotes } from './SummaryPanels';
 
 const BAR = '#3987e5';
@@ -64,14 +66,21 @@ export const SubsidyPanel: React.FC = () => {
         <NotEnoughData lang={lang} reason={tr(lang, s.notes[0])} />
       ) : (
         <>
+          {s.warnings.map((w) => (
+            <p key={w.vi} className="text-[11px] text-[#f08080] font-semibold leading-snug mb-2" role="alert">
+              ⚠ {w[lang]}
+            </p>
+          ))}
+          <MismatchBox items={s.mismatches} lang={lang} note={vi ? '"Cả khoảng" dùng dòng tổng; biểu đồ dùng số từng ngày.' : 'The whole-range figure uses the period row; the chart uses the days.'} />
           <div className="h-48" role="img" aria-label={vi ? '% phụ thuộc trợ giá theo thời gian' : 'Subsidy share over time'}>
             <ResponsiveContainer width="100%" height="100%">
+              {/* Invalid days have no share: the line breaks there instead of dipping below zero. */}
               <LineChart data={s.points.map((p) => ({ label: bucketLabel(p.key, grain, vi), share: p.share }))}>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
                 <XAxis dataKey="label" tick={axisTick} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
                 <YAxis tickFormatter={(v: number) => fmtRate(v, lang, 0)} tick={axisTick} width={40} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [fmtRate(v, lang), vi ? '% trợ giá' : 'Subsidy share']} />
-                <Line isAnimationActive={false} type="monotone" dataKey="share" stroke={BAR} strokeWidth={2} dot={grain === 'week'} connectNulls />
+                <Line isAnimationActive={false} type="monotone" dataKey="share" stroke={BAR} strokeWidth={2} dot={grain === 'week'} connectNulls={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -117,7 +126,11 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
   const vi = lang === 'vi';
   const d = useMemo(() => sourceDrivers(dataset, before, after, { platforms, excludeDates }), [dataset, before, after, platforms, excludeDates]);
   if (!(dataset.salesSummaries ?? []).some((r) => r.dimension === 'source' && r.periodStart === undefined)) return null;
-  const top = d.sources.filter((s) => Math.abs(s.delta) >= 1).slice(0, 8);
+  const top = d.sources.filter((s) => Math.abs(s.delta) >= 1).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 8);
+  // A share of a small total change is noise: the column shows only when the total moved ≥ 20% (9.2).
+  const totalChange = d.available ? d.after.gmvPerDay - d.before.gmvPerDay : 0;
+  const showShare = d.available && d.before.gmvPerDay > 0 && Math.abs(totalChange) >= 0.2 * d.before.gmvPerDay;
+  const channels = [...d.channels].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   return (
     <Section
       title={title ?? (vi ? 'Doanh số tăng/giảm do nguồn nào' : 'Which sources moved sales')}
@@ -139,21 +152,21 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
                   <Th>{vi ? 'Trước (TB/ngày)' : 'Before (/day)'}</Th>
                   <Th>{vi ? 'Sau (TB/ngày)' : 'After (/day)'}</Th>
                   <Th>{vi ? 'Thay đổi' : 'Change'}</Th>
-                  <Th title={vi ? 'Phần của tổng thay đổi; âm = đi ngược chiều tổng' : 'Share of the total change'}>{vi ? 'Tỷ trọng thay đổi' : 'Share of change'}</Th>
+                  {showShare && <Th title={vi ? 'Phần của tổng thay đổi; âm = đi ngược chiều tổng' : 'Share of the total change'}>{vi ? 'Tỷ trọng thay đổi' : 'Share of change'}</Th>}
                 </tr>
               </thead>
               <tbody>
-                {d.channels.map((c) => (
+                {channels.map((c) => (
                   <tr key={c.channel} className="border-t border-white/5 text-slate-100 font-semibold">
                     <td className="px-2.5 py-1.5">{tr(lang, SUMMARY_CHANNEL_LABELS[c.channel])}</td>
                     <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(c.before, lang)}</td>
                     <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(c.after, lang)}</td>
                     <td className={`px-2.5 py-1.5 text-right ${c.delta < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`}>{signed(c.delta, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtRate(c.shareOfChange, lang, 0)}</td>
+                    {showShare && <td className="px-2.5 py-1.5 text-right">{fmtRate(c.shareOfChange, lang, 0)}</td>}
                   </tr>
                 ))}
                 <tr className="border-t border-white/10 text-slate-400">
-                  <td colSpan={5} className="px-2.5 py-1 text-[11px]">{vi ? 'Nguồn thay đổi nhiều nhất' : 'Largest source changes'}</td>
+                  <td colSpan={showShare ? 5 : 4} className="px-2.5 py-1 text-[11px]">{vi ? 'Nguồn thay đổi nhiều nhất (xếp theo độ lớn thay đổi)' : 'Largest source changes'}</td>
                 </tr>
                 {top.map((s) => (
                   <tr key={`${s.channel}|${s.source}`} className="border-t border-white/5 text-slate-300">
@@ -163,14 +176,16 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
                     <td className="px-2.5 py-1 text-right">{fmtMoneyCompact(s.before, lang)}</td>
                     <td className="px-2.5 py-1 text-right">{fmtMoneyCompact(s.after, lang)}</td>
                     <td className={`px-2.5 py-1 text-right ${s.delta < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`}>{signed(s.delta, lang)}</td>
-                    <td className="px-2.5 py-1 text-right">{fmtRate(s.shareOfChange, lang, 0)}</td>
+                    {showShare && <td className="px-2.5 py-1 text-right">{fmtRate(s.shareOfChange, lang, 0)}</td>}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
-            {vi ? `Cỡ mẫu: ${d.before.days} ngày trước, ${d.after.days} ngày sau.` : `Sample: ${d.before.days} days before, ${d.after.days} after.`}
+            {vi
+              ? `So sánh ${d.after.days} ngày với trung bình ${d.before.days} ngày.${showShare ? '' : ' Tổng doanh số thay đổi dưới 20% nên không chia tỷ trọng thay đổi.'}`
+              : `${d.after.days} day(s) vs the average of ${d.before.days} days.`}
           </p>
           <SummaryNotes notes={d.notes} lang={lang} />
         </>
@@ -222,8 +237,10 @@ export const StageFunnelPanel: React.FC = () => {
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.placed.gmv, lang)} <span className="text-slate-500">· {fmtOrders(r.placed.orders, lang)}</span></td>
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.confirmed.gmv, lang)}</td>
                       <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.paid.gmv, lang)} <span className="text-slate-500">· {fmtOrders(r.paid.orders, lang)}</span></td>
-                      <td className="px-2.5 py-1.5 whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtRate(r.paidRateGmv, lang)}<ShareBar share={r.paidRateGmv} /></div></td>
-                      <td className="px-2.5 py-1.5 text-right">{fmtRate(r.paidRateOrders, lang)}</td>
+                      <td className="px-2.5 py-1.5 whitespace-nowrap" title={r.paidRateGmv === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>
+                        <div className="flex items-center justify-end gap-2">{fmtRate(r.paidRateGmv, lang)}<ShareBar share={r.paidRateGmv} /></div>
+                      </td>
+                      <td className="px-2.5 py-1.5 text-right" title={r.paidRateOrders === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>{fmtRate(r.paidRateOrders, lang)}</td>
                       <td className="px-2.5 py-1.5 text-right text-[#f08080]">{r.lostGmv === null ? '—' : fmtMoneyCompact(r.lostGmv, lang)}</td>
                     </tr>
                   );
@@ -306,23 +323,40 @@ export const CustomerTrendPanel: React.FC = () => {
   const t = useMemo(() => customerTrend(dataset, { range, platforms }, grain), [dataset, range, platforms, grain]);
   if (!dataset.dailyMetrics.some((d) => d.newBuyers !== undefined || d.existingBuyers !== undefined)) return null;
   const pt = t.periodTotal;
+  // Weekly bars add up daily distinct counts: say so on every series.
+  const summed = grain === 'week' ? (vi ? ' (cộng theo ngày)' : ' (sum of days)') : '';
   return (
-    <Section title={vi ? 'Khách mới và khách cũ (mức tổng)' : 'New vs existing buyers (totals)'} subtitle={formatRangeVi(range)} right={<GrainPicker grain={grain} onChange={setGrain} vi={vi} />}>
+    <Section title={vi ? 'Khách mới và khách cũ (đơn đặt)' : 'New vs existing buyers (placed orders)'} subtitle={formatRangeVi(range)} right={<GrainPicker grain={grain} onChange={setGrain} vi={vi} />}>
       {!t.available ? (
         <NotEnoughData lang={lang} reason={tr(lang, t.notes[0])} />
       ) : (
         <>
+          {!pt && (
+            <p className="text-[11px] text-slate-400 mb-2">
+              {vi
+                ? 'Tỉ lệ quay lại: Không tính được — chỉ Shopee có số này (dòng tổng cả kỳ, công thức không công khai). Chọn trọn kỳ báo cáo để xem.'
+                : 'Repeat rate: cannot be computed — only the Shopee period row has it. Select the whole report period.'}
+            </p>
+          )}
           {pt && (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
               {[
                 { l: vi ? 'Người mua (khác nhau)' : 'Buyers (distinct)', v: fmtCount(pt.buyers, lang) },
                 { l: vi ? 'Người mua mới' : 'New buyers', v: `${fmtCount(pt.newBuyers, lang)} (${fmtRate(pt.newShare, lang, 0)})` },
                 { l: vi ? 'Người mua hiện tại' : 'Existing buyers', v: fmtCount(pt.existingBuyers, lang) },
-                { l: vi ? 'Người mua tiềm năng' : 'Potential buyers', v: fmtCount(pt.potentialBuyers, lang) },
-                { l: vi ? 'Tỉ lệ quay lại' : 'Repeat rate', v: fmtRate(pt.repeatRate, lang) },
+                {
+                  l: vi ? 'Người mua tiềm năng' : 'Potential buyers',
+                  v: fmtCount(pt.potentialBuyers, lang),
+                  tip: vi ? 'Theo Shopee: người đã xem / thêm giỏ sản phẩm của shop nhưng chưa mua trong kỳ. Số khác nhau cả kỳ, không cộng từ các ngày.' : 'Shopee: visitors who viewed or added to cart but did not buy. Distinct for the period.',
+                },
+                {
+                  l: vi ? 'Tỉ lệ quay lại' : 'Repeat rate',
+                  v: fmtRate(pt.repeatRate, lang),
+                  tip: vi ? 'Số của Shopee ở dòng tổng cả kỳ. Công thức không công khai (khách cũ ÷ người mua ra số khác), nên không tự tính và không tính được cho một phần kỳ.' : "Shopee's own period figure; its formula is not published, so it is not recomputed.",
+                },
               ].map((x) => (
-                <div key={x.l} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <div className="text-[11px] text-slate-400">{x.l}</div>
+                <div key={x.l} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2" title={'tip' in x ? x.tip : undefined}>
+                  <div className="text-[11px] text-slate-400">{x.l}{'tip' in x && <span className="ml-1 text-slate-500" aria-hidden>ⓘ</span>}</div>
                   <div className="text-base font-bold text-white">{x.v}</div>
                 </div>
               ))}
@@ -334,8 +368,8 @@ export const CustomerTrendPanel: React.FC = () => {
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
                 <XAxis dataKey="label" tick={axisTick} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
                 <YAxis tick={axisTick} width={32} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [fmtCount(v, lang), n === 'newBuyers' ? (vi ? 'Mới' : 'New') : vi ? 'Hiện tại' : 'Existing']} />
-                <Legend formatter={(n: string) => (n === 'newBuyers' ? (vi ? 'Người mua mới' : 'New') : vi ? 'Người mua hiện tại' : 'Existing')} wrapperStyle={{ fontSize: 11 }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [fmtCount(v, lang), `${n === 'newBuyers' ? (vi ? 'Mới' : 'New') : vi ? 'Hiện tại' : 'Existing'}${summed}`]} />
+                <Legend formatter={(n: string) => `${n === 'newBuyers' ? (vi ? 'Người mua mới' : 'New') : vi ? 'Người mua hiện tại' : 'Existing'}${summed}`} wrapperStyle={{ fontSize: 11 }} />
                 <Bar isAnimationActive={false} dataKey="newBuyers" stackId="b" fill={BAR} maxBarSize={20} />
                 <Bar isAnimationActive={false} dataKey="existingBuyers" stackId="b" fill={SECOND} radius={[4, 4, 0, 0]} maxBarSize={20} />
               </BarChart>

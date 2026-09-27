@@ -1,14 +1,16 @@
 import React, { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { adsIntelligence, fmtCount, fmtDay, fmtMoney, fmtMoneyCompact, fmtMultiple, fmtRate, formatRangeVi, PLATFORM_LABELS, type AdEfficiency } from '../../../analytics';
+import { adsIntelligence, moneyTolerance, fmtCount, fmtDay, fmtMoney, fmtMoneyCompact, fmtMultiple, fmtRate, formatRangeVi, PLATFORM_LABELS, type AdEfficiency } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
+import { ChartTotalNote, MismatchBox } from '../../workspace/MismatchBox';
 import { ShareBar, Th } from '../ui';
 
 const BAR = '#3987e5';
 const EFF: Record<AdEfficiency, { vi: string; en: string; cls: string }> = {
   profitable: { vi: 'Trên hòa vốn', en: 'Above break-even', cls: 'border-[#0ca30c]/40 bg-[#0ca30c]/10 text-[#4ade80]' },
   below_break_even: { vi: 'Dưới hòa vốn', en: 'Below break-even', cls: 'border-[#d03b3b]/40 bg-[#d03b3b]/10 text-[#f08080]' },
+  likely_loss: { vi: 'Gần như chắc chắn lỗ', en: 'Almost surely losing', cls: 'border-[#d03b3b]/40 bg-[#d03b3b]/10 text-[#f08080]' },
   unknown: { vi: 'Chưa đánh giá được', en: 'Unknown', cls: 'border-white/15 bg-white/[0.04] text-slate-400' },
 };
 const tooltipStyle = { background: '#0b1024', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, fontSize: 12 };
@@ -52,18 +54,26 @@ export const AdsIntelligenceView: React.FC = () => {
     );
   }
   const t = ai.totals;
+  // Margin from the shop-wide estimates in Settings (0.9), not from COGS.
+  const est = t.marginIsEstimate ? ` · ${vi ? 'ước tính theo số bạn nhập' : 'estimate from your inputs'}` : '';
   const tiles = [
     { l: vi ? 'Chi phí Ads' : 'Spend', v: fmtMoneyCompact(t.spend, lang) },
     { l: vi ? 'Doanh thu quy đổi' : 'Attributed revenue', v: fmtMoneyCompact(t.attributedRevenue, lang) },
-    { l: 'ROAS', v: fmtMultiple(t.roas, lang) },
-    { l: vi ? 'ROAS hòa vốn (shop)' : 'Break-even ROAS', v: fmtMultiple(t.breakEvenRoas, lang) },
-    { l: vi ? 'Lời sau Ads (ước tính)' : 'Profit after ads', v: t.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(t.estimatedProfitAfterAds, lang), bad: (t.estimatedProfitAfterAds ?? 0) < 0 },
+    { l: vi ? 'ROAS (đơn đặt)' : 'ROAS (placed)', v: fmtMultiple(t.roas, lang) },
+    { l: vi ? 'ROAS (đơn đã thanh toán)' : 'ROAS (paid)', v: t.paidRoas === null ? (vi ? 'Chọn trọn kỳ báo cáo' : 'Select the whole period') : fmtMultiple(t.paidRoas, lang) },
+    { l: `${vi ? 'ROAS hòa vốn (shop)' : 'Break-even ROAS'}${est}`, v: fmtMultiple(t.breakEvenRoas, lang) },
+    { l: `${vi ? 'Lời sau Ads (ước tính)' : 'Profit after ads'}${est}`, v: t.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(t.estimatedProfitAfterAds, lang), bad: (t.estimatedProfitAfterAds ?? 0) < 0 },
     { l: vi ? 'Ngân sách dưới hòa vốn' : 'Spend below break-even', v: ai.campaigns.some((c) => c.breakEvenRoas !== null) ? `${fmtMoneyCompact(ai.spendBelowBreakEven, lang)} (${fmtRate(t.spend ? ai.spendBelowBreakEven / t.spend : null, lang, 0)})` : '—', bad: ai.spendBelowBreakEven > 0 },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
+      <p className="text-[11px] text-slate-400">
+        {vi
+          ? 'Nguồn: tổng các dòng quảng cáo trong sheet "Nguồn truy cập cho Đơn hàng…" (không dùng dòng "Doanh thu từ quảng cáo Shopee" ở đầu sheet). ROAS đơn đặt gồm cả đơn sau đó bị hủy; ROAS đơn đã thanh toán = doanh thu Ads của đơn đã thanh toán ÷ chi phí.'
+          : 'Source: sum of the ad rows in the traffic-source sheet. Placed ROAS includes orders cancelled later; paid ROAS uses paid-order ad revenue.'}
+      </p>
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
         {tiles.map((x) => (
           <div key={x.l} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
             <div className="text-[11px] text-slate-400">{x.l}</div>
@@ -71,6 +81,7 @@ export const AdsIntelligenceView: React.FC = () => {
           </div>
         ))}
       </div>
+      <MismatchBox items={ai.mismatches} lang={lang} note={vi ? 'Bảng dùng dòng tổng cả kỳ; biểu đồ dùng số từng ngày.' : 'The table uses the period rows; the charts use the days.'} />
       {ai.notes.map((n, i) => (
         <p key={i} className="text-xs text-[#fab219]">{tr(lang, n)}</p>
       ))}
@@ -128,7 +139,7 @@ export const AdsIntelligenceView: React.FC = () => {
         </div>
         <p className="text-[11px] text-slate-500 mt-2">
           {vi
-            ? 'Lời sau Ads = doanh thu quy đổi × biên lợi nhuận trước Ads của SKU − chi phí. Doanh thu quy đổi do sàn báo cáo, có thể trùng với đơn tự nhiên. * = thiếu một số chi phí.'
+            ? `Lời sau Ads = doanh thu quy đổi × biên lợi nhuận trước Ads${t.marginIsEstimate ? ' (biên gộp − phí sàn bạn nhập ở Cài đặt, ước tính theo số bạn nhập)' : ' của SKU'} − chi phí. Doanh thu quy đổi do sàn báo cáo, có thể trùng với đơn tự nhiên. * = thiếu một số chi phí.`
             : 'Profit after ads = attributed revenue × margin before ads − spend. Attribution is the platform’s own.'}
         </p>
       </Section>
@@ -146,20 +157,41 @@ export const AdsIntelligenceView: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
+          <ChartTotalNote chartTotal={ai.daily.reduce((s, d) => s + d.spend, 0)} kpi={t.spend} lang={lang} tolerance={moneyTolerance(t.spend ?? 0)} />
         </Section>
         <Section title={vi ? 'ROAS theo ngày' : 'Daily ROAS'} subtitle={vi ? `Đường nét đứt: ROAS hòa vốn của shop (${fmtMultiple(t.breakEvenRoas, lang)})` : 'Dashed: shop break-even ROAS'}>
           <div className="h-48" role="img" aria-label={vi ? 'ROAS theo ngày' : 'Daily ROAS'}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={ai.daily.map((d) => ({ label: fmtDay(d.date), roas: d.roas, be: t.breakEvenRoas }))}>
+              <LineChart data={ai.daily.map((d) => ({ label: fmtDay(d.date), roas: d.roas, be: t.breakEvenRoas, outlier: d.roasOutlier }))}>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
                 <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
                 <YAxis tickFormatter={(v: number) => `${v}x`} tick={{ fill: '#94a3b8', fontSize: 10 }} width={36} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [fmtMultiple(v, lang), n === 'be' ? (vi ? 'Hòa vốn' : 'Break-even') : 'ROAS']} />
-                <Line isAnimationActive={false} type="monotone" dataKey="roas" stroke={BAR} strokeWidth={2} dot={false} connectNulls />
+                <Line
+                  isAnimationActive={false}
+                  type="monotone"
+                  dataKey="roas"
+                  stroke={BAR}
+                  strokeWidth={2}
+                  connectNulls
+                  dot={(p: { cx?: number; cy?: number; index?: number; payload?: { outlier?: boolean } }) =>
+                    p.payload?.outlier ? <circle key={p.index} cx={p.cx} cy={p.cy} r={4} fill="#f08080" stroke="#0b1024" strokeWidth={1} /> : <g key={p.index} />
+                  }
+                />
                 <Line isAnimationActive={false} type="monotone" dataKey="be" stroke="#8b93a3" strokeWidth={2} strokeDasharray="5 4" dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
+          {ai.daily.some((d) => d.roasOutlier) && (
+            <p className="text-[11px] text-[#f08080] mt-1.5">
+              {vi ? 'ROAS bất thường (chấm đỏ): ' : 'Unusual ROAS (red dots): '}
+              {ai.daily
+                .filter((d) => d.roasOutlier)
+                .map((d) => `${fmtDay(d.date)} ${fmtMultiple(d.roas, lang)}`)
+                .join(' · ')}
+              {vi ? ' — kiểm tra đơn lớn hoặc số liệu ngày này trước khi dùng để kết luận.' : ' — check large orders or the data before drawing conclusions.'}
+            </p>
+          )}
         </Section>
       </div>
 

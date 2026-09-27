@@ -9,12 +9,14 @@ import {
   fmtMoneyCompact,
   fmtPp,
   formatRangeVi,
+  moneyTolerance,
   type KpiKey,
   type MetricComparison,
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { KpiCard, NotEnoughData, Section, tr } from '../../seller/ui';
 import { SourceDriversPanel, SubsidyPanel } from '../../workspace/SummaryInsightPanels';
+import { ChartTotalNote } from '../../workspace/MismatchBox';
 import { BreakdownTable } from '../ui';
 
 const CURRENT_COLOR = '#3987e5';
@@ -52,9 +54,12 @@ export const ExecutiveOverview: React.FC = () => {
   const cur = useMemo(() => dailySeries(dataset, baseFilter), [dataset, baseFilter]);
   const prev = useMemo(() => dailySeries(dataset, { ...baseFilter, range: previousRange }), [dataset, baseFilter, previousRange]);
   const byPlatform = useMemo(() => breakdown(dataset, baseFilter, 'platform', previousRange, lang), [dataset, baseFilter, previousRange, lang]);
+  const gmvBasis = cmp.current.metrics.gmv.basis;
   const byCategory = useMemo(() => breakdown(dataset, baseFilter, 'category', previousRange, lang), [dataset, baseFilter, previousRange, lang]);
 
-  const compareLabel = vi ? `so với ${formatRangeVi(previousRange)}` : `vs ${formatRangeVi(previousRange)}`;
+  // No data in the comparison period: no Δ anywhere, and say so instead of "chưa đủ mẫu".
+  const noComparison = cmp.previous.coverage === 'none';
+  const compareLabel = noComparison ? (vi ? 'Không có kỳ so sánh' : 'No comparison period') : vi ? `so với ${formatRangeVi(previousRange)}` : `vs ${formatRangeVi(previousRange)}`;
   const changed = KPIS.map((k) => changeSentence(vi ? k.vi : k.en, cmp.metrics[k.key], lang)).filter(Boolean) as string[];
 
   const chart = Array.from({ length: Math.max(cur.length, prev.length) }, (_, i) => ({
@@ -70,26 +75,33 @@ export const ExecutiveOverview: React.FC = () => {
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5">
         {KPIS.map((k) => (
-          <KpiCard key={k.key} lang={lang} label={vi ? k.vi : k.en} metric={cmp.current.metrics[k.key]} cmp={cmp.metrics[k.key]} compareLabel={compareLabel} goodWhenUp={k.goodWhenUp} />
+          <KpiCard key={k.key} lang={lang} label={vi ? k.vi : k.en} metric={cmp.current.metrics[k.key]} cmp={noComparison ? undefined : cmp.metrics[k.key]} compareLabel={compareLabel} goodWhenUp={k.goodWhenUp} />
         ))}
       </div>
-      {cmp.previous.coverage !== 'full' && (
+      {noComparison && <p className="text-xs text-slate-400">{vi ? `Không có kỳ so sánh: ${formatRangeVi(previousRange)} nằm ngoài dữ liệu.` : `No comparison period: ${formatRangeVi(previousRange)} is outside the data.`}</p>}
+      {cmp.previous.coverage === 'partial' && (
         <p className="text-xs text-[#fab219]">
           {vi
-            ? `Kỳ so sánh ${formatRangeVi(previousRange)} ${cmp.previous.coverage === 'none' ? 'nằm ngoài dữ liệu' : 'chỉ có một phần dữ liệu'} — so sánh có thể không đại diện.`
-            : `Comparison period ${formatRangeVi(previousRange)} is ${cmp.previous.coverage === 'none' ? 'outside the data' : 'only partly covered'}.`}
+            ? `Kỳ so sánh ${formatRangeVi(previousRange)} chỉ có một phần dữ liệu — so sánh có thể không đại diện.`
+            : `Comparison period ${formatRangeVi(previousRange)} is only partly covered.`}
         </p>
       )}
 
-      <Section title={vi ? '1 · Điều gì đã thay đổi?' : '1 · What changed?'} subtitle={`${formatRangeVi(range)} ${compareLabel}`}>
+      <Section title={vi ? '1 · Điều gì đã thay đổi?' : '1 · What changed?'} subtitle={noComparison ? `${formatRangeVi(range)} · ${compareLabel}` : `${formatRangeVi(range)} ${compareLabel}`}>
         {changed.length === 0 ? (
-          <p className="text-sm text-slate-400">{vi ? 'Chưa có kỳ so sánh để xác định thay đổi.' : 'No comparison period available.'}</p>
+          <p className="text-sm text-slate-400">{vi ? 'Không có kỳ so sánh.' : 'No comparison period.'}</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {changed.map((s) => (
               <span key={s} className="text-xs px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-slate-100">{s}</span>
             ))}
           </div>
+        )}
+        {chart.length > 1 && (
+          <ChartTotalNote chartTotal={cur.reduce((s, p) => s + (p.gmv ?? 0), 0)} kpi={cmp.current.metrics.gmv.value} lang={lang} tolerance={moneyTolerance(cmp.current.metrics.gmv.value ?? 0)} />
+        )}
+        {chart.length > 1 && gmvBasis && (
+          <p className="text-[11px] text-slate-400 mt-4">{vi ? `Biểu đồ: GMV theo ngày, ${gmvBasis.vi.toLowerCase()}.` : `Chart: daily GMV, ${gmvBasis.en.toLowerCase()}.`}</p>
         )}
         {chart.length > 1 && (
           <div className="h-60 mt-4" role="img" aria-label={vi ? 'GMV theo ngày: kỳ này và kỳ so sánh' : 'Daily GMV: current vs comparison'}>

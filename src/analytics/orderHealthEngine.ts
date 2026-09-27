@@ -2,9 +2,11 @@
  * Order health — lifecycle counts and cancel/return breakdowns by SKU, platform,
  * date and reason. Rates use placed orders (cancel) and non-cancelled orders (return).
  */
-import type { CanonicalDataset, OrderStatus, Platform } from './model';
+import type { CanonicalDataset, OrderStatus, Platform, SummaryStage } from './model';
+import { usablePeriodTotals } from './kpiEngine';
 import { sliceDataset, type DatasetFilter } from './filters';
 import { isCancelled, isCompleted, isReturnOrRefund } from './status';
+import { stageDay, stageOf } from './orderStage';
 import { enumerateDays } from './period';
 
 export interface LifecycleCounts {
@@ -29,6 +31,8 @@ export interface RateRow {
   returned: number;
   cancelRate: number | null;
   returnRate: number | null;
+  /** Summary reports only: sales of the cancelled orders. */
+  cancelledGmv?: number;
 }
 
 export interface ReasonRow {
@@ -96,27 +100,32 @@ export function orderHealth(dataset: CanonicalDataset, filter: DatasetFilter): O
   let withoutReason = 0;
 
   // Summary reports: rates per day / platform from the daily rows (no statuses, no reasons).
+  // Every count is of ONE order stage (placed by default): cancel and refund rates are
+  // both "of those orders" — never refunds of one stage over orders of another.
   if (slice.orders.length === 0 && slice.dailyMetrics.length > 0) {
+    const stage = stageOf(filter);
     let placed = 0;
     let cancelled = 0;
     let valid = 0;
     let returned = 0;
     for (const d of slice.dailyMetrics) {
+      const s = stageDay(d, stage);
       const add = (row: RateRow) => {
-        row.placed += d.placedOrders ?? 0;
-        row.cancelled += d.cancelledOrders ?? 0;
-        row.valid += d.paidOrders ?? 0;
-        row.returned += d.refundedOrders ?? 0;
+        row.placed += s.orders ?? 0;
+        row.cancelled += s.cancelledOrders ?? 0;
+        row.valid += (s.orders ?? 0) - (s.cancelledOrders ?? 0);
+        row.returned += s.refundedOrders ?? 0;
+        if (s.cancelledGmv !== undefined) row.cancelledGmv = (row.cancelledGmv ?? 0) + s.cancelledGmv;
       };
       const day = byDate.get(d.date);
       if (day) add(day);
       let p = byPlatform.get(d.platform);
       if (!p) byPlatform.set(d.platform, (p = newRate(d.platform)));
       add(p);
-      placed += d.placedOrders ?? 0;
-      cancelled += d.cancelledOrders ?? 0;
-      valid += d.paidOrders ?? 0;
-      returned += d.refundedOrders ?? 0;
+      placed += s.orders ?? 0;
+      cancelled += s.cancelledOrders ?? 0;
+      valid += (s.orders ?? 0) - (s.cancelledOrders ?? 0);
+      returned += s.refundedOrders ?? 0;
     }
     lifecycle.total = placed;
     lifecycle.cancelled = cancelled;
@@ -124,7 +133,7 @@ export function orderHealth(dataset: CanonicalDataset, filter: DatasetFilter): O
     return {
       lifecycle,
       cancelRate: placed > 0 ? cancelled / placed : null,
-      returnRate: valid > 0 ? returned / valid : null,
+      returnRate: placed > 0 ? returned / placed : null,
       completionRate: null,
       bySku: [],
       byPlatform: finish(byPlatform),
@@ -190,5 +199,44 @@ export function orderHealth(dataset: CanonicalDataset, filter: DatasetFilter): O
     cancelReasons: reasons(cancelReasons),
     returnReasons: reasons(returnReasons),
     withoutReason,
+  };
+}
+
+export interface StageCancellations {
+  /** Cancelled orders as each stage's sheet reports them (placed / confirmed / paid). */
+  byStage: { stage: SummaryStage; cancelled: number | null; orders: number | null }[];
+  /** Cancelled sales ÷ sales of the selected stage, both from the same source. */
+  cancelledGmv: number | null;
+  gmv: number | null;
+  valueRate: number | null;
+  /** The platform's period row was used (whole report period selected), not a sum of days. */
+  fromPeriodRow: boolean;
+}
+
+/**
+ * Cancellations of a summary report: by order stage and by value. Whole report period →
+ * the platform's period row; otherwise the days. One source per figure (canonicalSources.ts).
+ */
+export function stageCancellations(dataset: CanonicalDataset, filter: DatasetFilter): StageCancellations {
+  const slice = sliceDataset(dataset, filter);
+  const figures = (stage: SummaryStage) => {
+    const totals = usablePeriodTotals(slice, stage);
+    const add = (pick: (x: { cancelledOrders?: number; cancelledGmv?: number; orders?: number; gmv?: number }) => number | undefined) => {
+      const rows = totals ?? slice.dailyMetrics.map((d) => stageDay(d, stage));
+      return rows.some((r) => pick(r) !== undefined) ? rows.reduce((s, r) => s + (pick(r) ?? 0), 0) : null;
+    };
+    return { cancelled: add((x) => x.cancelledOrders), orders: add((x) => x.orders), cancelledGmv: add((x) => x.cancelledGmv), gmv: add((x) => x.gmv), fromPeriodRow: totals !== null };
+  };
+  const stage = stageOf(filter);
+  const own = figures(stage);
+  return {
+    byStage: (['placed', 'confirmed', 'paid'] as const).map((s) => {
+      const f = figures(s);
+      return { stage: s, cancelled: f.cancelled, orders: f.orders };
+    }),
+    cancelledGmv: own.cancelledGmv,
+    gmv: own.gmv,
+    valueRate: own.cancelledGmv !== null && own.gmv ? own.cancelledGmv / own.gmv : null,
+    fromPeriodRow: own.fromPeriodRow,
   };
 }

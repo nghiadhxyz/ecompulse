@@ -20,6 +20,8 @@
 import type { CanonicalDataset } from './model';
 import type { DatasetFilter } from './filters';
 import { computeKpis } from './kpiEngine';
+import { adsSummary } from './adsLiveEngine';
+import { stageCancellations } from './orderHealthEngine';
 import type { ProfitLineKey, ProfitResult } from './profitEngine';
 import type { Bilingual } from './metric';
 
@@ -146,6 +148,126 @@ export function whatIf(dataset: CanonicalDataset, filter: DatasetFilter, levers:
     base: { gmv: base.gmv, net: base.net, profit: base.profit, margin: base.margin, breakEvenRoas: base.breakEvenRoas },
     scenario: { gmv: sc.gmv, net: sc.net, profit: sc.profit, margin: sc.margin, breakEvenRoas: sc.breakEvenRoas },
     volumeToKeepProfit,
+    notes,
+  };
+}
+
+// ============================================================ SUMMARY REPORTS (no order file)
+
+export interface SummaryWhatIfLevers {
+  /** Average price change (ratio). */
+  price: number;
+  /** Order volume change assumed by the user (ratio). */
+  volume: number;
+  /** Ad spend change (ratio). */
+  ads: number;
+  /** Change of the cancel rate by value, in percentage points (−0.085 = 28,5% → 20%). */
+  cancelPp: number;
+}
+
+export const NO_SUMMARY_CHANGE: SummaryWhatIfLevers = { price: 0, volume: 0, ads: 0, cancelPp: 0 };
+
+/** [low, high]: extra Ads spend earns between the paid-order ROAS and the placed-order ROAS. */
+export type Span = [number, number];
+
+export interface SummaryWhatIf {
+  available: boolean;
+  unavailable?: Bilingual;
+  /** 1: sales, orders, Ads, ROAS. 2: plus profit from the margin and fees entered in Settings (0.9). */
+  level: 1 | 2;
+  base: { gmv: number; orders: number; adSpend: number | null; roas: number | null; paidRoas: number | null; cancelValueRate: number | null; keptSales: number | null; profit: number | null };
+  scenario: { gmv: Span; orders: Span; adSpend: number | null; roas: Span | null; cancelValueRate: number | null; keptSales: Span | null; profit: Span | null };
+  /** Extra Ads spend and the sales it may bring (ceiling = the placed-order ROAS). */
+  adsEffect: { spend: number; sales: Span } | null;
+  /** Sales kept by the cancel-rate change alone (at the scenario's sales). */
+  cancelEffect: number | null;
+  notes: Bilingual[];
+}
+
+/**
+ * What-If on a summary report: no COGS needed. Baseline = the period's placed-order sales,
+ * orders, Ads spend and cancel rate by value (canonical sources, 0.3).
+ *   sales      × (1 + price) × (1 + volume), plus extra Ads spend × [paid ROAS ; placed ROAS]
+ *   orders     × (1 + volume), plus extra Ads sales ÷ AOV
+ *   kept sales = sales × (1 − cancel rate by value) − refunds (scaled like sales)
+ *   profit     = kept sales × (gross margin − fees) − Ads spend      (level 2, estimate)
+ * The upper end of the Ads range assumes every extra đồng earns today's average ROAS — a ceiling.
+ */
+export function summaryWhatIf(dataset: CanonicalDataset, filter: DatasetFilter, lv: SummaryWhatIfLevers): SummaryWhatIf {
+  const f: DatasetFilter = { ...filter, stage: 'placed' };
+  const m = computeKpis(dataset, f).metrics;
+  const gmv = m.gmv.value;
+  const orders = m.orders.value;
+  const empty = (reason: Bilingual): SummaryWhatIf => ({
+    available: false,
+    unavailable: reason,
+    level: 1,
+    base: { gmv: 0, orders: 0, adSpend: null, roas: null, paidRoas: null, cancelValueRate: null, keptSales: null, profit: null },
+    scenario: { gmv: [0, 0], orders: [0, 0], adSpend: null, roas: null, cancelValueRate: null, keptSales: null, profit: null },
+    adsEffect: null,
+    cancelEffect: null,
+    notes: [],
+  });
+  if (gmv === null || orders === null || gmv <= 0) return empty({ vi: 'Không có doanh số trong khoảng này.', en: 'No sales in this range.' });
+
+  const ads = adsSummary(dataset, f);
+  const spend0 = ads.available && ads.totals.spend > 0 ? ads.totals.spend : null;
+  const roas0 = spend0 !== null ? ads.totals.roas : null;
+  const paidRoas0 = spend0 !== null ? ads.totals.paidRoas : null;
+  const cancel = stageCancellations(dataset, f);
+  const cancel0 = cancel.valueRate;
+  // Refunds of the same orders: net revenue = sales − cancelled sales − refunds (kpiEngine).
+  const refundGmv = m.netRevenue.value !== null && cancel.cancelledGmv !== null ? Math.max(0, gmv - cancel.cancelledGmv - m.netRevenue.value) : 0;
+
+  const settings = dataset.costSettings;
+  const margin = settings?.estimatedGrossMargin !== undefined ? settings.estimatedGrossMargin - (settings.estimatedFeeRate ?? 0) : null;
+  const level: 1 | 2 = margin !== null ? 2 : 1;
+
+  const scale = (1 + lv.price) * (1 + lv.volume);
+  const aov = gmv / (orders || 1);
+  const extraSpend = spend0 !== null ? spend0 * lv.ads : 0;
+  const lowRoas = Math.min(paidRoas0 ?? roas0 ?? 0, roas0 ?? 0);
+  const highRoas = roas0 ?? 0;
+  const extraSales: Span = extraSpend >= 0 ? [extraSpend * lowRoas, extraSpend * highRoas] : [extraSpend * highRoas, extraSpend * lowRoas];
+  const gmvS: Span = [gmv * scale + extraSales[0], gmv * scale + extraSales[1]];
+  const ordersS: Span = [orders * (1 + lv.volume) + extraSales[0] / (aov * (1 + lv.price)), orders * (1 + lv.volume) + extraSales[1] / (aov * (1 + lv.price))];
+  const spendS = spend0 !== null ? spend0 + extraSpend : null;
+  const cancelS = cancel0 !== null ? Math.min(1, Math.max(0, cancel0 + lv.cancelPp)) : null;
+  const kept = (g: number, c: number | null) => (c === null ? null : g * (1 - c) - refundGmv * scale);
+  const keptBase = kept(gmv, cancel0);
+  const keptS: Span | null = cancelS === null ? null : [kept(gmvS[0], cancelS)!, kept(gmvS[1], cancelS)!];
+  const profit = (k: number | null, s: number | null) => (margin === null || k === null ? null : k * margin - (s ?? 0));
+  // ROAS as a range: paid-order ROAS to placed-order ROAS (the ceiling, 10.2).
+  const roasS: Span | null = spendS && roas0 !== null ? [lowRoas, highRoas] : null;
+
+  const notes: Bilingual[] = [
+    { vi: 'Mô phỏng trên báo cáo tổng hợp của kỳ đã chọn (đơn đặt) và các giả định bạn nhập — không phải dự báo.', en: 'Simulation on the summary report (placed orders) and your assumptions — not a forecast.' },
+    { vi: 'Số đơn không tự thay đổi khi đổi giá: nếu bạn nghĩ tăng giá sẽ làm giảm đơn, hãy nhập mức thay đổi số đơn.', en: 'Volume does not react to price unless you enter a volume change.' },
+  ];
+  if (spend0 !== null && lv.ads !== 0) {
+    notes.push({
+      vi: `Doanh số thêm từ Ads là một khoảng: đầu thấp theo ROAS đơn đã thanh toán (${(paidRoas0 ?? lowRoas).toFixed(2).replace('.', ',')}x), đầu cao theo ROAS đơn đặt (${highRoas.toFixed(2).replace('.', ',')}x) — mức trần, vì đồng Ads thêm thường kém hiệu quả hơn mức trung bình.`,
+      en: 'Extra Ads sales are a range from paid-order ROAS to placed-order ROAS (a ceiling).',
+    });
+  }
+  if (level === 2) notes.push({ vi: 'Lợi nhuận: ước tính theo số bạn nhập (biên gộp − phí sàn ở Cài đặt), trừ chi phí Ads.', en: 'Profit: estimate from your margin and fee inputs, minus Ads.' });
+  else notes.push({ vi: 'Nhập "Biên lợi nhuận gộp ước tính" và "Phí sàn" ở Cài đặt để xem lợi nhuận ước tính.', en: 'Enter a gross margin and fees in Settings for an estimated profit.' });
+
+  return {
+    available: true,
+    level,
+    base: { gmv, orders, adSpend: spend0, roas: roas0, paidRoas: paidRoas0, cancelValueRate: cancel0, keptSales: keptBase, profit: profit(keptBase, spend0) },
+    scenario: {
+      gmv: gmvS,
+      orders: ordersS,
+      adSpend: spendS,
+      roas: roasS,
+      cancelValueRate: cancelS,
+      keptSales: keptS,
+      profit: keptS ? [profit(keptS[0], spendS)!, profit(keptS[1], spendS)!] : null,
+    },
+    adsEffect: spend0 !== null && lv.ads !== 0 ? { spend: extraSpend, sales: extraSales } : null,
+    cancelEffect: cancelS !== null && lv.cancelPp !== 0 ? -lv.cancelPp * gmvS[0] : null,
     notes,
   };
 }

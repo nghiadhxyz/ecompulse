@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Send, Sparkles, Loader2, Lock, Cpu, Cloud } from 'lucide-react';
-import { askDolphin, answerToAiPayload, fmtByUnit, formatRangeVi, type DolphinAnswer } from '../../analytics';
+import { askDolphin, answerToAiPayload, fmtByUnit, formatRangeVi, questionUnavailable, SUGGESTED_QUESTIONS, type Bilingual, type DolphinAnswer } from '../../analytics';
 import { aiRephrase, type AiReply } from '../../utils/aiClient';
 import { PRIVACY_MODE_INFO } from '../../utils/aiPrivacy';
 import { useAiPrivacyMode } from '../workspace/AiPrivacySettings';
@@ -8,7 +8,6 @@ import { useWorkspace } from './SellerContext';
 import { EvidenceButton, tr } from './ui';
 import dolphinAvatar from '../../assets/images/dolphin_ai_avatar_1787721342181.jpg';
 
-const SUGGESTED = ['Tháng này doanh thu thế nào?', 'Tại sao GMV thay đổi?', 'SKU nào đang tăng trưởng?', 'Sản phẩm nào tốt nhất?', 'Chi phí nào tăng mạnh?', 'Live nào có conversion thấp?', 'Sản phẩm nào đang lỗ?'];
 const MODE_ICON = { local_only: Lock, privacy_ai: Cpu, cloud_ai: Cloud };
 
 interface Turn {
@@ -24,6 +23,30 @@ export const DolphinAsk: React.FC = () => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const ctx = useMemo(() => ({ range, previousRange, platforms }), [range, previousRange, platforms]);
   const ModeIcon = MODE_ICON[mode];
+  // Questions the loaded data cannot answer (no order export / COGS) are dimmed, with the reason.
+  const blocked = useMemo(() => {
+    const out = new Map<string, Bilingual>();
+    for (const q of SUGGESTED_QUESTIONS) {
+      const reason = questionUnavailable(dataset, q, ctx);
+      if (reason) out.set(q, reason);
+    }
+    return out;
+  }, [dataset, ctx]);
+  const chip = (q: string, className: string) => {
+    const reason = blocked.get(q);
+    return (
+      <button
+        key={q}
+        onClick={() => ask(q)}
+        disabled={!!reason}
+        title={reason ? tr(lang, reason) : undefined}
+        aria-disabled={!!reason}
+        className={`${className} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent`}
+      >
+        {q}
+      </button>
+    );
+  };
 
   const ask = (q: string) => {
     const question = q.trim();
@@ -74,12 +97,13 @@ export const DolphinAsk: React.FC = () => {
         </button>
       </form>
       <div className="flex flex-wrap gap-1.5 mt-2">
-        {SUGGESTED.map((q) => (
-          <button key={q} onClick={() => ask(q)} className="text-[11px] px-2 py-1 rounded-lg border border-white/10 text-slate-300 hover:bg-white/[0.06]">
-            {q}
-          </button>
-        ))}
+        {[...SUGGESTED_QUESTIONS].sort((a, b) => Number(blocked.has(a)) - Number(blocked.has(b))).map((q) => chip(q, 'text-[11px] px-2 py-1 rounded-lg border border-white/10 text-slate-300 hover:bg-white/[0.06]'))}
       </div>
+      {blocked.size > 0 && (
+        <p className="text-[11px] text-slate-500 mt-1">
+          {vi ? `Câu hỏi mờ chưa trả lời được với dữ liệu hiện có (cần file xuất đơn hàng hoặc giá vốn) — di chuột để xem lý do.` : 'Dimmed questions need an order export or COGS — hover for the reason.'}
+        </p>
+      )}
 
       <div className="space-y-3 mt-4">
         {turns.map((t, i) => {
@@ -159,11 +183,7 @@ export const DolphinAsk: React.FC = () => {
               )}
               {a.followUps.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {a.followUps.map((q) => (
-                    <button key={q} onClick={() => ask(q)} className="text-[11px] px-2 py-0.5 rounded-lg border border-white/10 text-slate-400 hover:text-white">
-                      {q}
-                    </button>
-                  ))}
+                  {a.followUps.filter((q) => !blocked.has(q)).map((q) => chip(q, 'text-[11px] px-2 py-0.5 rounded-lg border border-white/10 text-slate-400 hover:text-white'))}
                 </div>
               )}
             </article>

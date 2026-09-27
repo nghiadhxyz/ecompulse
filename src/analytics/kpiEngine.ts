@@ -24,12 +24,16 @@ import { isCancelled, isCompleted, isValidOrder } from './status';
 import { hasAny, missing, ok, partial, ratioMetric, sum, type Bilingual, type MetricResult, type MetricUnit } from './metric';
 import { computeProfit, type ProfitResult } from './profitEngine';
 import { moneyTolerance, ORDER_TOLERANCE } from './periodRows';
+import { stageDay, stageOf, STAGE_BASIS } from './orderStage';
+import { compareCopies, DAILY_SUM_LABEL, FILE_RATE_LABEL, fmtMismatchValue, PERIOD_ROW_LABEL, RECOMPUTED_LABEL } from './mismatch';
 
 export type DataGrain = 'order' | 'daily' | 'none';
 
 export const KPI_KEYS = [
   'gmv',
   'placedGmv',
+  'paidGmv',
+  'paidOrders',
   'netRevenue',
   'orders',
   'validOrders',
@@ -56,6 +60,8 @@ export type KpiKey = (typeof KPI_KEYS)[number];
 export const KPI_UNITS: Record<KpiKey, MetricUnit> = {
   gmv: 'vnd',
   placedGmv: 'vnd',
+  paidGmv: 'vnd',
+  paidOrders: 'count',
   netRevenue: 'vnd',
   orders: 'count',
   validOrders: 'count',
@@ -183,13 +189,15 @@ function fromPeriodTotals(
   const daily = sum(slice.dailyMetrics, dailyPick);
   // Only additive figures come here (sales, orders, cancellations, clicks) — never distinct
   // counts such as visitors or buyers, whose days are not meant to add up.
-  if (Math.abs(daily - value) <= (unit === 'vnd' ? moneyTolerance(value) : ORDER_TOLERANCE)) return ok(value, unit);
-  const fmt = (v: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(v);
+  const mismatch = compareCopies('period-vs-days', { vi: 'Số liệu', en: 'Figure' }, unit, { label: PERIOD_ROW_LABEL, value }, { label: DAILY_SUM_LABEL, value: daily });
+  if (!mismatch) return ok(value, unit);
+  const fmt = (v: number) => fmtMismatchValue(v, unit);
   return {
     ...ok(value, unit),
+    mismatch,
     warning: {
-      vi: `Cộng các ngày = ${fmt(daily)}, dòng tổng của sàn = ${fmt(value)} (lệch ${fmt(daily - value)}) — đang dùng dòng tổng.`,
-      en: `Daily rows add up to ${fmt(daily)} but the platform's total is ${fmt(value)} — using the total.`,
+      vi: `Dữ liệu không khớp: dòng tổng ${fmt(value)} · cộng ngày ${fmt(daily)} (lệch ${fmt(Math.abs(daily - value))}). Thẻ dùng dòng tổng, biểu đồ theo ngày dùng cộng ngày.`,
+      en: `Data does not match: period row ${fmt(value)} vs sum of days ${fmt(daily)}. The card uses the period row, daily charts the days.`,
     },
   };
 }
@@ -271,6 +279,9 @@ function orderGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
   return {
     gmv,
     placedGmv: ok(placedGmv, 'vnd'),
+    // "Tiền về" by payment day only exists in platform summary reports.
+    paidGmv: need('vnd', 'Chỉ có trong báo cáo tổng hợp của sàn.', 'Summary reports only.'),
+    paidOrders: need('count', 'Chỉ có trong báo cáo tổng hợp của sàn.', 'Summary reports only.'),
     netRevenue: profit.netRevenue,
     orders: ordersM,
     validOrders: validM,
@@ -302,25 +313,37 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
     vi: 'Báo cáo tổng hợp không có chỉ số này — cần file xuất đơn hàng.',
     en: 'Summary reports do not contain this metric — an order export is required.',
   };
+  // One order stage for every figure below (placed unless the filter asks otherwise), so
+  // GMV, orders, AOV, cancellations and refunds always count the same orders.
+  const stage = stageOf(slice.filter);
+  const day = (d: DailyMetric) => stageDay(d, stage);
   // Whole report period selected → the platform's own totals; otherwise the daily rows.
+  const totals = usablePeriodTotals(slice, stage);
   const placedTotals = usablePeriodTotals(slice, 'placed');
   const paidTotals = usablePeriodTotals(slice, 'paid');
+  // The source is chosen once per set of totals: the period row when it covers the range,
+  // the days otherwise. A field the period row lacks is missing — never filled from the days,
+  // so a ratio never takes its numerator and denominator from two sources (canonicalSources.ts).
+  const NOT_IN_PERIOD_ROW: Bilingual = { vi: 'Dòng tổng cả kỳ của sàn không có chỉ số này.', en: "The platform's period row lacks this figure." };
   const pick = (
-    totals: ShopPeriodTotal[] | null,
+    tot: ShopPeriodTotal[] | null,
     tPick: (t: ShopPeriodTotal) => number | undefined,
     dPick: (d: DailyMetric) => number | undefined,
     unit: MetricUnit,
     field: string,
-  ) => fromPeriodTotals(slice, totals, tPick, dPick, unit) ?? dailySum(slice, dPick, unit, ORDER_LEVEL, field);
-  const placedOrders = pick(placedTotals, (t) => t.orders, (d) => d.placedOrders, 'count', 'daily.placedOrders');
-  const paidOrders = pick(paidTotals, (t) => t.orders, (d) => d.paidOrders, 'count', 'daily.paidOrders');
-  const paidGmv = pick(paidTotals, (t) => t.gmv, (d) => d.paidGmv, 'vnd', 'daily.paidGmv');
+  ) => (tot ? fromPeriodTotals(slice, tot, tPick, dPick, unit) ?? missing(unit, NOT_IN_PERIOD_ROW, [field]) : dailySum(slice, dPick, unit, ORDER_LEVEL, field));
+  const gmvRaw = pick(totals, (t) => t.gmv, (d) => day(d).gmv, 'vnd', `daily.${stage}Gmv`);
+  const orders = pick(totals, (t) => t.orders, (d) => day(d).orders, 'count', `daily.${stage}Orders`);
+  const cancelled = pick(totals, (t) => t.cancelledOrders, (d) => day(d).cancelledOrders, 'count', 'daily.cancelledOrders');
+  const refundedOrders = pick(totals, (t) => t.refundedOrders, (d) => day(d).refundedOrders, 'count', 'daily.refundedOrders');
+  const refundedGmv = pick(totals, (t) => t.refundedGmv, (d) => day(d).refundedGmv, 'vnd', 'daily.refundedGmv');
+  const cancelledGmv = pick(totals, (t) => t.cancelledGmv, (d) => day(d).cancelledGmv, 'vnd', 'daily.cancelledGmv');
+  // Placed-order sales and "tiền về" (paid) are also offered on their own, always labelled.
   const placedGmv = pick(placedTotals, (t) => t.gmv, (d) => d.placedGmv, 'vnd', 'daily.placedGmv');
-  const cancelled = pick(placedTotals, (t) => t.cancelledOrders, (d) => d.cancelledOrders, 'count', 'daily.cancelledOrders');
-  const refundedOrders = pick(placedTotals, (t) => t.refundedOrders, (d) => d.refundedOrders, 'count', 'daily.refundedOrders');
-  const refundedGmv = pick(placedTotals, (t) => t.refundedGmv, (d) => d.refundedGmv, 'vnd', 'daily.refundedGmv');
+  const paidGmv = pick(paidTotals, (t) => t.gmv, (d) => d.paidGmv, 'vnd', 'daily.paidGmv');
+  const paidOrders = pick(paidTotals, (t) => t.orders, (d) => d.paidOrders, 'count', 'daily.paidOrders');
   const units = dailySum(slice, (d) => d.units, 'count', ORDER_LEVEL, 'daily.units');
-  const clicks = fromPeriodTotals(slice, placedTotals, (t) => t.productClicks, (d) => d.productClicks, 'count') ?? productClicks(slice);
+  const clicks = fromPeriodTotals(slice, totals, (t) => t.productClicks, (d) => d.productClicks, 'count') ?? productClicks(slice);
   // Distinct buyers are not additive across days (a buyer can order on several days).
   const hasDailyBuyers = hasAny(slice.dailyMetrics, (d) => d.buyers);
   const buyers: MetricResult =
@@ -334,45 +357,85 @@ function dailyGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
           };
   const visits = trafficVisits(slice, placedTotals);
   const { adSpend, roas } = adMetrics(slice);
+  const basis = STAGE_BASIS[stage];
 
-  // GMV here is the platform's paid-order sales figure.
   const gmv: MetricResult =
-    paidGmv.value !== null
-      ? { ...paidGmv, notes: [{ vi: 'Theo doanh số đơn đã thanh toán của sàn.', en: "Platform's paid-order sales." }] }
-      : paidGmv;
+    gmvRaw.value !== null ? { ...gmvRaw, notes: [{ vi: `Doanh số ${basis.vi.toLowerCase()} của sàn.`, en: `Platform sales, ${basis.en.toLowerCase()}.` }] } : gmvRaw;
 
+  // Sales still kept: the stage's sales minus its cancelled sales and its refunds — all three
+  // from the same stage (and from the period row or the days, never mixed).
   const netRevenue: MetricResult =
-    paidGmv.value !== null && refundedGmv.value !== null
-      ? partial(paidGmv.value - refundedGmv.value, 'vnd', [
-          { vi: 'Chưa trừ voucher shop chịu (báo cáo tổng hợp không có).', en: 'Seller vouchers not deducted (not in summary report).' },
-        ])
-      : missing('vnd', ORDER_LEVEL, ['orderLines.sellerDiscount', 'daily.refundedGmv']);
+    gmvRaw.value !== null && cancelledGmv.value !== null && refundedGmv.value !== null
+      ? {
+          ...partial(gmvRaw.value - cancelledGmv.value - refundedGmv.value, 'vnd', [
+            {
+              vi: `Doanh số ${basis.vi.toLowerCase()} ${fmtVnd(gmvRaw.value)} − doanh số hủy ${fmtVnd(cancelledGmv.value)} − tiền hoàn ${fmtVnd(refundedGmv.value)} (cùng mức đơn). Chưa trừ voucher shop chịu (báo cáo tổng hợp không có).`,
+              en: 'Sales − cancelled sales − refunds, same order stage. Seller vouchers not deducted (not in summary report).',
+            },
+          ]),
+          warning: gmvRaw.warning ?? cancelledGmv.warning ?? refundedGmv.warning,
+          mismatch: gmvRaw.mismatch ?? cancelledGmv.mismatch ?? refundedGmv.mismatch,
+        }
+      : missing('vnd', ORDER_LEVEL, ['orderLines.sellerDiscount', 'daily.cancelledGmv', 'daily.refundedGmv']);
 
-  return {
+  // Recomputed from numerator and denominator — never the platform's rate or an average of days.
+  // The platform's own figure is only compared, so a report that disagrees with itself is visible.
+  const cvr = ratioMetric(orders, clicks, 'ratio', ZERO_DENOM);
+  const reportedCvr = totals && totals.length === 1 ? totals[0].reportedCvr : undefined;
+  if (cvr.value !== null && reportedCvr !== undefined && Math.abs(cvr.value - reportedCvr) > CVR_TOLERANCE) {
+    const pct = (v: number) => new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+    const count = (v: number | null) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(v ?? 0);
+    const gap = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Math.abs(cvr.value - reportedCvr) * 100);
+    cvr.warning = {
+      vi: `Dữ liệu không khớp: file ghi CVR ${pct(reportedCvr)}, tính lại ${basis.vi} ÷ Lượt nhấp sản phẩm = ${count(orders.value)} ÷ ${count(clicks.value)} = ${pct(cvr.value)} (lệch ${gap} điểm %). Đang dùng số tính lại.`,
+      en: `Data does not match: the file states CVR ${pct(reportedCvr)} but orders ÷ product clicks = ${pct(cvr.value)}. Using the recomputed value.`,
+    };
+    cvr.mismatch = compareCopies('cvr', { vi: 'CVR', en: 'CVR' }, 'ratio', { label: RECOMPUTED_LABEL, value: cvr.value }, { label: FILE_RATE_LABEL, value: reportedCvr }) ?? undefined;
+  }
+
+  // Valid orders = orders of the stage that were not cancelled.
+  const validOrders: MetricResult =
+    orders.value !== null && cancelled.value !== null ? { ...ok(orders.value - cancelled.value, 'count'), warning: orders.warning ?? cancelled.warning, mismatch: orders.mismatch ?? cancelled.mismatch } : orders;
+
+  const metrics: Record<KpiKey, MetricResult> = {
     gmv,
     placedGmv,
+    paidGmv,
+    paidOrders,
     netRevenue,
-    orders: placedOrders,
-    validOrders: paidOrders,
+    orders,
+    validOrders,
     completedOrders: missing('count', ORDER_LEVEL, ['order.status']),
     cancelledOrders: cancelled,
     returnedOrders: missing('count', ORDER_LEVEL, ['order.status']),
-    refundedOrders: refundedOrders,
+    refundedOrders,
     units,
-    aov: ratioMetric(paidGmv, paidOrders, 'vnd', ZERO_DENOM),
-    cancelRate: ratioMetric(cancelled, placedOrders, 'ratio', ZERO_DENOM),
-    refundRate: ratioMetric(refundedOrders, paidOrders, 'ratio', ZERO_DENOM),
+    // Shopee's "Doanh số trên mỗi đơn hàng": sales ÷ orders of the same stage.
+    aov: ratioMetric(gmvRaw, orders, 'vnd', ZERO_DENOM),
+    cancelRate: ratioMetric(cancelled, orders, 'ratio', ZERO_DENOM),
+    refundRate: ratioMetric(refundedOrders, orders, 'ratio', ZERO_DENOM),
     completionRate: missing('ratio', ORDER_LEVEL, ['order.status']),
     visits,
-    // Recomputed from numerator and denominator — never the platform's rate or an average of days.
-    cvr: ratioMetric(placedOrders, clicks, 'ratio', ZERO_DENOM),
+    cvr,
     buyers,
     adSpend,
     roas,
     profit: profit.profit,
     margin: profit.margin,
   };
+  for (const k of STAGED_KPIS) if (metrics[k].value !== null) metrics[k] = { ...metrics[k], basis };
+  if (placedGmv.value !== null) metrics.placedGmv = { ...placedGmv, basis: STAGE_BASIS.placed };
+  if (paidGmv.value !== null) metrics.paidGmv = { ...paidGmv, basis: STAGE_BASIS.paid };
+  if (paidOrders.value !== null) metrics.paidOrders = { ...paidOrders, basis: STAGE_BASIS.paid };
+  return metrics;
 }
+
+const CVR_TOLERANCE = 0.0005; // 0,05 điểm %: the platform prints rates with 2 decimals
+
+const fmtVnd = (v: number) => `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(v)}đ`;
+
+/** KPIs that count the selected order stage (summary reports only). */
+const STAGED_KPIS: KpiKey[] = ['gmv', 'netRevenue', 'orders', 'validOrders', 'cancelledOrders', 'refundedOrders', 'aov', 'cancelRate', 'refundRate', 'cvr'];
 
 /** Marks every computed metric as partial when the range is only partly covered by data. */
 function withPartialCoverage(metrics: Record<KpiKey, MetricResult>, dataset: CanonicalDataset, range: DateRange): Record<KpiKey, MetricResult> {

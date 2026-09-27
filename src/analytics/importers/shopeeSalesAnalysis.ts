@@ -14,8 +14,8 @@
  * of a period sheet carries periodStart, so it only counts when the whole period is inside
  * the analysed range.
  */
-import { emptyDataset, type AdPerformance, type AffiliatePerformance, type CanonicalDataset, type LiveSession, type Product, type SalesSummaryRow, type SummaryChannel, type SummaryStage } from '../model';
-import { normalizeHeader, toIsoDate, toNumber } from '../parse';
+import { emptyDataset, type AdPerformance, type AffiliatePerformance, type CanonicalDataset, type LiveSession, type Product, type ReportedFigure, type SalesSummaryRow, type SummaryChannel, type SummaryStage } from '../model';
+import { normalizeHeader, toIsoDate, toNumber, toRate } from '../parse';
 import type { SheetInput } from './orderExport';
 
 export interface SheetReadInfo {
@@ -39,6 +39,20 @@ const CHANNEL_TITLES: Record<string, SummaryChannel> = {
   dichvuhienthishopee: 'ads',
 };
 
+/**
+ * Columns of the header row every channel / product sheet starts with. These totals repeat
+ * figures found elsewhere in the file (and do not always agree with them), so they are only
+ * kept as reported figures for mismatch checks — see canonicalSources.ts.
+ */
+const HEADER_COLUMNS: [string, ReportedFigure['scope'], string][] = [
+  ['Doanh số (VND)', 'shop', 'shop'],
+  ['Doanh thu từ thẻ sản phẩm', 'channel', 'product_card'],
+  ['Doanh thu từ Livestream của người bán', 'channel', 'live'],
+  ['Doanh thu từ Video của người bán', 'channel', 'video'],
+  ['Doanh thu từ đối tác liên kết', 'channel', 'affiliate'],
+  ['Doanh thu từ quảng cáo Shopee', 'ads_total', 'ads'],
+];
+
 const PERIOD_RE = /^(\d{2})-(\d{2})-(\d{4})\s*-\s*(\d{2})-(\d{2})-(\d{4})$/;
 const DAY_RE = /^\d{2}-\d{2}-\d{4}$/;
 
@@ -47,6 +61,17 @@ const num = (v: unknown): number | undefined => {
   const s = str(v);
   if (!s || s === '-') return undefined;
   return toNumber(v);
+};
+const rate = (v: unknown): number | undefined => {
+  const s = str(v);
+  if (!s || s === '-') return undefined;
+  return toRate(v);
+};
+/** Printed rates of a row (period sheets only) — compared with the recomputed ones, never used. */
+const printedRates = (r: Row, col: (n: string) => number) => {
+  const pick = (name: string) => (col(name) >= 0 ? rate(r[col(name)]) : undefined);
+  const reported = { ctr: pick('CTR'), cvr: pick('Tỷ lệ chuyển đổi đơn hàng'), share: pick('Tỷ lệ doanh số') };
+  return reported.ctr === undefined && reported.cvr === undefined && reported.share === undefined ? undefined : reported;
 };
 
 function parsePeriod(v: unknown): { start: string; end: string } | null {
@@ -82,9 +107,12 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
   const platform = 'shopee' as const;
   const summaries: SalesSummaryRow[] = [];
   const ads: AdPerformance[] = [];
+  /** Paid-order revenue per ad row of a period ("start|end|name"), joined to the placed rows at the end. */
+  const paidAdRevenue = new Map<string, number>();
   const live = new Map<string, LiveSession>();
   const content = new Map<string, AffiliatePerformance>();
   const products = new Map<string, Product>();
+  const reported: ReportedFigure[] = [];
   const info: SheetReadInfo[] = [];
 
   // Report period: first "dd-mm-yyyy-dd-mm-yyyy" cell anywhere in column A.
@@ -97,6 +125,15 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
     if (period) break;
   }
   let lastStage: SummaryStage = 'placed';
+  const readHeader = (rows: Row[], stage: SummaryStage, source: ReportedFigure['source']) => {
+    if (!period || !rows[1] || !parsePeriod(rows[1][0])) return;
+    const col = headerIndex(rows[0]);
+    for (const [name, scope, key] of HEADER_COLUMNS) {
+      const i = col(name);
+      const value = i >= 0 ? num(rows[1][i]) : undefined;
+      if (value !== undefined) reported.push({ platform, stage, start: period.start, end: period.end, source, scope, key, field: 'gmv', value });
+    }
+  };
 
   for (const sheet of input.sheets) {
     const rows = sheet.rows as Row[];
@@ -121,14 +158,9 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
       let col: (n: string) => number = () => -1;
       let current: { source: string; isChannelTotal: boolean } | null = null;
       let count = 0;
-      // Ads revenue for the period comes from the header row ("Doanh thu từ quảng cáo Shopee");
-      // it overlaps the four channels and is never added to them. The four channel totals are
-      // read from their own rows below, with orders and traffic.
-      if (stageRow && period) {
-        const i = headerIndex(rows[0])('Doanh thu từ quảng cáo Shopee');
-        const v = i >= 0 ? num(rows[1][i]) : undefined;
-        if (v !== undefined) summaries.push({ platform, date: period.end, periodStart: period.start, stage, dimension: 'channel', channel: 'ads', key: 'ads', gmv: v });
-      }
+      // The header row repeats channel and Ads totals; the canonical figures are the channel
+      // rows and the ad rows below (canonicalSources.ts), the header is only cross-checked.
+      if (stageRow) readHeader(rows, stage, 'traffic_header');
       for (const r of rows) {
         const a = str(r[0]);
         const na = normalizeHeader(a);
@@ -182,11 +214,25 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
         // A source (or channel-total) row.
         const isChannelTotal = CHANNEL_TITLES[na] === channel && channel !== 'ads';
         current = { source: a, isChannelTotal };
+        // Daily sheets open each block with an undated total — another copy of the period
+        // figure, kept for mismatch checks only.
+        if (daily && period) {
+          const base = { platform, stage, start: period.start, end: period.end, source: 'daily_sheet_total' as const };
+          if (channel === 'ads') {
+            if (metrics.gmv !== undefined) reported.push({ ...base, scope: 'ad', key: a, field: 'gmv', value: metrics.gmv });
+            const spend = spendI >= 0 ? num(r[spendI]) : undefined;
+            if (spend !== undefined) reported.push({ ...base, scope: 'ad', key: a, field: 'spend', value: spend });
+          } else if (isChannelTotal && metrics.gmv !== undefined) {
+            reported.push({ ...base, scope: 'channel', key: channel, field: 'gmv', value: metrics.gmv });
+          }
+        }
         if (!daily && period) {
           if (channel === 'ads') {
             const spend = spendI >= 0 ? num(r[spendI]) : undefined;
+            if (stage === 'paid' && metrics.gmv !== undefined) paidAdRevenue.set(`${period.start}|${period.end}|${a}`, metrics.gmv);
             if (stage === 'placed') {
-              ads.push({ date: period.end, periodStart: period.start, platform, campaignId: `shopee-ads:${a}`, adName: a, adType: a, spend, impressions: metrics.impressions, orders: metrics.orders, attributedRevenue: metrics.gmv });
+              const roasI = col('ROAS quảng cáo');
+              ads.push({ date: period.end, periodStart: period.start, platform, campaignId: `shopee-ads:${a}`, adName: a, adType: a, spend, impressions: metrics.impressions, orders: metrics.orders, attributedRevenue: metrics.gmv, reportedRoas: roasI >= 0 ? num(r[roasI]) : undefined });
             }
             continue;
           }
@@ -200,6 +246,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
             key: isChannelTotal ? channel : a,
             label: a,
             ...metrics,
+            reported: printedRates(r, col),
           });
           count++;
         }
@@ -211,6 +258,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
     // Product sheets
     if (productHeaderIdx >= 0 && period) {
       if (stageRow) lastStage = stageRow;
+      if (stageRow) readHeader(rows, stage, 'product_header');
       let channel: SummaryChannel | null = null;
       let col: (n: string) => number = () => -1;
       let count = 0;
@@ -247,6 +295,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
           clicks: num(r[col('Lượt nhấp vào sản phẩm')]),
           uniqueImpressions: num(r[col('Lượt hiển thị sản phẩm duy nhất')]),
           uniqueClicks: num(r[col('Lượt nhấp sản phẩm duy nhất')]),
+          reported: printedRates(r, col),
         });
         count++;
       }
@@ -314,6 +363,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
                 clicks: num(r[col('Lượt nhấp vào sản phẩm')]),
                 orders: num(r[col('psd_label_orders')]),
                 gmv: num(r[col('Doanh số (VND)')]),
+                buyers: col('Người mua') >= 0 ? num(r[col('Người mua')]) : undefined,
               }
             : {
                 date: period.end,
@@ -325,6 +375,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
                 clicks: num(r[col('Lượt nhấp vào sản phẩm')]),
                 orders: num(r[col('psd_label_orders')]),
                 gmv: num(r[col('Doanh số (VND)')]),
+                buyers: col('Người mua') >= 0 ? num(r[col('Người mua')]) : undefined,
               },
         );
       }
@@ -340,6 +391,12 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
   // so nothing is counted twice and the platform's own totals are not re-derived by summing
   // rounded days.
   ds.salesSummaries = summaries;
+  ds.reportedFigures = reported;
+  for (const a of ads) {
+    if (a.periodStart === undefined) continue;
+    const paid = paidAdRevenue.get(`${a.periodStart}|${a.date}|${a.adName}`);
+    if (paid !== undefined) a.paidRevenue = paid;
+  }
   ds.ads = ads;
   ds.liveSessions = [...live.values()];
   ds.affiliates = [...content.values()];

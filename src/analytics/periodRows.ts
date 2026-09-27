@@ -9,7 +9,6 @@
  * daily rows it covers are dropped; otherwise the daily rows inside the range are used and
  * the period row is left out (it is never spread across days).
  */
-import type { Bilingual } from './metric';
 import type { DateRange } from './period';
 
 interface DatedRow {
@@ -87,15 +86,4 @@ export function periodMismatches<T extends DatedRow>(
     }
   }
   return out;
-}
-
-/** One note summarising mismatches, or none. `describe` names a mismatch in Vietnamese. */
-export function mismatchNote(list: PeriodMismatch[], describe: (m: PeriodMismatch) => string): Bilingual | null {
-  if (list.length === 0) return null;
-  const shown = list.slice(0, 3).map(describe).join('; ');
-  const more = list.length > 3 ? ` và ${list.length - 3} chỉ số khác` : '';
-  return {
-    vi: `Cộng các ngày lệch với dòng tổng của sàn (sàn làm tròn từng ngày): ${shown}${more}. Khi chọn trọn kỳ, số liệu dùng dòng tổng.`,
-    en: `Daily rows do not add up to the platform's period total in ${list.length} place(s); the period total is used for the full period.`,
-  };
 }

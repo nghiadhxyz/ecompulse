@@ -23,6 +23,7 @@ import { DolphinView } from './views/DolphinView';
 import { DataView } from './views/DataView';
 import { SettingsView } from './views/SettingsView';
 import { useWorkspaceData } from '../workspace/useWorkspaceData';
+import { DEFAULT_STAGE, type SummaryStage } from '../../analytics';
 import { ViewErrorBoundary } from '../workspace/ViewErrorBoundary';
 
 interface SellerWorkspaceProps {
@@ -56,6 +57,7 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
   const [preset, setPreset] = useState<PeriodPreset>('last30');
   const [custom, setCustom] = useState<DateRange | null>(null);
   const [platform, setPlatform] = useState<Platform | 'all'>('all');
+  const [stage, setStage] = useState<SummaryStage>(DEFAULT_STAGE);
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
   const loadDemo = () => {
     ws.loadDemo();
@@ -130,10 +132,13 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
       compareMode,
       previousRange,
       platforms,
-      baseFilter: { range, platforms },
+      stage,
+      baseFilter: { range, platforms, stage },
       openEvidence: setEvidence,
       goTo: (v: WorkspaceView) => SELLER_VIEWS.includes(v as SellerView) && setView(v as SellerView),
       focus: null,
+      settings: costSettings,
+      updateSettings: ws.updateSettings,
     };
     analytics = (
       <SellerProvider value={ctx}>
@@ -162,6 +167,8 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
               platform={platform}
               onPlatform={setPlatform}
               availablePlatforms={available}
+              stage={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0 ? stage : undefined}
+              onStage={setStage}
             />
           )}
           <ViewErrorBoundary lang={lang} key={view}>

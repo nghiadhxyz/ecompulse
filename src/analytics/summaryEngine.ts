@@ -13,11 +13,14 @@ import type { CanonicalDataset, SalesSummaryRow, SummaryChannel, SummaryStage } 
 import { sliceDataset, type DatasetFilter } from './filters';
 import { isInRange, type DateRange } from './period';
 import type { Bilingual } from './metric';
-import { mismatchNote, moneyTolerance, ORDER_TOLERANCE, periodMismatches, selectPeriodOrDaily } from './periodRows';
+import { moneyTolerance, ORDER_TOLERANCE, periodMismatches, selectPeriodOrDaily } from './periodRows';
+import { byGap, compareCopies, FILE_RATE_LABEL, periodMismatchItems, RECOMPUTED_LABEL, type MismatchItem } from './mismatch';
 import { fmtMoney, fmtOrders } from './format';
+import { computeKpis } from './kpiEngine';
+import { STAGE_BASIS } from './orderStage';
 
 export const SUMMARY_CHANNEL_LABELS: Record<SummaryChannel, Bilingual> = {
-  product_card: { vi: 'Thẻ sản phẩm (tự nhiên & tìm kiếm)', en: 'Product card' },
+  product_card: { vi: 'Thẻ sản phẩm (gồm cả lượt có quảng cáo)', en: 'Product card (incl. ad-driven visits)' },
   live: { vi: 'Livestream của shop', en: 'Shop live' },
   video: { vi: 'Video của shop', en: 'Shop video' },
   affiliate: { vi: 'Affiliate / KOC', en: 'Affiliate' },
@@ -51,19 +54,46 @@ export function hasSalesSummaries(dataset: CanonicalDataset): boolean {
   return (dataset.salesSummaries?.length ?? 0) > 0;
 }
 
-/** Warning when the days of a whole selected period do not add up to the platform's rows. */
-export function summaryMismatchNote(dataset: CanonicalDataset, filter: DatasetFilter, stage: SummaryStage): Bilingual | null {
+/** Channel / source rows whose days do not add up to the platform's period row. */
+export function summaryMismatches(dataset: CanonicalDataset, filter: DatasetFilter, stage: SummaryStage): MismatchItem[] {
   const rows = stageRows(dataset, filter, stage).filter((r) => r.dimension !== 'sku');
   const mm = periodMismatches(rows, filter.range, summaryRowKey, [
     { key: 'gmv', pick: (r) => r.gmv, tolerance: moneyTolerance },
     { key: 'orders', pick: (r) => r.orders, tolerance: ORDER_TOLERANCE },
   ]);
-  return mismatchNote(mm, (m) => {
-    const [, , , channel, key] = m.group.split('|');
-    const name = key === channel ? SUMMARY_CHANNEL_LABELS[channel as SummaryChannel]?.vi ?? key : key;
-    const f = m.field === 'orders' ? (v: number) => fmtOrders(v) : (v: number) => fmtMoney(v);
-    return `${name} — ${m.field === 'orders' ? 'số đơn' : 'doanh số'} cộng ngày ${f(m.dailySum)}, dòng tổng ${f(m.periodValue)}`;
-  });
+  return periodMismatchItems(
+    mm,
+    (m) => {
+      const [, , , channel, key] = m.group.split('|');
+      const name = key === channel ? SUMMARY_CHANNEL_LABELS[channel as SummaryChannel] ?? { vi: key, en: key } : { vi: key, en: key };
+      return m.field === 'orders' ? { vi: `${name.vi} — số đơn`, en: `${name.en} — orders` } : { vi: `${name.vi} — doanh số`, en: `${name.en} — sales` };
+    },
+    (m) => (m.field === 'orders' ? 'count' : 'vnd'),
+  );
+}
+
+/**
+ * Printed rates of period rows (CTR, CVR, share of the channel) that differ from the ones
+ * recomputed from their own numerator and denominator. Product-card rows only: the other
+ * channels define their "CTR" on viewers and do not print comparable rates.
+ */
+export function rateMismatches(rows: SalesSummaryRow[], channelGmv: (r: SalesSummaryRow) => number | null): MismatchItem[] {
+  const out: MismatchItem[] = [];
+  for (const r of rows) {
+    if (!r.reported || r.periodStart === undefined || r.dimension === 'channel') continue;
+    const name = r.dimension === 'sku' ? `${r.label ?? r.key} (${r.key})` : r.key;
+    const add = (what: string, reported: number | undefined, computed: number | null, rounding = 0) => {
+      // The file prints orders with 2 decimals, so a CVR recomputed from them can be off by ±0,005 / clicks.
+      if (reported !== undefined && computed !== null && Math.abs(reported - computed) <= rounding + 1e-4) return;
+      const m = compareCopies(`rate|${summaryRowKey(r)}|${what}`, { vi: `${name} — ${what}`, en: `${name} — ${what}` }, 'ratio', { label: RECOMPUTED_LABEL, value: computed }, { label: FILE_RATE_LABEL, value: reported });
+      if (m) out.push(m);
+    };
+    add('CTR', r.reported.ctr, r.impressions ? (r.clicks ?? 0) / r.impressions : null);
+    add('CVR', r.reported.cvr, r.clicks ? (r.orders ?? 0) / r.clicks : null, r.clicks ? 0.005 / r.clicks : 0);
+    const ch = channelGmv(r);
+    add('tỷ lệ doanh số', r.reported.share, ch ? (r.gmv ?? 0) / ch : null);
+  }
+  return out.sort(byGap);
 }
 
 export interface SourceMetrics {
@@ -96,6 +126,8 @@ export interface ChannelMix {
   adsAssistedShare: number | null;
   /** False over part of the period: unique counts are then sums of daily values. */
   uniqueIsDistinct: boolean;
+  /** Where the file disagrees with itself (days vs period row, printed vs recomputed rates). */
+  mismatches: MismatchItem[];
   notes: Bilingual[];
 }
 
@@ -139,13 +171,10 @@ export function channelMix(dataset: CanonicalDataset, filter: DatasetFilter, sta
   const total = channels.reduce((s, c) => s + c.gmv, 0);
   for (const c of channels) c.share = total ? c.gmv / total : null;
 
-  const adsRows = rows.filter((r) => r.dimension === 'channel' && r.channel === 'ads');
+  // Canonical Ads sales = the sum of the ad rows (canonicalSources.ts), never the sheet header.
+  // Ad rows exist for placed orders only.
   const slicedAds = sliceDataset(dataset, filter).ads;
-  const adsGmv = adsRows.length
-    ? adsRows.reduce((s, r) => s + (r.gmv ?? 0), 0)
-    : slicedAds.some((a) => a.attributedRevenue !== undefined)
-      ? slicedAds.reduce((s, a) => s + (a.attributedRevenue ?? 0), 0)
-      : null;
+  const adsGmv = stage === 'placed' && slicedAds.some((a) => a.attributedRevenue !== undefined) ? slicedAds.reduce((s, a) => s + (a.attributedRevenue ?? 0), 0) : null;
 
   const whole = usesPeriodRows(rows);
   const partialPeriod = (dataset.salesSummaries ?? []).some(
@@ -162,9 +191,20 @@ export function channelMix(dataset: CanonicalDataset, filter: DatasetFilter, sta
   if (!whole && channels.some((c) => c.uniqueImpressions !== null)) {
     notes.push({ vi: 'Lượt hiển thị/nhấp duy nhất khi chọn một phần kỳ là cộng từng ngày (một người xem nhiều ngày được đếm nhiều lần). Chọn trọn kỳ để có số người duy nhất.', en: 'Unique counts over part of the period are sums of daily values.' });
   }
-  const mm = summaryMismatchNote(dataset, filter, stage);
-  if (mm) notes.push(mm);
-  return { available: channels.length > 0, stage, total, channels: channels.sort((a, b) => b.gmv - a.gmv), adsGmv, adsAssistedShare: adsGmv !== null && total ? adsGmv / total : null, uniqueIsDistinct: whole, notes };
+  const channelRowGmv = (r: SalesSummaryRow) => rows.find((x) => x.dimension === 'channel' && x.channel === r.channel)?.gmv ?? null;
+  const mismatches = [...summaryMismatches(dataset, filter, stage), ...rateMismatches(rows.filter((r) => r.dimension === 'source'), channelRowGmv)];
+  // The 4 channels should add up to the shop's sales of the same stage (4.2).
+  const shopGmv = channels.length ? computeKpis(dataset, { ...filter, stage }).metrics.gmv.value : null;
+  const totalCheck = compareCopies(
+    `channels-total|${stage}`,
+    { vi: `Tổng 4 kênh so với doanh số shop (${STAGE_BASIS[stage].vi.toLowerCase()})`, en: `4-channel total vs shop sales (${STAGE_BASIS[stage].en.toLowerCase()})` },
+    'vnd',
+    { label: { vi: 'tổng 4 kênh', en: '4-channel total' }, value: total },
+    { label: { vi: 'doanh số shop', en: 'shop sales' }, value: shopGmv },
+  );
+  if (totalCheck) mismatches.push(totalCheck);
+  mismatches.sort(byGap);
+  return { available: channels.length > 0, stage, total, channels: channels.sort((a, b) => b.gmv - a.gmv), adsGmv, adsAssistedShare: adsGmv !== null && total ? adsGmv / total : null, uniqueIsDistinct: whole, mismatches, notes };
 }
 
 export interface SummaryProductRow {
@@ -212,6 +252,8 @@ export interface SummaryProducts {
   byChannel: ChannelTopProducts[];
   /** Share of channel GMV covered by the listed products. */
   coverage: number | null;
+  /** Printed CTR / CVR / share of the listed products that differ from the recomputed ones. */
+  mismatches: MismatchItem[];
   notes: Bilingual[];
 }
 
@@ -223,7 +265,7 @@ export function summaryProducts(dataset: CanonicalDataset, filter: DatasetFilter
   if (placed.length === 0) {
     if (anySku) notes.push({ vi: 'Số liệu Top 5 sản phẩm là tổng cả kỳ báo cáo — hãy chọn khoảng thời gian bao trọn kỳ đó.', en: 'Top-5 product rows are period totals — select a range covering the whole report period.' });
     const p = (dataset.salesSummaries ?? []).find((r) => r.dimension === 'sku' && r.periodStart);
-    return { available: false, period: p ? { start: p.periodStart!, end: p.date } : null, rows: [], byChannel: [], coverage: null, notes };
+    return { available: false, period: p ? { start: p.periodStart!, end: p.date } : null, rows: [], byChannel: [], coverage: null, mismatches: [], notes };
   }
   const paidBy = (channel: SummaryChannel, sku: string) => paid.find((r) => r.channel === channel && r.key === sku)?.gmv ?? null;
   const map = new Map<string, SummaryProductRow & { channels: Set<SummaryChannel> }>();
@@ -276,18 +318,39 @@ export function summaryProducts(dataset: CanonicalDataset, filter: DatasetFilter
       }))
       .sort((a, b) => b.gmv - a.gmv);
     const chGmv = mix.channels.find((c) => c.channel === channel)?.gmv ?? null;
+    // Share of the channel's sales (canonical channel row, 0.3), same figure in title and note.
     return { channel, rows, coverage: chGmv ? Math.min(1, rows.reduce((s, r) => s + r.gmv, 0) / chGmv) : null };
   }).filter((c) => c.rows.length > 0);
+  // The file's own "Tỷ lệ doanh số" column, added up per channel, vs the recomputed share.
+  const topShareMismatches: MismatchItem[] = [];
+  for (const c of byChannel) {
+    const printed = placed.filter((r) => r.channel === c.channel && r.periodStart !== undefined && r.reported?.share !== undefined);
+    if (printed.length === 0 || c.coverage === null) continue;
+    const printedSum = printed.reduce((s, r) => s + r.reported!.share!, 0);
+    // Each printed share is rounded to 0,01%, so the sum can drift by that much per row.
+    if (Math.abs(printedSum - c.coverage) <= printed.length * 0.00005 + 1e-4) continue;
+    const label = SUMMARY_CHANNEL_LABELS[c.channel];
+    const m = compareCopies(
+      `topshare|${c.channel}`,
+      { vi: `Top ${SUMMARY_TOP_N} ${label.vi} — tỷ trọng trong kênh`, en: `Top ${SUMMARY_TOP_N} ${label.en} — share of channel` },
+      'ratio',
+      { label: RECOMPUTED_LABEL, value: c.coverage },
+      { label: { vi: 'cộng cột "Tỷ lệ doanh số"', en: 'sum of the share column' }, value: printedSum },
+    );
+    if (m) topShareMismatches.push(m);
+  }
   const listed = [...map.values()].reduce((s, r) => s + r.gmv, 0);
   const coverage = mix.total ? Math.min(1, listed / mix.total) : null;
+  // No share here: the panel shows the selected channel's share, the one number used for this table.
   notes.push({
-    vi: `Shopee chỉ liệt kê Top ${SUMMARY_TOP_N} sản phẩm mỗi kênh — không phải tất cả sản phẩm. Các sản phẩm này chiếm khoảng ${coverage === null ? '—' : Math.round(coverage * 100) + '%'} doanh số. Số đơn có thể lẻ vì Shopee chia đơn cho nhiều nguồn.`,
-    en: `Shopee lists only the top ${SUMMARY_TOP_N} products per channel (≈${coverage === null ? '—' : Math.round(coverage * 100) + '%'} of sales).`,
+    vi: `Shopee chỉ liệt kê Top ${SUMMARY_TOP_N} sản phẩm mỗi kênh — không phải tất cả sản phẩm. Số đơn có thể lẻ vì Shopee chia đơn cho nhiều nguồn.`,
+    en: `Shopee lists only the top ${SUMMARY_TOP_N} products per channel.`,
   });
   notes.push({ vi: 'Chưa có giá vốn theo đơn nên chưa tính được lợi nhuận sản phẩm — cần file xuất đơn hàng.', en: 'No per-order COGS: product profit needs an order export.' });
   const p = placed.find((r) => r.periodStart);
   const rows = [...map.values()].map(({ channels: _c, ...r }) => r).sort((a, b) => b.gmv - a.gmv);
-  return { available: true, period: p ? { start: p.periodStart!, end: p.date } : null, rows, byChannel, coverage, notes };
+  const mismatches = [...topShareMismatches, ...rateMismatches(placed, (r) => mix.channels.find((c) => c.channel === r.channel)?.gmv ?? null)].sort(byGap);
+  return { available: true, period: p ? { start: p.periodStart!, end: p.date } : null, rows, byChannel, coverage, mismatches, notes };
 }
 
 /** Daily rows of one stage in a range (never period rows) — for series by day. */

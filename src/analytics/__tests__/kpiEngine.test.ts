@@ -161,18 +161,49 @@ describe('KPI engine — edge cases', () => {
 describe('KPI engine — daily grain (summary reports)', () => {
   const ds = dataset([], [], {
     dailyMetrics: [
-      { date: '2025-09-01', platform: 'shopee', placedOrders: 10, paidOrders: 8, paidGmv: 800, cancelledOrders: 2, refundedOrders: 1, refundedGmv: 100, visits: 150, productClicks: 200, buyers: 7 },
-      { date: '2025-09-02', platform: 'shopee', placedOrders: 20, paidOrders: 16, paidGmv: 1600, cancelledOrders: 3, refundedOrders: 0, refundedGmv: 0, visits: 250, productClicks: 300, buyers: 15 },
+      { date: '2025-09-01', platform: 'shopee', placedGmv: 1000, placedOrders: 10, paidOrders: 8, paidGmv: 800, cancelledOrders: 2, cancelledGmv: 200, paidCancelledGmv: 50, refundedOrders: 1, refundedGmv: 100, paidRefundedOrders: 1, paidRefundedGmv: 40, visits: 150, productClicks: 200, buyers: 7 },
+      { date: '2025-09-02', platform: 'shopee', placedGmv: 2000, placedOrders: 20, paidOrders: 16, paidGmv: 1600, cancelledOrders: 3, cancelledGmv: 300, paidCancelledGmv: 0, refundedOrders: 0, refundedGmv: 0, paidRefundedOrders: 0, paidRefundedGmv: 0, visits: 250, productClicks: 300, buyers: 15 },
     ],
   });
   const m = computeKpis(ds, { range: SEPT_1_2 }).metrics;
 
   it('uses platform aggregates', () => {
-    expect(m.gmv.value).toBe(2400);
+    expect(m.gmv.value).toBe(3000);
     expect(m.orders.value).toBe(30);
     expect(m.aov.value).toBe(100);
     expect(m.cancelRate.value).toBeCloseTo(5 / 30, 10);
     expect(m.cvr.value).toBeCloseTo(30 / 500, 10);
+  });
+
+  it('counts one order stage everywhere — placed by default', () => {
+    for (const k of ['gmv', 'netRevenue', 'orders', 'aov', 'cancelRate', 'refundRate', 'cvr'] as const) expect(m[k].basis?.vi).toBe('Đơn đặt');
+    expect(m.netRevenue.value).toBe(3000 - 500 - 100); // placed sales − cancelled − refunded, all placed
+    expect(m.refundRate.value).toBeCloseTo(1 / 30, 10);
+    // "Tiền về" stays available, labelled.
+    expect(m.paidGmv.value).toBe(2400);
+    expect(m.paidOrders.value).toBe(24);
+    expect(m.paidGmv.basis?.vi).toBe('Đơn đã thanh toán');
+  });
+
+  it('switches every figure together when paid orders are asked for', () => {
+    const p = computeKpis(ds, { range: SEPT_1_2, stage: 'paid' }).metrics;
+    expect(p.gmv.value).toBe(2400);
+    expect(p.orders.value).toBe(24);
+    expect(p.aov.value).toBe(100);
+    expect(p.netRevenue.value).toBe(2400 - 50 - 40); // paid sales − paid cancellations − paid refunds
+    expect(p.refundRate.value).toBeCloseTo(1 / 24, 10);
+    for (const k of ['gmv', 'netRevenue', 'orders', 'aov', 'refundRate'] as const) expect(p[k].basis?.vi).toBe('Đơn đã thanh toán');
+  });
+
+  it("flags a platform CVR that its own orders and clicks do not give", () => {
+    const withTotal = { ...ds, periodTotals: [{ platform: 'shopee' as const, start: '2025-09-01', end: '2025-09-02', stage: 'placed' as const, orders: 30, productClicks: 500, reportedCvr: 0.08 }] };
+    const cvr = computeKpis(withTotal, { range: SEPT_1_2 }).metrics.cvr;
+    expect(cvr.value).toBeCloseTo(0.06, 10);
+    expect(cvr.warning?.vi).toContain('file ghi CVR 8,00%');
+    expect(cvr.mismatch).toMatchObject({ used: { value: 0.06 }, other: { value: 0.08 } });
+    const agreeing = { ...withTotal, periodTotals: [{ ...withTotal.periodTotals[0], reportedCvr: 0.06 }] };
+    expect(computeKpis(agreeing, { range: SEPT_1_2 }).metrics.cvr.warning).toBeUndefined();
+    expect(computeKpis(agreeing, { range: SEPT_1_2 }).metrics.cvr.mismatch).toBeUndefined();
   });
 
   it('does not present summed daily buyers as distinct buyers', () => {

@@ -19,6 +19,8 @@ import { safeDivide, type Bilingual } from './metric';
 import { campaignCalendar, dayTypeOf, weekdayIndex } from './campaignEngine';
 import { dailySummaryRows, summaryRowsInRange, SUMMARY_CHANNEL_LABELS, SUMMARY_STACKED_CHANNELS } from './summaryEngine';
 import { usablePeriodTotals } from './kpiEngine';
+import { byGap, compareCopies, DAILY_SUM_LABEL, PERIOD_ROW_LABEL, type MismatchItem } from './mismatch';
+import { crossStageRate } from './orderStage';
 
 export type SeriesGrain = 'day' | 'week';
 
@@ -44,42 +46,88 @@ export interface SubsidyDependence {
   total: SubsidyPoint | null;
   points: SubsidyPoint[];
   notes: Bilingual[];
+  /** Data problems the reader must see (days that do not add up, impossible days). */
+  warnings: Bilingual[];
+  /** Period row vs days: "Cả khoảng" uses the period row, the chart the days. */
+  mismatches: MismatchItem[];
+  /** Days where sales excluding subsidy exceed sales: impossible, left out of every figure. */
+  invalidDays: string[];
 }
+
+const fmtInt = (v: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(v);
+const fmtDdMm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 /**
  * Share of placed sales funded by the platform ("Doanh số" − "Doanh số không bao gồm trợ
  * giá bởi Shopee"), per day or week, recomputed from the sums — never averaged.
+ *
+ * A day whose sales excluding subsidy exceed its sales would mean a negative subsidy; the
+ * report is wrong for that day, so it is flagged and left out rather than drawn below zero.
  */
 export function subsidyDependence(dataset: CanonicalDataset, filter: DatasetFilter, grain: SeriesGrain = 'day'): SubsidyDependence {
   const slice = sliceDataset(dataset, filter);
   const rows = slice.dailyMetrics.filter((d) => d.placedGmv !== undefined && d.placedNoSubsidyGmv !== undefined);
   if (rows.length === 0) {
-    return { available: false, total: null, points: [], notes: [{ vi: 'Báo cáo không có cột "Doanh số không bao gồm trợ giá bởi Shopee".', en: 'The report has no sales-excluding-subsidy column.' }] };
+    return {
+      available: false,
+      total: null,
+      points: [],
+      notes: [{ vi: 'Báo cáo không có cột "Doanh số không bao gồm trợ giá bởi Shopee".', en: 'The report has no sales-excluding-subsidy column.' }],
+      warnings: [],
+      mismatches: [],
+      invalidDays: [],
+    };
   }
+  const isInvalid = (d: DailyMetric) => d.placedNoSubsidyGmv! > d.placedGmv!;
+  const invalidDays = [...new Set(rows.filter(isInvalid).map((d) => d.date))].sort();
   const buckets = new Map<string, SubsidyPoint>();
   for (const d of rows) {
     const k = bucketKey(d.date, grain);
     const b = buckets.get(k) ?? { key: k, days: 0, gmv: 0, noSubsidyGmv: 0, subsidy: 0, share: null };
+    buckets.set(k, b);
+    if (isInvalid(d)) continue;
     b.days++;
     b.gmv += d.placedGmv!;
     b.noSubsidyGmv += d.placedNoSubsidyGmv!;
-    buckets.set(k, b);
   }
-  const finish = (b: SubsidyPoint): SubsidyPoint => ({ ...b, subsidy: b.gmv - b.noSubsidyGmv, share: safeDivide(b.gmv - b.noSubsidyGmv, b.gmv) });
+  const finish = (b: SubsidyPoint): SubsidyPoint =>
+    b.days === 0 ? { ...b, subsidy: 0, share: null } : { ...b, subsidy: b.gmv - b.noSubsidyGmv, share: safeDivide(b.gmv - b.noSubsidyGmv, b.gmv) };
   const points = [...buckets.values()].map(finish).sort((a, b) => a.key.localeCompare(b.key));
+  const validDays = rows.length - rows.filter(isInvalid).length;
   const totals = usablePeriodTotals(slice, 'placed');
-  const total =
-    totals && totals.every((t) => t.gmv !== undefined && t.noSubsidyGmv !== undefined)
-      ? finish({ key: 'total', days: rows.length, gmv: totals.reduce((s, t) => s + t.gmv!, 0), noSubsidyGmv: totals.reduce((s, t) => s + t.noSubsidyGmv!, 0), subsidy: 0, share: null })
-      : finish({ key: 'total', days: rows.length, gmv: points.reduce((s, p) => s + p.gmv, 0), noSubsidyGmv: points.reduce((s, p) => s + p.noSubsidyGmv, 0), subsidy: 0, share: null });
+  const useTotals = !!totals && totals.every((t) => t.gmv !== undefined && t.noSubsidyGmv !== undefined);
+  const total = useTotals
+    ? finish({ key: 'total', days: rows.length, gmv: totals!.reduce((s, t) => s + t.gmv!, 0), noSubsidyGmv: totals!.reduce((s, t) => s + t.noSubsidyGmv!, 0), subsidy: 0, share: null })
+    : finish({ key: 'total', days: validDays, gmv: points.reduce((s, p) => s + p.gmv, 0), noSubsidyGmv: points.reduce((s, p) => s + p.noSubsidyGmv, 0), subsidy: 0, share: null });
+
+  const warnings: Bilingual[] = [];
+  const mismatches: MismatchItem[] = [];
+  if (invalidDays.length > 0) {
+    warnings.push({
+      vi: `Dữ liệu không hợp lệ ở ${invalidDays.length} ngày (${invalidDays.map(fmtDdMm).join(', ')}): doanh số không gồm trợ giá lớn hơn doanh số, tức trợ giá âm. Các ngày này bị bỏ khỏi biểu đồ và bảng${useTotals ? '' : ' và tổng'}.`,
+      en: `Invalid data on ${invalidDays.length} day(s): sales excluding subsidy exceed sales. These days are left out.`,
+    });
+  }
+  if (useTotals) {
+    // The period row and the days describe the same placed orders; say so when they disagree.
+    const dayGmv = rows.reduce((s, d) => s + d.placedGmv!, 0);
+    const dayNoSub = rows.reduce((s, d) => s + d.placedNoSubsidyGmv!, 0);
+    for (const m of [
+      compareCopies('subsidy|gmv', { vi: 'Doanh số đơn đặt', en: 'Placed sales' }, 'vnd', { label: PERIOD_ROW_LABEL, value: total.gmv }, { label: DAILY_SUM_LABEL, value: dayGmv }),
+      compareCopies('subsidy|nosub', { vi: 'Doanh số không gồm trợ giá', en: 'Sales excl. subsidy' }, 'vnd', { label: PERIOD_ROW_LABEL, value: total.noSubsidyGmv }, { label: DAILY_SUM_LABEL, value: dayNoSub }),
+    ])
+      if (m) mismatches.push(m);
+  }
+  mismatches.sort(byGap);
+
   const notes: Bilingual[] = [
     {
       vi: 'Phần trợ giá = Doanh số − Doanh số không bao gồm trợ giá bởi Shopee (đơn đã đặt). Tỷ lệ cao nghĩa là doanh số phụ thuộc nhiều vào voucher/trợ giá của sàn — khi sàn giảm trợ giá, doanh số có thể giảm theo.',
       en: 'Subsidy = sales − sales excluding Shopee subsidy (placed orders).',
     },
   ];
-  if (grain === 'week' && points.some((p) => p.days < 7)) notes.push({ vi: 'Tuần ở đầu/cuối kỳ không đủ 7 ngày — cột "Số ngày" cho biết cỡ mẫu.', en: 'Edge weeks have fewer than 7 days.' });
-  return { available: true, total, points, notes };
+  if (grain === 'week' && points.some((p) => p.days < 7)) notes.push({ vi: 'Tuần ở đầu/cuối kỳ hoặc có ngày bị loại không đủ 7 ngày — cột "Số ngày" cho biết cỡ mẫu.', en: 'Some weeks have fewer than 7 usable days.' });
+  return { available: true, total, points, notes, warnings, mismatches, invalidDays };
 }
 
 // ------------------------------------------------------------------ B2 source drivers
@@ -190,6 +238,8 @@ export interface StageFunnelRow {
   confirmedRateGmv: number | null;
   /** Placed sales lost before payment. */
   lostGmv: number | null;
+  /** Paid exceeds placed: the stages counted different orders, rates are not shown. */
+  crossPeriod: boolean;
 }
 
 export interface StageFunnel {
@@ -224,9 +274,11 @@ export function stageFunnel(dataset: CanonicalDataset, filter: DatasetFilter): S
         placed: p,
         confirmed: { gmv: c?.gmv ?? null, orders: c?.orders ?? null },
         paid: { gmv: d?.gmv ?? null, orders: d?.orders ?? null },
-        paidRateGmv: d ? safeDivide(d.gmv, p.gmv) : null,
-        paidRateOrders: d && d.orders !== null && p.orders !== null ? safeDivide(d.orders, p.orders) : null,
-        confirmedRateGmv: c ? safeDivide(c.gmv, p.gmv) : null,
+        // Above 100% the two stages counted different orders (paid on another day): no rate.
+        paidRateGmv: crossStageRate(d?.gmv, p.gmv).rate,
+        paidRateOrders: crossStageRate(d?.orders, p.orders).rate,
+        confirmedRateGmv: crossStageRate(c?.gmv, p.gmv).rate,
+        crossPeriod: crossStageRate(d?.gmv, p.gmv).crossPeriod || crossStageRate(d?.orders, p.orders).crossPeriod,
         lostGmv: d ? p.gmv - d.gmv : null,
       });
     }
@@ -236,7 +288,7 @@ export function stageFunnel(dataset: CanonicalDataset, filter: DatasetFilter): S
     rows,
     notes: [
       { vi: 'Tỷ lệ giữ = đơn đã thanh toán / đơn đã đặt của cùng kênh, cùng nguồn (tính lại từ tổng, không lấy trung bình các ngày). Phần rơi gồm đơn hủy, đơn chưa thanh toán trong kỳ.', en: 'Retention = paid / placed for the same channel and source.' },
-      { vi: 'Đơn đã thanh toán trong kỳ có thể gồm đơn đặt trước kỳ, nên tỷ lệ theo từng ngày có thể dao động; xem theo trọn kỳ sẽ ổn định hơn.', en: 'Paid orders in a window can include orders placed before it.' },
+      { vi: 'Đơn đã thanh toán trong kỳ có thể gồm đơn đặt trước kỳ, nên tỷ lệ theo từng ngày có thể dao động; xem theo trọn kỳ sẽ ổn định hơn. Tỷ lệ trên 100% không hiện ("—"): hai mức đơn đang đếm khác kỳ.', en: 'Paid orders in a window can include orders placed before it; rates above 100% are not shown.' },
     ],
   };
 }
@@ -366,6 +418,8 @@ export interface CustomerTrend {
   points: CustomerTrendPoint[];
   /** Whole report period: the platform's distinct counts. */
   periodTotal: { buyers: number | null; newBuyers: number | null; existingBuyers: number | null; potentialBuyers: number | null; repeatRate: number | null; newShare: number | null } | null;
+  /** Existing / potential buyers added up day by day — counts the same buyer on several days. */
+  dailySums: { existingBuyers: number | null; potentialBuyers: number | null };
   notes: Bilingual[];
 }
 
@@ -376,7 +430,7 @@ export function customerTrend(dataset: CanonicalDataset, filter: DatasetFilter, 
     vi: 'Báo cáo tổng hợp không có mã người mua nên chưa phân nhóm RFM, cohort hay giá trị vòng đời được — cần file xuất đơn hàng.',
     en: 'No buyer IDs in summary reports: RFM / cohorts need an order export.',
   };
-  if (rows.length === 0) return { available: false, grain, points: [], periodTotal: null, notes: [{ vi: 'Báo cáo không có số người mua mới / hiện tại theo ngày.', en: 'No new/existing buyer counts.' }, noRfm] };
+  if (rows.length === 0) return { available: false, grain, points: [], periodTotal: null, dailySums: { existingBuyers: null, potentialBuyers: null }, notes: [{ vi: 'Báo cáo không có số người mua mới / hiện tại theo ngày.', en: 'No new/existing buyer counts.' }, noRfm] };
   const buckets = new Map<string, CustomerTrendPoint>();
   const add = (a: number | null, b: number | undefined) => (b === undefined ? a : (a ?? 0) + b);
   for (const d of rows as DailyMetric[]) {
@@ -403,10 +457,15 @@ export function customerTrend(dataset: CanonicalDataset, filter: DatasetFilter, 
         newShare: one.newBuyers !== undefined && one.existingBuyers !== undefined ? safeDivide(one.newBuyers, one.newBuyers + one.existingBuyers) : null,
       }
     : null;
+  const sumOf = (pick: (d: DailyMetric) => number | undefined) => (rows.some((d) => pick(d) !== undefined) ? rows.reduce((s, d) => s + (pick(d) ?? 0), 0) : null);
+  const dailySums = { existingBuyers: sumOf((d) => d.existingBuyers), potentialBuyers: sumOf((d) => d.potentialBuyers) };
   const notes: Bilingual[] = [];
-  if (grain === 'week') notes.push({ vi: 'Số theo tuần là cộng số người mua từng ngày — một người mua nhiều ngày trong tuần được đếm nhiều lần.', en: 'Weekly values are sums of daily distinct counts.' });
+  if (grain === 'week') {
+    const vs = periodTotal?.existingBuyers !== null && periodTotal?.existingBuyers !== undefined && dailySums.existingBuyers !== null ? ` (khách cũ cộng theo ngày ${dailySums.existingBuyers} so với dòng tổng cả kỳ ${periodTotal.existingBuyers})` : '';
+    notes.push({ vi: `Số theo tuần là cộng số người mua từng ngày — một người mua nhiều ngày trong tuần được đếm nhiều lần${vs}.`, en: 'Weekly values are sums of daily distinct counts.' });
+  }
   if (!periodTotal) notes.push({ vi: 'Chọn trọn kỳ báo cáo để xem số người mua khác nhau, người mua tiềm năng và tỉ lệ quay lại của cả kỳ.', en: 'Select the whole report period for distinct totals.' });
   notes.push({ vi: 'Người mua hiện tại = khách đã từng mua trước đó (theo định nghĩa của Shopee).', en: 'Existing buyers = bought before (Shopee definition).' });
   notes.push(noRfm);
-  return { available: true, grain, points, periodTotal, notes };
+  return { available: true, grain, points, periodTotal, dailySums, notes };
 }

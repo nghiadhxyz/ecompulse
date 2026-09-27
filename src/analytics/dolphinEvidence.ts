@@ -17,6 +17,7 @@ import { liveAudit, adsIntelligence } from './growthEngines';
 import { summaryProducts } from './summaryEngine';
 import { detectAlerts } from './anomalyEngine';
 import { breakdown } from './breakdownEngine';
+import { computeKpis } from './kpiEngine';
 import { orderHealth } from './orderHealthEngine';
 import { addDays, enumerateDays, formatRangeVi, type DateRange } from './period';
 import { fmtByUnit, fmtChange, fmtDay, fmtMoneyCompact, fmtMultiple, fmtPp, fmtRate, sessionDateLabel } from './format';
@@ -97,6 +98,24 @@ export function detectIntent(question: string): { intent: DolphinIntent; metric?
 
 const FOLLOW_UPS = ['Tháng này doanh thu thế nào?', 'Tại sao GMV thay đổi?', 'SKU nào đang tăng trưởng?', 'Sản phẩm nào tốt nhất?', 'Chi phí nào tăng mạnh?', 'Live nào có conversion thấp?'];
 
+/** Questions offered as one-click suggestions. */
+export const SUGGESTED_QUESTIONS = [...FOLLOW_UPS, 'Sản phẩm nào đang lỗ?'];
+
+/**
+ * Why a suggested question cannot be answered with the data loaded (null when it can), so
+ * the UI can dim it instead of offering a dead end. Summary reports are small, so the
+ * question is simply tried; with order rows only the cheap preconditions are checked.
+ */
+export function questionUnavailable(dataset: CanonicalDataset, question: string, ctx: DolphinContext): Bilingual | null {
+  if (dataset.orders.length === 0) return askDolphin(dataset, question, ctx).unavailable ?? null;
+  const { intent } = detectIntent(question);
+  if (intent === 'live_conversion' && dataset.liveSessions.length === 0) return { vi: 'Chưa có dữ liệu phiên live.', en: 'No live-session data.' };
+  if (intent === 'losing_products' && computeKpis(dataset, { range: ctx.range, platforms: ctx.platforms }).metrics.profit.value === null) {
+    return { vi: 'Cần giá vốn của sản phẩm để biết sản phẩm nào lỗ.', en: 'Product COGS is needed to find loss-making products.' };
+  }
+  return null;
+}
+
 function answer(intent: DolphinIntent, question: string, a: Omit<DolphinAnswer, 'intent' | 'question' | 'followUps'>): DolphinAnswer {
   return { intent, question, followUps: FOLLOW_UPS.filter((f) => f !== question).slice(0, 4), ...a };
 }
@@ -141,17 +160,22 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
     case 'overview': {
       const cmp = compareRanges(dataset, filter, ctx.previousRange);
       const m = cmp.metrics;
-      if (m.gmv.current === null) return noData(intent, question, { vi: 'Khoảng thời gian này chưa có dữ liệu.', en: 'No data for this period.' });
+      // One order stage: summary reports count orders and cancellations on placed orders, so
+      // revenue is placed-order sales too.
+      const placedStage = cmp.current.grain === 'daily';
+      const rv = placedStage ? m.placedGmv : m.gmv;
+      const rvName = placedStage ? 'Doanh thu đơn đặt' : 'GMV';
+      if (rv.current === null) return noData(intent, question, { vi: 'Khoảng thời gian này chưa có dữ liệu.', en: 'No data for this period.' });
       const plat = breakdown(dataset, filter, 'platform', ctx.previousRange).rows;
       const top = [...plat].sort((a, b) => Math.abs(b.change.gmv.absoluteDelta ?? 0) - Math.abs(a.change.gmv.absoluteDelta ?? 0))[0];
       const alerts = detectAlerts(dataset, { day: addDays(ctx.range.end, -1), platforms: ctx.platforms }).filter((a) => a.severity !== 'info');
       return answer(intent, question, {
         insight: {
-          vi: `${period}: GMV ${fmtMoneyCompact(m.gmv.current)} (${fmtChange(m.gmv.percentageDelta)})${m.profit.current !== null ? `, lợi nhuận ước tính ${fmtMoneyCompact(m.profit.current)} (${fmtChange(m.profit.percentageDelta)})` : ''}, ${m.orders.current} đơn (${fmtChange(m.orders.percentageDelta)}), tỷ lệ hủy ${fmtRate(m.cancelRate.current)} (${fmtPp(m.cancelRate.percentagePointDelta ?? null)})${m.adSpend.current ? `, chi phí Ads ${fmtMoneyCompact(m.adSpend.current)} (ROAS ${fmtMultiple(m.roas.current)})` : ''}.${m.profit.current === null ? ' Chưa tính được lợi nhuận (cần file đơn hàng và giá vốn).' : ''}`,
-          en: `${periodEn}: GMV ${fmtMoneyCompact(m.gmv.current, 'en')} (${fmtChange(m.gmv.percentageDelta, 'en')}), profit ${fmtMoneyCompact(m.profit.current, 'en')}, ${m.orders.current} orders.`,
+          vi: `${period}: ${rvName} ${fmtMoneyCompact(rv.current)} (${fmtChange(rv.percentageDelta)})${m.profit.current !== null ? `, lợi nhuận ước tính ${fmtMoneyCompact(m.profit.current)} (${fmtChange(m.profit.percentageDelta)})` : ''}, ${m.orders.current} đơn${placedStage ? ' đặt' : ''} (${fmtChange(m.orders.percentageDelta)}), tỷ lệ hủy ${fmtRate(m.cancelRate.current)} (${fmtPp(m.cancelRate.percentagePointDelta ?? null)})${m.adSpend.current ? `, chi phí Ads ${fmtMoneyCompact(m.adSpend.current)} (ROAS ${fmtMultiple(m.roas.current)})` : ''}.${m.profit.current === null ? ' Chưa tính được lợi nhuận (cần file đơn hàng và giá vốn).' : ''}`,
+          en: `${periodEn}: ${placedStage ? 'Placed-order sales' : 'GMV'} ${fmtMoneyCompact(rv.current, 'en')} (${fmtChange(rv.percentageDelta, 'en')}), profit ${fmtMoneyCompact(m.profit.current, 'en')}, ${m.orders.current} orders.`,
         },
         evidence: [
-          { label: { vi: 'GMV', en: 'GMV' }, unit: 'vnd', current: m.gmv.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.gmv.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' }, filter: baseEv },
+          { label: { vi: rvName, en: placedStage ? 'Placed-order sales' : 'GMV' }, unit: 'vnd', current: rv.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: rv.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' }, filter: baseEv },
           ...(m.profit.current !== null
             ? [
                 { label: { vi: 'Lợi nhuận ước tính', en: 'Est. profit' }, unit: 'vnd' as const, current: m.profit.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.profit.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } },

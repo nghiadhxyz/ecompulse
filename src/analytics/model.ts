@@ -131,6 +131,10 @@ export interface AdPerformance {
   orders?: number;
   /** Revenue the ad platform attributes to the ad. */
   attributedRevenue?: number;
+  /** ROAS as the report prints it — only compared with revenue ÷ spend, never used. */
+  reportedRoas?: number;
+  /** Revenue of the ad's paid orders (paid-order sheet, period rows only). Excludes cancellations. */
+  paidRevenue?: number;
 }
 
 export interface LiveSession {
@@ -169,6 +173,8 @@ export interface AffiliatePerformance {
   orders?: number;
   gmv?: number;
   commission?: number;
+  /** Distinct buyers (Shopee "Người mua"). */
+  buyers?: number;
 }
 
 /** Daily traffic facts, optionally per SKU. Enables CVR and funnel. */
@@ -198,12 +204,22 @@ export interface DailyMetric {
   paidOrders?: number;
   confirmedGmv?: number;
   confirmedOrders?: number;
+  /** Cancellations as the confirmed-order sheet reports them. */
+  confirmedCancelledOrders?: number;
+  confirmedCancelledGmv?: number;
   /** Placed-order sales excluding Shopee's subsidy ("Doanh số không bao gồm trợ giá bởi Shopee"). */
   placedNoSubsidyGmv?: number;
   cancelledOrders?: number;
   cancelledGmv?: number;
+  /** Refunds of placed orders (placed-order sheet). */
   refundedOrders?: number;
   refundedGmv?: number;
+  /** Refunds of paid orders (paid-order sheet) — the ones deducted from paid GMV. */
+  paidRefundedOrders?: number;
+  paidRefundedGmv?: number;
+  /** Cancellations as the paid-order sheet reports them. */
+  paidCancelledOrders?: number;
+  paidCancelledGmv?: number;
   units?: number;
   /** Distinct buyers of the day — not additive across days. */
   buyers?: number;
@@ -243,6 +259,28 @@ export interface ShopPeriodTotal {
   existingBuyers?: number;
   potentialBuyers?: number;
   repeatRate?: number;
+  /** Conversion rate as the platform prints it (ratio). Only compared with the recomputed CVR. */
+  reportedCvr?: number;
+}
+
+/**
+ * A figure the report prints somewhere other than its canonical place (see
+ * canonicalSources.ts): the header row of a sheet, the undated total row of a daily sheet.
+ * Kept only to warn when the file disagrees with itself — never used as a value.
+ */
+export interface ReportedFigure {
+  platform: Platform;
+  stage: SummaryStage;
+  /** Report period the figure covers. */
+  start: string;
+  end: string;
+  source: 'traffic_header' | 'product_header' | 'daily_sheet_total';
+  /** shop = all sales, channel = one of the four channels, ads_total = all Shopee Ads, ad = one ad type. */
+  scope: 'shop' | 'channel' | 'ads_total' | 'ad';
+  /** Channel id, ad name, or "shop" / "ads". */
+  key: string;
+  field: 'gmv' | 'spend' | 'orders';
+  value: number;
 }
 
 /** Order stage a summary report counts: placed, confirmed, or paid orders. */
@@ -279,6 +317,8 @@ export interface SalesSummaryRow {
   /** Distinct impressions / clicks ("… duy nhất") — not additive across days or channels. */
   uniqueImpressions?: number;
   uniqueClicks?: number;
+  /** Rates as the report prints them (ratios) — only compared with the recomputed ones. */
+  reported?: { ctr?: number; cvr?: number; share?: number };
 }
 
 export type CostType = 'packaging' | 'staff' | 'rent' | 'tools' | 'shipping' | 'marketing' | 'other';
@@ -330,6 +370,15 @@ export interface CostSettings {
   noSellerShippingDeclared?: boolean;
   /** Per-SKU unit COGS entered by the user; overrides catalog values. */
   skuCogs?: Record<string, number>;
+  /**
+   * Shop-wide estimates for summary reports (no COGS per order): gross margin and platform
+   * fees as a share of sales. Used for break-even ROAS, profit after Ads and What-If, and
+   * every result is labelled "ước tính theo số bạn nhập".
+   */
+  estimatedGrossMargin?: number;
+  estimatedFeeRate?: number;
+  /** Sale / campaign days the user confirmed or entered by hand (ISO dates). */
+  confirmedSaleDays?: string[];
 }
 
 export interface DatasetSource {
@@ -361,6 +410,8 @@ export interface CanonicalDataset {
   salesSummaries?: SalesSummaryRow[];
   /** Whole-period shop totals from summary reports (optional). */
   periodTotals?: ShopPeriodTotal[];
+  /** Non-canonical copies of figures, only for "the file disagrees with itself" checks. */
+  reportedFigures?: ReportedFigure[];
   costSettings?: CostSettings;
   /** Field names the source reported only as estimates; engines treat them as missing. */
   estimatedFields?: string[];

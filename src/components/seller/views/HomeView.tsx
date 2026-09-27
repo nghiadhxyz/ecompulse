@@ -12,6 +12,7 @@ import {
   fmtMoneyCompact,
   fmtRate,
   formatRangeVi,
+  moneyTolerance,
   type MetricComparison,
   type MetricResult,
   type ProfitResult,
@@ -19,6 +20,7 @@ import {
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, GhostButton, HelpTip, KpiCard, NotEnoughData, Section, SeverityBadge, SourceBadge, tr } from '../ui';
 import { SummaryChannelsPanel } from '../../workspace/SummaryPanels';
+import { ChartTotalNote } from '../../workspace/MismatchBox';
 import { SubsidyPanel } from '../../workspace/SummaryInsightPanels';
 
 const BAR_COLOR = '#3987e5';
@@ -35,10 +37,10 @@ function sumComparison(a: MetricComparison, b: MetricComparison): MetricComparis
 }
 
 export const HomeView: React.FC = () => {
-  const { lang, dataset, range, previousRange, compareMode, platforms, asOf, openEvidence, goTo } = useSeller();
+  const { lang, dataset, range, previousRange, compareMode, platforms, stage, asOf, openEvidence, goTo } = useSeller();
   const vi = lang === 'vi';
-  const cmp = useMemo(() => comparePeriods(dataset, { range, platforms }, compareMode), [dataset, range, platforms, compareMode]);
-  const series = useMemo(() => dailySeries(dataset, { range, platforms }), [dataset, range, platforms]);
+  const cmp = useMemo(() => comparePeriods(dataset, { range, platforms, stage }, compareMode), [dataset, range, platforms, stage, compareMode]);
+  const series = useMemo(() => dailySeries(dataset, { range, platforms, stage }), [dataset, range, platforms, stage]);
   const alertDay = addDays(asOf, -1);
   const alerts = useMemo(() => detectAlerts(dataset, { day: alertDay, platforms }), [dataset, alertDay, platforms]);
 
@@ -120,6 +122,7 @@ export const HomeView: React.FC = () => {
                 </ResponsiveContainer>
               </div>
             )}
+            <ChartTotalNote chartTotal={series.reduce((s, p) => s + (p.gmv ?? 0), 0)} kpi={k.gmv.value} lang={lang} tolerance={moneyTolerance(k.gmv.value ?? 0)} />
           </Section>
         </div>
         <div className="xl:col-span-2">
@@ -132,8 +135,8 @@ export const HomeView: React.FC = () => {
               </button>
             }
           >
-            {dataset.orders.length === 0 ? (
-              <NotEnoughData lang={lang} reason={vi ? 'Cảnh báo theo SKU, Ads, Live cần file xuất đơn hàng.' : 'Alerts need an order export.'} />
+            {dataset.orders.length === 0 && dataset.dailyMetrics.length === 0 ? (
+              <NotEnoughData lang={lang} reason={vi ? 'Chưa có dữ liệu để tạo cảnh báo.' : 'No data for alerts yet.'} />
             ) : topAlerts.length === 0 ? (
               <p className="text-sm text-slate-400">{vi ? 'Không có điểm bất thường cần chú ý.' : 'Nothing unusual to flag.'}</p>
             ) : (

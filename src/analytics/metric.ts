@@ -7,6 +7,8 @@
  * never as 0.
  */
 
+import type { MismatchItem } from './mismatch';
+
 export type MetricUnit = 'vnd' | 'count' | 'ratio' | 'multiple';
 export type MetricStatus = 'ok' | 'partial' | 'missing';
 
@@ -33,6 +35,13 @@ export interface MetricResult {
    * differs from the sum of its daily rows.
    */
   warning?: Bilingual;
+  /**
+   * Which orders the figure counts when a summary report gives several stages (placed,
+   * paid…), e.g. "Đơn đã thanh toán". Shown on the card so mixed stages are not compared.
+   */
+  basis?: Bilingual;
+  /** The file prints another value for this figure (beyond rounding): "Dữ liệu không khớp", red. */
+  mismatch?: MismatchItem;
 }
 
 export function ok(value: number, unit: MetricUnit): MetricResult {
@@ -85,7 +94,8 @@ export function ratioMetric(
   const value = safeDivide(numerator.value, denominator.value);
   if (value === null) return missing(unit, zeroDenominatorNote);
   const warning = numerator.warning ?? denominator.warning;
-  if (warning && numerator.status !== 'partial' && denominator.status !== 'partial') return { ...ok(value, unit), warning };
+  const mismatch = numerator.mismatch ?? denominator.mismatch;
+  if (warning && numerator.status !== 'partial' && denominator.status !== 'partial') return { ...ok(value, unit), warning, mismatch };
   if (numerator.status === 'partial' || denominator.status === 'partial') {
     return partial(value, unit, [...(numerator.notes || []), ...(denominator.notes || [])], [
       ...(numerator.requires || []),

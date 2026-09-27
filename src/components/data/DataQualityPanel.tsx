@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { ShieldCheck, AlertTriangle, XCircle, Info, CheckCircle2, CircleDashed, ChevronDown } from 'lucide-react';
-import { assessDataQuality, formatRangeVi, PLATFORM_LABELS, type CanonicalDataset, type Capability, type DataIssue } from '../../analytics';
+import { assessDataQuality, dataNotices, datasetDateBounds, formatRangeVi, PLATFORM_LABELS, type CanonicalDataset, type Capability, type DataIssue } from '../../analytics';
 import { formatNumber } from '../../utils/formatters';
+import { DataNoticesList } from '../workspace/DataNotices';
+import { SourceChecksPanel } from './SourceChecksPanel';
 
 interface DataQualityPanelProps {
   dataset: CanonicalDataset;
@@ -23,6 +25,10 @@ const ISSUE_STYLE: Record<DataIssue['severity'], { icon: typeof Info; cls: strin
 /** What the imported data supports, what is missing, and what looks wrong. */
 export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ dataset, language }) => {
   const report = useMemo(() => assessDataQuality(dataset), [dataset]);
+  const notices = useMemo(() => {
+    const b = datasetDateBounds(dataset);
+    return b ? dataNotices(dataset, b) : [];
+  }, [dataset]);
   const [expanded, setExpanded] = useState(true);
   const t = (v: { vi: string; en: string }) => v[language];
   const vi = language === 'vi';
@@ -125,6 +131,17 @@ export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ dataset, lan
           )}
         </div>
       )}
+      {dataset.reportedFigures?.length ? (
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <SourceChecksPanel dataset={dataset} lang={language} />
+          {notices.length > 0 && (
+            <div className="mt-3">
+              <h3 className="text-sm font-black text-white mb-1">{vi ? 'Bản ghi bất thường' : 'Odd records'}</h3>
+              <DataNoticesList notices={notices} lang={language} />
+            </div>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 };

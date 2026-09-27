@@ -2,7 +2,8 @@
  * Growth engines: Ads Intelligence, Live Auditor, Video & Affiliate.
  * All built on the same slice / profit engine as the rest of the analytics.
  */
-import type { AdPerformance, AffiliatePerformance, CanonicalDataset, LiveSession, Platform } from './model';
+import type { AdPerformance, AffiliatePerformance, CanonicalDataset, LiveSession, Platform, SummaryChannel } from './model';
+import { channelMix } from './summaryEngine';
 import { sliceDataset, type DatasetFilter } from './filters';
 import { adsSummary, isUndatedSession, liveSessions, type AdCampaignRow, type LiveSessionRow } from './adsLiveEngine';
 import { computeProfitByGroup } from './profitEngine';
@@ -11,23 +12,33 @@ import { compareValues, type Comparison } from './comparisonEngine';
 import { safeDivide, type Bilingual } from './metric';
 import { enumerateDays } from './period';
 import { weekdayIndex } from './campaignEngine';
-import { mismatchNote, moneyTolerance, ORDER_TOLERANCE, periodMismatches } from './periodRows';
+import { moneyTolerance, ORDER_TOLERANCE, periodMismatches } from './periodRows';
+import { byGap, compareCopies, FILE_RATE_LABEL, periodMismatchItems, RECOMPUTED_LABEL, type MismatchItem } from './mismatch';
 import { fmtMoney, fmtOrders } from './format';
 
 // ============================================================ ADS INTELLIGENCE
 
-export type AdEfficiency = 'profitable' | 'below_break_even' | 'unknown';
+/** likely_loss: ROAS below 1,5 with no margin known — almost surely losing money. */
+export type AdEfficiency = 'profitable' | 'below_break_even' | 'likely_loss' | 'unknown';
+
+/** Robust score above which a day's ROAS is marked unusual. */
+export const ROAS_OUTLIER_SCORE = 3.5;
+
+/** Below this ROAS a campaign almost surely loses money, whatever the margin (6.3). */
+export const LIKELY_LOSS_ROAS = 1.5;
 
 export interface AdsIntelligence {
   available: boolean;
   campaigns: (AdCampaignRow & { efficiency: AdEfficiency; spendShare: number | null })[];
   totals: ReturnType<typeof adsSummary>['totals'];
-  daily: { date: string; spend: number; revenue: number | null; roas: number | null; clicks: number | null }[];
+  daily: { date: string; spend: number; revenue: number | null; roas: number | null; clicks: number | null; roasOutlier: boolean }[];
   byPlatform: { platform: Platform; spend: number; revenue: number | null; roas: number | null; profitAfterAds: number | null }[];
   /** Spend on campaigns below break-even ROAS. */
   spendBelowBreakEven: number;
   /** Period-total rows cannot be split by day and are excluded from the daily chart. */
   periodRowsExcludedFromDaily: number;
+  /** Ad rows whose days do not add up to the period row, and printed ROAS ≠ revenue ÷ spend. */
+  mismatches: MismatchItem[];
   notes: Bilingual[];
 }
 
@@ -37,7 +48,15 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
   const totalSpend = summary.totals.spend;
   const campaigns = summary.rows.map((r) => ({
     ...r,
-    efficiency: (r.roas === null || r.breakEvenRoas === null ? 'unknown' : r.roas >= r.breakEvenRoas ? 'profitable' : 'below_break_even') as AdEfficiency,
+    efficiency: (r.roas === null
+      ? 'unknown'
+      : r.breakEvenRoas !== null
+        ? r.roas >= r.breakEvenRoas
+          ? 'profitable'
+          : 'below_break_even'
+        : r.roas < LIKELY_LOSS_ROAS
+          ? 'likely_loss'
+          : 'unknown') as AdEfficiency,
     spendShare: totalSpend && r.spend !== null ? r.spend / totalSpend : null,
   }));
   // The chart by day always uses the daily rows, even when the totals above use the
@@ -49,8 +68,19 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
     const hasRev = rows.some((a) => typeof a.attributedRevenue === 'number');
     const revenue = hasRev ? rows.reduce((s, a) => s + (a.attributedRevenue || 0), 0) : null;
     const hasClicks = rows.some((a) => typeof a.clicks === 'number');
-    return { date, spend, revenue, roas: revenue !== null ? safeDivide(revenue, spend) : null, clicks: hasClicks ? rows.reduce((s, a) => s + (a.clicks || 0), 0) : null };
+    return { date, spend, revenue, roas: revenue !== null ? safeDivide(revenue, spend) : null, clicks: hasClicks ? rows.reduce((s, a) => s + (a.clicks || 0), 0) : null, roasOutlier: false };
   });
+  // Unusual ROAS days (6.4): robust score against the median day, as in anomalyScan.ts.
+  const roasDays = daily.filter((d) => d.roas !== null && d.spend > 0);
+  if (roasDays.length >= 7) {
+    const med = (xs: number[]) => {
+      const s = [...xs].sort((a, b) => a - b);
+      return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+    };
+    const m = med(roasDays.map((d) => d.roas!));
+    const mad = Math.max(med(roasDays.map((d) => Math.abs(d.roas! - m))), m * 0.1);
+    for (const d of roasDays) d.roasOutlier = mad > 0 && Math.abs((0.6745 * (d.roas! - m)) / mad) >= ROAS_OUTLIER_SCORE;
+  }
   const platforms = Array.from(new Set(campaigns.map((c) => c.platform)));
   const byPlatform = platforms.map((platform) => {
     const rows = campaigns.filter((c) => c.platform === platform);
@@ -82,13 +112,27 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
     { key: 'attributedRevenue', pick: (a) => a.attributedRevenue, tolerance: moneyTolerance },
     { key: 'orders', pick: (a) => a.orders, tolerance: ORDER_TOLERANCE },
   ]);
-  const FIELD_VI: Record<string, string> = { spend: 'chi phí', attributedRevenue: 'doanh số', orders: 'số đơn' };
-  const mmNote = mismatchNote(mm, (m) => {
-    const name = m.group.split('|')[2] || m.group.split('|')[1];
-    const f = m.field === 'orders' ? fmtOrders : (v: number) => fmtMoney(v);
-    return `${name} — ${FIELD_VI[m.field]} cộng ngày ${f(m.dailySum)}, dòng tổng ${f(m.periodValue)}`;
-  });
-  if (mmNote) notes.push(mmNote);
+  const FIELD: Record<string, Bilingual> = { spend: { vi: 'chi phí', en: 'spend' }, attributedRevenue: { vi: 'doanh số', en: 'sales' }, orders: { vi: 'số đơn', en: 'orders' } };
+  const mismatches = periodMismatchItems(
+    mm,
+    (m) => {
+      const name = m.group.split('|')[2] || m.group.split('|')[1];
+      return { vi: `${name} — ${FIELD[m.field].vi}`, en: `${name} — ${FIELD[m.field].en}` };
+    },
+    (m) => (m.field === 'orders' ? 'count' : 'vnd'),
+  );
+  // The report's own ROAS column vs revenue ÷ spend of the same row.
+  for (const a of slice.ads.filter((x) => x.periodStart !== undefined && x.reportedRoas !== undefined)) {
+    const m = compareCopies(
+      `roas|${adKey(a)}`,
+      { vi: `${a.adName ?? a.campaignId} — ROAS`, en: `${a.adName ?? a.campaignId} — ROAS` },
+      'multiple',
+      { label: RECOMPUTED_LABEL, value: a.spend ? (a.attributedRevenue ?? 0) / a.spend : null },
+      { label: FILE_RATE_LABEL, value: a.reportedRoas },
+    );
+    if (m) mismatches.push(m);
+  }
+  mismatches.sort(byGap);
   return {
     available: summary.available,
     campaigns,
@@ -97,6 +141,7 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
     byPlatform,
     spendBelowBreakEven: campaigns.filter((c) => c.efficiency === 'below_break_even').reduce((s, c) => s + (c.spend ?? 0), 0),
     periodRowsExcludedFromDaily: periodRows,
+    mismatches,
     notes,
   };
 }
@@ -125,6 +170,16 @@ export interface LiveAudit {
   funnel: Funnel;
   totals: { sessions: number; hours: number | null; gmv: number; orders: number; gmvPerHour: number | null };
   notes: Bilingual[];
+  /** Sessions with at least one viewer (7.2). */
+  watchedSessions: number;
+  /** Air date inferred for a period-total session (7.1), by session id — always labelled. */
+  inferredDates: Record<string, string>;
+  /** No session has a duration: the ranking is by GMV and the "/giờ" columns are hidden (7.3). */
+  rankedBy: 'gmvPerHour' | 'gmv';
+  /** ROAS of the live ads (e.g. "Dịch Vụ Hiển Thị Live"), when there are any. */
+  liveAdsRoas: number | null;
+  /** Automatic conclusion (7.6), null when nothing stands out. */
+  insight: Bilingual | null;
 }
 
 const SLOTS: { key: string; label: Bilingual; from: number; to: number }[] = [
@@ -157,7 +212,8 @@ function groupStats(key: string, label: Bilingual, rows: LiveSessionRow[]): Live
   const hours = withHours.reduce((s, r) => s + (r.durationHours || 0), 0);
   const gmv = withHours.reduce((s, r) => s + (r.session.gmv || 0), 0);
   const orders = withHours.reduce((s, r) => s + (r.session.orders || 0), 0);
-  const viewersRows = rows.filter((r) => typeof r.session.viewers === 'number');
+  // Sessions with 0 viewers say nothing about how many people watch (7.5).
+  const viewersRows = rows.filter((r) => typeof r.session.viewers === 'number' && r.session.viewers > 0);
   const viewers = viewersRows.reduce((s, r) => s + (r.session.viewers || 0), 0);
   const ordersAll = viewersRows.reduce((s, r) => s + (r.session.orders || 0), 0);
   const profitRows = withHours.filter((r) => r.estimatedProfit !== null);
@@ -173,9 +229,36 @@ function groupStats(key: string, label: Bilingual, rows: LiveSessionRow[]): Live
   };
 }
 
+/**
+ * Air date of a period-total session (7.1), when exactly one listed session had viewers:
+ * the date in its title ("MEGA LIVE 25.7") if the Live channel had views that day, otherwise
+ * the only day the Live channel had views. Always shown as "ngày suy luận".
+ */
+function inferSessionDates(dataset: CanonicalDataset, filter: DatasetFilter, sessions: LiveSessionRow[]): Record<string, string> {
+  const watched = sessions.filter((r) => isUndatedSession(r.session) && (r.session.viewers ?? 0) > 0);
+  if (watched.length !== 1) return {};
+  const s = watched[0].session;
+  const days = new Set(
+    (dataset.salesSummaries ?? [])
+      .filter((r) => r.channel === 'live' && r.dimension === 'channel' && r.stage === 'placed' && r.periodStart === undefined && r.platform === s.platform)
+      .filter((r) => r.date >= (s.periodStart ?? filter.range.start) && r.date <= s.date && ((r.views ?? 0) > 0 || (r.uniqueImpressions ?? 0) > 0))
+      .map((r) => r.date),
+  );
+  const m = s.title?.match(/(?:^|[^\d])(\d{1,2})[./](\d{1,2})(?![\d./])/);
+  if (m) {
+    const titled = [...days].find((d) => Number(d.slice(8, 10)) === Number(m[1]) && Number(d.slice(5, 7)) === Number(m[2]));
+    if (titled) return { [s.sessionId]: titled };
+  }
+  return days.size === 1 ? { [s.sessionId]: [...days][0] } : {};
+}
+
 export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): LiveAudit {
   const sessions = liveSessions(dataset, filter);
-  const ranking = [...sessions].filter((r) => r.gmvPerHour !== null).sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0));
+  const inferredDates = inferSessionDates(dataset, filter, sessions);
+  const anyDuration = sessions.some((r) => r.gmvPerHour !== null);
+  const ranking = anyDuration
+    ? [...sessions].filter((r) => r.gmvPerHour !== null).sort((a, b) => (b.gmvPerHour ?? 0) - (a.gmvPerHour ?? 0))
+    : [...sessions].sort((a, b) => (b.session.gmv ?? 0) - (a.session.gmv ?? 0));
   const hourOf = (s: LiveSession) => (s.startTime ? Number(s.startTime.slice(0, 2)) : null);
   const withTime = sessions.filter((r) => !isUndatedSession(r.session) && hourOf(r.session) !== null);
   const byTimeSlot = SLOTS.map((slot) => groupStats(slot.key, slot.label, withTime.filter((r) => hourOf(r.session)! >= slot.from && hourOf(r.session)! < slot.to))).filter((g) => g.sessions > 0);
@@ -203,6 +286,18 @@ export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): Liv
   if (sessions.length > 0 && sessions.length < 8) {
     notes.push({ vi: 'Số phiên live còn ít — so sánh theo khung giờ/thứ chỉ mang tính tham khảo.', en: 'Few sessions — slot/weekday comparisons are indicative only.' });
   }
+  const watchedSessions = sessions.filter((r) => (r.session.viewers ?? 0) > 0).length;
+  // Live ads: campaigns whose name says Live (Shopee "Dịch Vụ Hiển Thị Live").
+  const liveAds = adsSummary(dataset, filter).rows.filter((r) => /live/i.test(r.name) && r.spend);
+  const liveSpend = liveAds.reduce((s, r) => s + (r.spend ?? 0), 0);
+  const liveAdsRoas = liveAds.length && liveAds.every((r) => r.attributedRevenue !== null) ? safeDivide(liveAds.reduce((s, r) => s + (r.attributedRevenue ?? 0), 0), liveSpend) : null;
+  const insight: Bilingual | null =
+    sessions.length > 0 && watchedSessions <= 1 && liveAdsRoas !== null && liveAdsRoas < LIKELY_LOSS_ROAS
+      ? {
+          vi: `Kênh Live gần như chưa hoạt động (${watchedSessions}/${sessions.length} phiên có người xem, ROAS quảng cáo Live ${liveAdsRoas.toFixed(2).replace('.', ',')}x), cân nhắc dừng quảng cáo Live hoặc lập lịch live đều đặn.`,
+          en: `Live is barely active (${watchedSessions}/${sessions.length} sessions with viewers, live ads ROAS ${liveAdsRoas.toFixed(2)}x): consider pausing live ads or scheduling regular lives.`,
+        }
+      : null;
   return {
     sessions,
     ranking,
@@ -213,6 +308,11 @@ export function liveAudit(dataset: CanonicalDataset, filter: DatasetFilter): Liv
     funnel: liveFunnel(dataset, filter.range, filter.platforms),
     totals: { sessions: sessions.length, hours, gmv, orders: sessions.reduce((s, r) => s + (r.session.orders || 0), 0), gmvPerHour: hours ? withHours.reduce((s, r) => s + (r.session.gmv || 0), 0) / hours : null },
     notes,
+    watchedSessions,
+    inferredDates,
+    rankedBy: anyDuration ? 'gmvPerHour' : 'gmv',
+    liveAdsRoas,
+    insight,
   };
 }
 
@@ -250,6 +350,9 @@ export const CONTENT_KIND_LABELS: Record<ContentKind, Bilingual> = {
   creator: { vi: 'Nhà sáng tạo (live)', en: 'Creator (live)' },
 };
 
+/** At most this many buyers: the content's sales hinge on one or two large orders. */
+export const FEW_BUYERS = 3;
+
 export interface ContentRow {
   key: string;
   kind: ContentKind;
@@ -260,6 +363,8 @@ export interface ContentRow {
   views: number | null;
   clicks: number | null;
   orders: number | null;
+  /** Distinct buyers; FEW_BUYERS or fewer → sales hinge on 1–2 big orders (8.4). */
+  buyers: number | null;
   gmv: number | null;
   commission: number | null;
   ctr: number | null;
@@ -273,7 +378,8 @@ export interface ContentRow {
 
 export interface VideoAffiliate {
   available: boolean;
-  byKind: { kind: ContentKind; gmv: number; orders: number; commission: number; items: number }[];
+  /** channelShare: the listed (Top 5) sales as a share of the channel's sales (8.1). */
+  byKind: { kind: ContentKind; gmv: number; orders: number; commission: number; items: number; channelGmv: number | null; channelShare: number | null }[];
   creators: ContentRow[];
   videos: ContentRow[];
   notes: Bilingual[];
@@ -306,6 +412,7 @@ export function videoAffiliate(dataset: CanonicalDataset, filter: DatasetFilter,
     const orders = sumOrNull(rows, (r) => r.orders);
     const gmv = sumOrNull(rows, (r) => r.gmv);
     const commission = sumOrNull(rows, (r) => r.commission);
+    const buyers = sumOrNull(rows, (r) => r.buyers);
     const p = profits.get(attributionKey);
     return {
       key,
@@ -317,6 +424,7 @@ export function videoAffiliate(dataset: CanonicalDataset, filter: DatasetFilter,
       views,
       clicks,
       orders,
+      buyers,
       gmv,
       commission,
       ctr: views && clicks !== null ? clicks / views : null,
@@ -351,15 +459,22 @@ export function videoAffiliate(dataset: CanonicalDataset, filter: DatasetFilter,
   videos.sort((a, b) => (b.gmv ?? 0) - (a.gmv ?? 0));
 
   const kinds: ContentKind[] = ['affiliate', 'shop_video', 'organic_video', 'creator'];
+  // The channel row of the summary report (canonical, 0.3) for "Top 5 · chiếm X% kênh".
+  const mix = (dataset.salesSummaries?.length ? channelMix(dataset, filter, 'placed') : null)?.channels;
+  const CHANNEL_OF: Partial<Record<ContentKind, SummaryChannel>> = { affiliate: 'affiliate', shop_video: 'video' };
   const byKind = kinds
     .map((kind) => {
       const rows = slice.affiliates.filter((a) => (a.contentType ?? 'affiliate') === kind);
+      const gmv = rows.reduce((s, r) => s + (r.gmv || 0), 0);
+      const channelGmv = mix?.find((c) => c.channel === CHANNEL_OF[kind])?.gmv ?? null;
       return {
         kind,
-        gmv: rows.reduce((s, r) => s + (r.gmv || 0), 0),
+        gmv,
         orders: rows.reduce((s, r) => s + (r.orders || 0), 0),
         commission: rows.reduce((s, r) => s + (r.commission || 0), 0),
         items: new Set(rows.map((r) => r.contentId ?? r.creatorId)).size,
+        channelGmv,
+        channelShare: channelGmv ? gmv / channelGmv : null,
       };
     })
     .filter((k) => k.items > 0);

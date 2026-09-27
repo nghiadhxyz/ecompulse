@@ -6,6 +6,7 @@ import {
   compareCampaigns,
   fmtChange,
   fmtCount,
+  fmtDay,
   fmtMoney,
   fmtMoneyCompact,
   fmtRate,
@@ -16,12 +17,19 @@ import {
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
+import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
+import { SampleTag, SmallRateCell } from '../../workspace/SampleSize';
+import { REFERENCE_MAX_SAMPLES } from '../../../analytics';
 import { ChangeCell, Th } from '../ui';
 
 const BAR = '#3987e5';
 
 export const CampaignCalendar: React.FC = () => {
-  const { lang, dataset, baseFilter, range, openEvidence } = useWorkspace();
+  const { lang, dataset, baseFilter, range, openEvidence, settings, updateSettings } = useWorkspace();
+  const [manualDay, setManualDay] = useState('');
+  // Confirmed / hand-entered sale days live in the settings (5.4).
+  const confirmedDays = settings?.confirmedSaleDays ?? [];
+  const setConfirmed = (days: string[]) => updateSettings?.({ ...(settings ?? {}), confirmedSaleDays: [...new Set(days)].sort() });
   const vi = lang === 'vi';
   const perf = useMemo(() => calendarPerformance(dataset, baseFilter), [dataset, baseFilter]);
   const all = useMemo(() => campaignCalendar(dataset).sort((a, b) => a.range.start.localeCompare(b.range.start)), [dataset]);
@@ -40,15 +48,20 @@ export const CampaignCalendar: React.FC = () => {
     );
   }
 
+  // Profit per day needs COGS: without it the column is hidden (one note below the table).
+  const hasProfit = perf.byDayType.some((b) => b.profitPerDay !== null);
   const bucketRow = (x: BucketStats) => (
     <tr key={x.key} className="border-t border-white/5 text-slate-200">
-      <td className="px-2.5 py-2 font-semibold text-white">{tr(lang, x.label)}</td>
+      <td className="px-2.5 py-2 font-semibold text-white">
+        {tr(lang, x.label)}
+        <SampleTag n={x.days} lang={lang} />
+      </td>
       <td className="px-2.5 py-2 text-right">{x.days}</td>
       <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.gmvPerDay, lang)}</td>
       <td className="px-2.5 py-2 text-right">{fmtCount(x.ordersPerDay === null ? null : Math.round(x.ordersPerDay), lang)}</td>
       <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.aov, lang)}</td>
-      <td className="px-2.5 py-2 text-right">{fmtRate(x.cancelRate, lang)}</td>
-      <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.profitPerDay, lang)}</td>
+      <SmallRateCell rate={x.cancelRate} orders={x.ordersPerDay === null ? 0 : x.ordersPerDay * x.days} lang={lang} />
+      {hasProfit && <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.profitPerDay, lang)}</td>}
       <td className="px-2.5 py-2 text-right whitespace-nowrap">{x.upliftVsWeekday === null ? '—' : x.key === 'weekday' ? (vi ? 'mốc' : 'base') : fmtChange(x.upliftVsWeekday, lang)}</td>
     </tr>
   );
@@ -57,7 +70,7 @@ export const CampaignCalendar: React.FC = () => {
     ? [
         { label: 'GMV', get: (r) => fmtMoneyCompact(r.kpis.metrics.gmv.value, lang), change: cmp.changes.gmv },
         { label: vi ? 'GMV / ngày' : 'GMV / day', get: (r) => fmtMoneyCompact(r.gmvPerDay, lang) },
-        { label: vi ? 'Mức tăng so với ngày thường trước đó' : 'Uplift vs normal days before', get: (r) => (r.uplift === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtChange(r.uplift, lang)), change: cmp.changes.uplift, rate: true },
+        { label: vi ? 'Mức tăng so với 14 ngày trước chiến dịch' : 'Uplift vs the 14 days before', get: (r) => (r.uplift === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtChange(r.uplift, lang)), change: cmp.changes.uplift, rate: true },
         { label: vi ? 'Đơn đặt' : 'Orders', get: (r) => fmtCount(r.kpis.metrics.orders.value, lang), change: cmp.changes.orders },
         { label: 'AOV', get: (r) => fmtMoneyCompact(r.kpis.metrics.aov.value, lang), change: cmp.changes.aov },
         { label: vi ? 'Tỷ lệ hủy' : 'Cancel rate', get: (r) => fmtRate(r.kpis.metrics.cancelRate.value, lang), change: cmp.changes.cancelRate, rate: true, goodWhenUp: false },
@@ -70,13 +83,67 @@ export const CampaignCalendar: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       {perf.warnings.map((w, i) => (
         <p key={i} className="text-xs text-[#fab219] rounded-xl border border-[#fab219]/30 bg-[#fab219]/[0.06] px-3 py-2">{tr(lang, w)}</p>
       ))}
 
+      {(perf.suggestedSaleDays.length > 0 || confirmedDays.length > 0 || updateSettings) && (
+        <Section
+          title={vi ? 'Lịch ngày sale' : 'Sale-day calendar'}
+          subtitle={vi ? 'Ngày được xác nhận là ngày sale sẽ bị loại khỏi mốc "ngày thường" ở mọi bảng trên trang này.' : 'Confirmed sale days are left out of every "normal day" baseline on this page.'}
+        >
+          {perf.suggestedSaleDays.length > 0 && (
+            <>
+              <div className="text-xs font-bold text-slate-300 mb-1">{vi ? 'Ngày nghi là sale — cần bạn xác nhận' : 'Possible sale days — please confirm'}</div>
+              <ul className="space-y-1 mb-3">
+                {perf.suggestedSaleDays.map((s) => (
+                  <li key={s.date} className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+                    <b className="text-white w-14">{fmtDay(s.date)}</b>
+                    <span className="text-slate-400">{s.reasons.map((r) => tr(lang, r)).join(' · ')}{s.autoDoubleDay ? (vi ? ' · đang được tự nhận là ngày đôi' : ' · auto double day') : ''}</span>
+                    {updateSettings && (
+                      <button onClick={() => setConfirmed([...confirmedDays, s.date])} className="px-2 py-0.5 rounded-md border border-sky-400/40 text-sky-200 font-semibold">
+                        {vi ? 'Xác nhận là ngày sale' : 'Confirm sale day'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {confirmedDays.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-300 mb-2">
+              {vi ? 'Đã xác nhận:' : 'Confirmed:'}
+              {confirmedDays.map((d) => (
+                <span key={d} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/15">
+                  {fmtDay(d)}
+                  {updateSettings && (
+                    <button onClick={() => setConfirmed(confirmedDays.filter((x) => x !== d))} aria-label={vi ? `Bỏ ${fmtDay(d)}` : `Remove ${fmtDay(d)}`} className="text-slate-500 hover:text-white">×</button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+          {updateSettings && (
+            <form
+              className="flex items-center gap-2 text-xs text-slate-300"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(manualDay)) setConfirmed([...confirmedDays, manualDay]);
+                setManualDay('');
+              }}
+            >
+              {vi ? 'Nhập ngày sale thủ công:' : 'Add a sale day:'}
+              <input type="date" value={manualDay} onChange={(e) => setManualDay(e.target.value)} className="bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-slate-100 [color-scheme:dark]" />
+              <button type="submit" className="px-2 py-1 rounded-md border border-white/15 font-semibold">{vi ? 'Thêm' : 'Add'}</button>
+            </form>
+          )}
+        </Section>
+      )}
+
       <Section
         title={vi ? 'Hiệu quả theo loại ngày' : 'Performance by day type'}
-        subtitle={vi ? `${formatRangeVi(range)} · ${perf.analyzedDays} ngày · ${perf.months} tháng · cột "Ngày" là cỡ mẫu` : `${formatRangeVi(range)} · ${perf.analyzedDays} days`}
+        subtitle={vi ? `${formatRangeVi(range)} · ${perf.analyzedDays} ngày · cột "Ngày" là cỡ mẫu · mức tăng so với ngày thường cả kỳ` : `${formatRangeVi(range)} · ${perf.analyzedDays} days · uplift vs weekdays of the whole period`}
       >
         <div className="overflow-x-auto rounded-xl border border-white/10">
           <table className="w-full text-xs">
@@ -88,14 +155,14 @@ export const CampaignCalendar: React.FC = () => {
                 <Th>{vi ? 'Đơn/ngày' : 'Orders/day'}</Th>
                 <Th>AOV</Th>
                 <Th>{vi ? 'Hủy' : 'Cancel'}</Th>
-                <Th>{vi ? 'LN/ngày' : 'Profit/day'}</Th>
-                <Th title={vi ? 'GMV/ngày so với ngày thường trong tuần' : 'GMV/day vs weekdays'}>{vi ? 'So với ngày thường' : 'Vs weekday'}</Th>
+                {hasProfit && <Th>{vi ? 'LN/ngày' : 'Profit/day'}</Th>}
+                <Th title={vi ? 'GMV/ngày so với ngày thường trong tuần của cả kỳ' : 'GMV/day vs weekdays of the whole period'}>{vi ? 'So với ngày thường cả kỳ' : 'Vs weekdays (period)'}</Th>
               </tr>
             </thead>
             <tbody>
               {perf.byDayType.map(bucketRow)}
               <tr className="border-t border-white/15 bg-white/[0.03]">
-                <td className="px-2.5 py-2 font-bold text-white" colSpan={8}>
+                <td className="px-2.5 py-2 font-bold text-white" colSpan={hasProfit ? 8 : 7}>
                   {vi ? 'Ngày sale so với ngày thường: ' : 'Sale vs normal days: '}
                   <span className="text-sky-300">{fmtMoneyCompact(perf.saleVsNormal.sale.gmvPerDay, lang)}</span> {vi ? 'so với' : 'vs'}{' '}
                   <span className="text-slate-300">{fmtMoneyCompact(perf.saleVsNormal.normal.gmvPerDay, lang)}</span> / {vi ? 'ngày' : 'day'} ({fmtChange(perf.saleVsNormal.uplift, lang)}) ·{' '}
@@ -105,10 +172,18 @@ export const CampaignCalendar: React.FC = () => {
             </tbody>
           </table>
         </div>
+        {!hasProfit && <p className="text-[11px] text-slate-500 mt-1.5">{vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận theo ngày.' : 'No COGS yet, so no profit per day.'}</p>}
       </Section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Section title={vi ? 'Theo thứ trong tuần' : 'By day of week'} subtitle={vi ? 'Chỉ ngày thường (đã loại ngày sale, ngày lương)' : 'Normal days only'}>
+        <Section
+          title={vi ? 'Theo thứ trong tuần' : 'By day of week'}
+          subtitle={
+            vi
+              ? `Chỉ ngày không sale${perf.byWeekday.some((w) => w.days > 0 && w.days <= REFERENCE_MAX_SAMPLES) ? ` · mỗi thứ chỉ có ${Math.min(...perf.byWeekday.filter((w) => w.days > 0).map((w) => w.days))}–${Math.max(...perf.byWeekday.map((w) => w.days))} ngày: tham khảo` : ''}`
+              : 'Non-sale days only'
+          }
+        >
           <div className="h-52" role="img" aria-label={vi ? 'GMV trung bình mỗi ngày theo thứ' : 'Average GMV per weekday'}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={perf.byWeekday.map((w) => ({ label: tr(lang, w.label), gmv: w.gmvPerDay, days: w.days }))}>
@@ -124,6 +199,7 @@ export const CampaignCalendar: React.FC = () => {
             </ResponsiveContainer>
           </div>
         </Section>
+        {perf.showByDayOfMonth ? (
         <Section title={vi ? 'Theo ngày trong tháng' : 'By day of month'} subtitle={vi ? '● = có ngày sale trong mẫu' : '● = includes sale days'}>
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs max-h-52 overflow-y-auto pr-1">
             {perf.byDayOfMonth.map((d) => {
@@ -139,11 +215,16 @@ export const CampaignCalendar: React.FC = () => {
             })}
           </ul>
         </Section>
+        ) : (
+          <Section title={vi ? 'Theo ngày trong tháng' : 'By day of month'}>
+            <p className="text-sm text-slate-400">{vi ? 'Không đủ dữ liệu: cần từ 2 tháng trở lên để mỗi ngày trong tháng có ít nhất 2 mẫu.' : 'Not enough data: needs 2+ months.'}</p>
+          </Section>
+        )}
       </div>
 
       <Section
         title={vi ? 'So sánh chiến dịch' : 'Campaign comparison'}
-        subtitle={vi ? 'Mức tăng = GMV/ngày của chiến dịch so với trung bình các ngày thường trong 14 ngày trước đó' : 'Uplift = campaign GMV/day vs the normal days in the 14 days before'}
+        subtitle={vi ? 'Mức tăng so với 14 ngày trước chiến dịch (chỉ ngày thường, đã loại ngày sale đã xác nhận)' : 'Uplift vs the normal days in the 14 days before the campaign'}
       >
         {all.length < 2 ? (
           <NotEnoughData lang={lang} reason={vi ? 'Cần ít nhất 2 chiến dịch/ngày sale trong dữ liệu.' : 'At least 2 campaigns are needed.'} />

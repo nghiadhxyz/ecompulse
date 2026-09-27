@@ -2,10 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { ArrowDown, AlertTriangle } from 'lucide-react';
 import {
   breakdown,
+  channelFunnel,
   compareFunnels,
+  SUMMARY_CHANNEL_LABELS,
+  type SummaryChannel,
   fmtCount,
   fmtPp,
   fmtRate,
+  fmtShare,
+  isOverFull,
+  OVER_FULL_NOTE,
   formatRangeVi,
   funnel,
   FUNNEL_LABELS,
@@ -23,15 +29,17 @@ import { Th } from '../ui';
 
 type Segment = 'platform' | 'category' | 'sku';
 
-export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map<string, number | null> }> = ({ f, lang, ppByStep }) => {
+/** `showLeak`: mark the lowest step only when there is something to compare it with (4.3). */
+export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map<string, number | null>; showLeak?: boolean }> = ({ f, lang, ppByStep, showLeak = false }) => {
   const vi = lang === 'vi';
-  const keys = Object.keys(f.stages) as FunnelStageKey[];
+  const keys = (Object.keys(f.stages) as FunnelStageKey[]).filter((k) => f.stages[k] !== null || !f.labels);
+  const name = (k: FunnelStageKey) => tr(lang, f.labels?.[k] ?? FUNNEL_LABELS[k]);
   return (
     <ol className="space-y-1.5">
       {keys.map((k) => {
         const v = f.stages[k];
         const step = f.steps.find((s) => s.to === k);
-        const leak = f.biggestLeak && f.biggestLeak.to === k;
+        const leak = showLeak && f.biggestLeak && f.biggestLeak.to === k;
         const pp = step ? ppByStep?.get(`${step.from}>${step.to}`) : undefined;
         return (
           <li key={k}>
@@ -39,8 +47,8 @@ export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map
               <div className={`flex items-center gap-2 pl-3 text-[11px] ${leak ? 'text-[#fab219] font-bold' : 'text-slate-400'}`}>
                 <ArrowDown className="w-3 h-3" aria-hidden />
                 <span>
-                  {fmtRate(step.rate, lang, 2)} {vi ? 'chuyển tiếp' : 'convert'}
-                  {step.skipped.length > 0 && ` (${vi ? 'bỏ qua' : 'skips'} ${step.skipped.map((x) => tr(lang, FUNNEL_LABELS[x])).join(', ')})`}
+                  <span title={isOverFull(step.rate) ? tr(lang, OVER_FULL_NOTE) : undefined}>{fmtShare(step.rate, lang, 2)}</span> {vi ? 'chuyển tiếp' : 'convert'}
+                  {step.skipped.length > 0 && !f.labels && ` (${vi ? 'bỏ qua' : 'skips'} ${step.skipped.map((x) => tr(lang, FUNNEL_LABELS[x])).join(', ')})`}
                   {pp !== undefined && pp !== null && <span className={pp >= 0 ? 'text-[#4ade80]' : 'text-[#f08080]'}> · {fmtPp(pp, lang)} {vi ? 'so với kỳ trước' : 'vs prev'}</span>}
                   {leak && (
                     <>
@@ -52,7 +60,7 @@ export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map
               </div>
             )}
             <div className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${v === null ? 'border-dashed border-white/10 text-slate-500' : leak ? 'border-[#fab219]/40 bg-[#fab219]/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
-              <span className="text-sm font-semibold">{tr(lang, FUNNEL_LABELS[k])}</span>
+              <span className="text-sm font-semibold">{name(k)}</span>
               <span className={`text-sm font-black ${v === null ? 'font-normal text-xs' : 'text-white'}`}>{v === null ? (vi ? 'Không đủ dữ liệu' : 'Not enough data') : fmtCount(v, lang)}</span>
             </div>
           </li>
@@ -71,6 +79,14 @@ export const TrafficFunnel: React.FC = () => {
   const cmp = useMemo(() => compareFunnels(cur, prev), [cur, prev]);
   const ppByStep = new Map(cmp.stepChangesPp.map((s) => [`${s.from}>${s.to}`, s.pp]));
   const live = useMemo(() => liveFunnel(dataset, range, baseFilter.platforms), [dataset, range, baseFilter.platforms]);
+  // "Biggest leak" is only a conclusion when the previous period has the same steps.
+  const hasBaseline = cmp.stepChangesPp.some((s) => s.pp !== null);
+  const channelOptions = useMemo(
+    () => (['product_card', 'affiliate', 'video', 'live'] as SummaryChannel[]).map((c) => ({ c, f: channelFunnel(dataset, baseFilter, c) })).filter((x) => x.f !== null),
+    [dataset, baseFilter],
+  );
+  const [channel, setChannel] = useState<SummaryChannel>('product_card');
+  const chosen = channelOptions.find((x) => x.c === channel) ?? channelOptions[0];
 
   const segments = useMemo(() => {
     const members =
@@ -95,11 +111,14 @@ export const TrafficFunnel: React.FC = () => {
               {vi ? 'Chưa có dữ liệu traffic (hiển thị/nhấp sản phẩm) — chỉ phân tích được phần đơn hàng. Nhập báo cáo traffic theo sản phẩm để có phễu đầy đủ.' : 'No traffic data — only the order part of the funnel is available.'}
             </p>
           )}
-          <FunnelView f={cur} lang={lang} ppByStep={ppByStep} />
+          <FunnelView f={cur} lang={lang} ppByStep={ppByStep} showLeak={hasBaseline} />
           {cur.notes.map((n, i) => (
             <p key={i} className="text-[11px] text-slate-500 mt-2">{tr(lang, n)}</p>
           ))}
-          {cur.biggestLeak && (
+          {!hasBaseline && cur.steps.length > 0 && (
+            <p className="text-[11px] text-slate-500 mt-2">{vi ? 'Không có kỳ so sánh nên chưa kết luận bước nào rơi nhiều nhất.' : 'No comparison period, so no step is called the biggest leak.'}</p>
+          )}
+          {hasBaseline && cur.biggestLeak && (
             <p className="text-sm text-slate-200 mt-3">
               {vi ? 'Điểm rơi lớn nhất (sau khi khách đã nhấp vào sản phẩm): ' : 'Biggest leak (after the product click): '}
               <b>{tr(lang, FUNNEL_LABELS[cur.biggestLeak.from])} → {tr(lang, FUNNEL_LABELS[cur.biggestLeak.to])}</b> ({fmtRate(cur.biggestLeak.rate, lang, 2)}).{' '}
@@ -107,6 +126,26 @@ export const TrafficFunnel: React.FC = () => {
             </p>
           )}
         </Section>
+        {chosen && (
+          <Section
+            title={vi ? 'Phễu theo kênh' : 'Funnel by channel'}
+            subtitle={`${formatRangeVi(range)} · ${vi ? 'dòng kênh trong sheet nguồn truy cập, đơn đặt' : 'channel row, placed orders'}`}
+            right={
+              <div className="flex flex-wrap gap-1" role="group" aria-label={vi ? 'Kênh' : 'Channel'}>
+                {channelOptions.map((x) => (
+                  <button key={x.c} onClick={() => setChannel(x.c)} aria-pressed={chosen.c === x.c} className={`px-2 py-1 rounded-lg text-xs font-semibold border ${chosen.c === x.c ? 'bg-white/15 border-white/30 text-white' : 'border-white/10 text-slate-400'}`}>
+                    {tr(lang, SUMMARY_CHANNEL_LABELS[x.c]).split(' (')[0]}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            <FunnelView f={chosen.f!} lang={lang} />
+            {chosen.f!.notes.map((n, i) => (
+              <p key={i} className="text-[11px] text-slate-500 mt-2">{tr(lang, n)}</p>
+            ))}
+          </Section>
+        )}
         <Section title={vi ? 'Phễu livestream' : 'Live funnel'} subtitle={formatRangeVi(range)}>
           {live.stages.impressions === null && live.stages.orders === null ? (
             <NotEnoughData lang={lang} reason={vi ? 'Chưa có dữ liệu phiên live trong khoảng này.' : 'No live sessions in this range.'} />
@@ -163,7 +202,7 @@ export const TrafficFunnel: React.FC = () => {
                   <td className="px-2.5 py-2 text-right">{fmtCount(f.stages.orders, lang)}</td>
                   <td className="px-2.5 py-2 text-right">{fmtCount(f.stages.paid, lang)}</td>
                   <td className="px-2.5 py-2 text-right">{fmtCount(f.stages.completed, lang)}</td>
-                  <td className="px-2.5 py-2 text-right">{fmtRate(f.stages.clicks && f.stages.orders !== null ? f.stages.orders / f.stages.clicks : null, lang, 2)}</td>
+                  <td className="px-2.5 py-2 text-right">{fmtShare(f.stages.clicks && f.stages.orders !== null ? f.stages.orders / f.stages.clicks : null, lang, 2)}</td>
                   <td className="px-2.5 py-2 text-slate-300 whitespace-nowrap">
                     {f.biggestLeak ? `${tr(lang, FUNNEL_LABELS[f.biggestLeak.from])} → ${tr(lang, FUNNEL_LABELS[f.biggestLeak.to])} (${fmtRate(f.biggestLeak.rate, lang, 1)})` : '—'}
                   </td>

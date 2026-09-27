@@ -13,6 +13,7 @@ import type { DatasetFilter } from './filters';
 import { breakdown, type BreakdownRow } from './breakdownEngine';
 import { campaignCalendar, dayTypeOf, weekdayIndex } from './campaignEngine';
 import { enumerateDays, type DateRange } from './period';
+import { placedOnly } from './orderStage';
 import type { Bilingual, MetricUnit } from './metric';
 
 /** Standard normal CDF (Abramowitz–Stegun 7.1.26). */
@@ -37,7 +38,8 @@ export interface TestResult {
   /** n per side (orders / clicks / days). */
   nCurrent: number;
   nPrevious: number;
-  verdict: 'significant' | 'not_significant' | 'insufficient';
+  /** no_comparison: the comparison period has no data at all (not a small sample). */
+  verdict: 'significant' | 'not_significant' | 'insufficient' | 'no_comparison';
 }
 
 export function twoProportionTest(x1: number, n1: number, x0: number, n0: number): { diff: number; lo: number; hi: number; p: number } | null {
@@ -64,15 +66,41 @@ export function welchTest(a: number[], b: number[]): { diff: number; lo: number;
   return { diff, lo: diff - 1.96 * se, hi: diff + 1.96 * se, p: se > 0 ? twoSidedP(diff / se) : diff === 0 ? 1 : 0 };
 }
 
-function verdictOf(p: number | null): TestResult['verdict'] {
+function verdictOf(p: number | null, nPrevious = 1): TestResult['verdict'] {
+  if (nPrevious === 0) return 'no_comparison';
   return p === null ? 'insufficient' : p < 0.05 ? 'significant' : 'not_significant';
 }
 
 export interface CorrelationCell {
   a: string;
   b: string;
+  /** Pearson r. */
   r: number | null;
+  /** Spearman ρ (ranks): less sensitive to a few extreme days such as sales (11.4). */
+  rho: number | null;
   n: number;
+  /** The two series are tied by a formula (GMV = orders × AOV): r says little (11.3). */
+  formulaLinked: boolean;
+}
+
+/** Pairs linked by GMV = orders × AOV. */
+const FORMULA_PAIRS = new Set(['gmv|aov', 'gmv|orders', 'orders|aov']);
+
+function ranks(xs: number[]): number[] {
+  const order = xs.map((v, i) => [v, i] as const).sort((a, b) => a[0] - b[0]);
+  const out = new Array<number>(xs.length);
+  for (let i = 0; i < order.length; ) {
+    let j = i;
+    while (j + 1 < order.length && order[j + 1][0] === order[i][0]) j++;
+    // Ties share the average rank.
+    for (let k = i; k <= j; k++) out[order[k][1]] = (i + j) / 2 + 1;
+    i = j + 1;
+  }
+  return out;
+}
+
+export function spearman(x: number[], y: number[]): number | null {
+  return pearson(ranks(x), ranks(y));
 }
 
 export interface AdvancedStats {
@@ -108,7 +136,8 @@ const WD: Bilingual[] = [
   { vi: 'Chủ nhật', en: 'Sun' },
 ];
 
-export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, previousRange: DateRange): AdvancedStats {
+export function advancedStats(dataset: CanonicalDataset, requested: DatasetFilter, previousRange: DateRange, options: { excludeSaleDays?: boolean } = {}): AdvancedStats {
+  const filter = placedOnly(requested);
   const cur = breakdown(dataset, filter, 'day').rows;
   const prev = breakdown(dataset, { ...filter, range: previousRange }, 'day').rows;
   const sum = (rows: BreakdownRow[], f: (r: BreakdownRow) => number | null) => rows.reduce((s, r) => s + (f(r) ?? 0), 0);
@@ -121,10 +150,11 @@ export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, 
     const x0 = sum(prev, num);
     const n0 = hasDen(prev) ? sum(prev, den) : 0;
     const t = twoProportionTest(x1, n1, x0, n0);
-    tests.push({ key, label, unit: 'ratio', current: n1 ? x1 / n1 : null, previous: n0 ? x0 / n0 : null, difference: t?.diff ?? null, ciLow: t?.lo ?? null, ciHigh: t?.hi ?? null, pValue: t?.p ?? null, nCurrent: n1, nPrevious: n0, verdict: verdictOf(t?.p ?? null) });
+    tests.push({ key, label, unit: 'ratio', current: n1 ? x1 / n1 : null, previous: n0 ? x0 / n0 : null, difference: t?.diff ?? null, ciLow: t?.lo ?? null, ciHigh: t?.hi ?? null, pValue: t?.p ?? null, nCurrent: n1, nPrevious: n0, verdict: verdictOf(t?.p ?? null, n0) });
   };
   rateTest('cancelRate', { vi: 'Tỷ lệ hủy', en: 'Cancel rate' }, (r) => r.current.cancelled, (r) => r.current.placed);
-  rateTest('refundRate', { vi: 'Tỷ lệ trả/hoàn', en: 'Refund rate' }, (r) => r.current.returned, (r) => r.current.valid);
+  // Refunds of the same orders as the cancellations: placed orders (7/519), one stage (0.1).
+  rateTest('refundRate', { vi: 'Tỷ lệ trả/hoàn', en: 'Refund rate' }, (r) => r.current.returned, (r) => (dataset.orders.length === 0 ? r.current.placed : r.current.valid));
   rateTest('cvr', { vi: 'CVR (đơn / lượt nhấp)', en: 'CVR' }, (r) => r.current.placed, (r) => r.current.clicks);
 
   const meanTest = (key: string, label: Bilingual, unit: MetricUnit, f: (r: BreakdownRow) => number) => {
@@ -138,13 +168,18 @@ export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, 
     const b = fill(prev, previousRange);
     const t = welchTest(a, b);
     const mean = (x: number[]) => (x.length ? x.reduce((s, v) => s + v, 0) / x.length : null);
-    tests.push({ key, label, unit, current: mean(a), previous: mean(b), difference: t?.diff ?? null, ciLow: t?.lo ?? null, ciHigh: t?.hi ?? null, pValue: t?.p ?? null, nCurrent: a.length, nPrevious: b.length, verdict: verdictOf(t?.p ?? null) });
+    tests.push({ key, label, unit, current: mean(a), previous: mean(b), difference: t?.diff ?? null, ciLow: t?.lo ?? null, ciHigh: t?.hi ?? null, pValue: t?.p ?? null, nCurrent: a.length, nPrevious: b.length, verdict: verdictOf(t?.p ?? null, b.length) });
   };
   meanTest('gmvPerDay', { vi: 'GMV mỗi ngày', en: 'GMV per day' }, 'vnd', (r) => r.current.gmv);
   meanTest('ordersPerDay', { vi: 'Đơn mỗi ngày', en: 'Orders per day' }, 'count', (r) => r.current.placed);
 
-  // Daily correlations (current range)
-  const days = enumerateDays(filter.range);
+  // Daily correlations (current range), optionally without sale days (11.4).
+  const cal = campaignCalendar(dataset);
+  const isNormal = (d: string) => {
+    const t = dayTypeOf(d, cal);
+    return t === 'weekday' || t === 'weekend';
+  };
+  const days = enumerateDays(filter.range).filter((d) => !options.excludeSaleDays || isNormal(d));
   const byDay = new Map(cur.map((r) => [r.key, r]));
   const adsByDay = new Map<string, number>();
   for (const a of dataset.ads) {
@@ -153,6 +188,7 @@ export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, 
   }
   const series: { key: string; label: Bilingual; values: (number | null)[] }[] = [
     { key: 'gmv', label: { vi: 'GMV', en: 'GMV' }, values: days.map((d) => byDay.get(d)?.current.gmv ?? 0) },
+    { key: 'orders', label: { vi: 'Số đơn', en: 'Orders' }, values: days.map((d) => byDay.get(d)?.current.placed ?? 0) },
     { key: 'clicks', label: { vi: 'Lượt nhấp', en: 'Clicks' }, values: days.map((d) => byDay.get(d)?.current.clicks ?? null) },
     { key: 'ads', label: { vi: 'Chi phí Ads', en: 'Ad spend' }, values: days.map((d) => (adsByDay.size ? adsByDay.get(d) ?? 0 : null)) },
     { key: 'cancelRate', label: { vi: 'Tỷ lệ hủy', en: 'Cancel rate' }, values: days.map((d) => byDay.get(d)?.current.cancelRate ?? null) },
@@ -162,16 +198,21 @@ export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, 
   for (let i = 0; i < series.length; i++) {
     for (let j = i + 1; j < series.length; j++) {
       const pairs = series[i].values.map((v, k) => [v, series[j].values[k]] as const).filter(([x, y]) => x !== null && y !== null) as [number, number][];
-      cells.push({ a: series[i].key, b: series[j].key, r: pearson(pairs.map((p) => p[0]), pairs.map((p) => p[1])), n: pairs.length });
+      const xs = pairs.map((p) => p[0]);
+      const ys = pairs.map((p) => p[1]);
+      cells.push({
+        a: series[i].key,
+        b: series[j].key,
+        r: pearson(xs, ys),
+        rho: xs.length >= 10 ? spearman(xs, ys) : null,
+        n: pairs.length,
+        formulaLinked: FORMULA_PAIRS.has(`${series[i].key}|${series[j].key}`) || FORMULA_PAIRS.has(`${series[j].key}|${series[i].key}`),
+      });
     }
   }
 
   // Weekday index over normal days only (sale days would distort it)
-  const cal = campaignCalendar(dataset);
-  const normal = cur.filter((r) => {
-    const t = dayTypeOf(r.key, cal);
-    return t === 'weekday' || t === 'weekend';
-  });
+  const normal = cur.filter((r) => isNormal(r.key));
   const avg = normal.length ? normal.reduce((s, r) => s + r.current.gmv, 0) / normal.length : 0;
   const weekday = WD.map((label, w) => {
     const xs = normal.filter((r) => weekdayIndex(r.key) === w);
@@ -181,7 +222,8 @@ export function advancedStats(dataset: CanonicalDataset, filter: DatasetFilter, 
   const notes: Bilingual[] = [
     { vi: 'p < 0,05: khác biệt khó xảy ra chỉ do dao động ngẫu nhiên. p ≥ 0,05: có thể chỉ là dao động — chưa nên kết luận.', en: 'p < 0.05: unlikely to be random variation.' },
     { vi: 'Kiểm định giả định các ngày/đơn độc lập; ngày sale, mùa vụ và thay đổi cách đo có thể làm sai lệch.', en: 'Tests assume independence; sale days and seasonality can bias them.' },
-    { vi: 'Tương quan chỉ cho biết hai chỉ số đi cùng nhau, không chứng minh cái này gây ra cái kia.', en: 'Correlation is not causation.' },
+    { vi: 'Tương quan không phải nhân quả: hai chỉ số đi cùng nhau không chứng minh cái này gây ra cái kia.', en: 'Correlation is not causation.' },
+    { vi: 'Spearman xếp hạng các ngày nên ít bị vài ngày sale đột biến kéo lệch hơn Pearson.', en: 'Spearman uses ranks, so a few extreme days move it less than Pearson.' },
   ];
   return { tests, correlations: { series: series.map(({ key, label }) => ({ key, label })), cells }, weekday, notes };
 }
