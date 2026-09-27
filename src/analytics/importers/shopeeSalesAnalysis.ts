@@ -363,6 +363,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
                 clicks: num(r[col('Lượt nhấp vào sản phẩm')]),
                 orders: num(r[col('psd_label_orders')]),
                 gmv: num(r[col('Doanh số (VND)')]),
+                buyers: col('Người mua') >= 0 ? num(r[col('Người mua')]) : undefined,
               }
             : {
                 date: period.end,
@@ -374,6 +375,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
                 clicks: num(r[col('Lượt nhấp vào sản phẩm')]),
                 orders: num(r[col('psd_label_orders')]),
                 gmv: num(r[col('Doanh số (VND)')]),
+                buyers: col('Người mua') >= 0 ? num(r[col('Người mua')]) : undefined,
               },
         );
       }

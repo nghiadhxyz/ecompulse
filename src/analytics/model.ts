@@ -173,6 +173,8 @@ export interface AffiliatePerformance {
   orders?: number;
   gmv?: number;
   commission?: number;
+  /** Distinct buyers (Shopee "Người mua"). */
+  buyers?: number;
 }
 
 /** Daily traffic facts, optionally per SKU. Enables CVR and funnel. */

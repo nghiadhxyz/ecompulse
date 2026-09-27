@@ -2,7 +2,8 @@
  * Growth engines: Ads Intelligence, Live Auditor, Video & Affiliate.
  * All built on the same slice / profit engine as the rest of the analytics.
  */
-import type { AdPerformance, AffiliatePerformance, CanonicalDataset, LiveSession, Platform } from './model';
+import type { AdPerformance, AffiliatePerformance, CanonicalDataset, LiveSession, Platform, SummaryChannel } from './model';
+import { channelMix } from './summaryEngine';
 import { sliceDataset, type DatasetFilter } from './filters';
 import { adsSummary, isUndatedSession, liveSessions, type AdCampaignRow, type LiveSessionRow } from './adsLiveEngine';
 import { computeProfitByGroup } from './profitEngine';
@@ -349,6 +350,9 @@ export const CONTENT_KIND_LABELS: Record<ContentKind, Bilingual> = {
   creator: { vi: 'Nhà sáng tạo (live)', en: 'Creator (live)' },
 };
 
+/** At most this many buyers: the content's sales hinge on one or two large orders. */
+export const FEW_BUYERS = 3;
+
 export interface ContentRow {
   key: string;
   kind: ContentKind;
@@ -359,6 +363,8 @@ export interface ContentRow {
   views: number | null;
   clicks: number | null;
   orders: number | null;
+  /** Distinct buyers; FEW_BUYERS or fewer → sales hinge on 1–2 big orders (8.4). */
+  buyers: number | null;
   gmv: number | null;
   commission: number | null;
   ctr: number | null;
@@ -372,7 +378,8 @@ export interface ContentRow {
 
 export interface VideoAffiliate {
   available: boolean;
-  byKind: { kind: ContentKind; gmv: number; orders: number; commission: number; items: number }[];
+  /** channelShare: the listed (Top 5) sales as a share of the channel's sales (8.1). */
+  byKind: { kind: ContentKind; gmv: number; orders: number; commission: number; items: number; channelGmv: number | null; channelShare: number | null }[];
   creators: ContentRow[];
   videos: ContentRow[];
   notes: Bilingual[];
@@ -405,6 +412,7 @@ export function videoAffiliate(dataset: CanonicalDataset, filter: DatasetFilter,
     const orders = sumOrNull(rows, (r) => r.orders);
     const gmv = sumOrNull(rows, (r) => r.gmv);
     const commission = sumOrNull(rows, (r) => r.commission);
+    const buyers = sumOrNull(rows, (r) => r.buyers);
     const p = profits.get(attributionKey);
     return {
       key,
@@ -416,6 +424,7 @@ export function videoAffiliate(dataset: CanonicalDataset, filter: DatasetFilter,
       views,
       clicks,
       orders,
+      buyers,
       gmv,
       commission,
       ctr: views && clicks !== null ? clicks / views : null,
@@ -450,15 +459,22 @@ export function videoAffiliate(dataset: CanonicalDataset, filter: DatasetFilter,
   videos.sort((a, b) => (b.gmv ?? 0) - (a.gmv ?? 0));
 
   const kinds: ContentKind[] = ['affiliate', 'shop_video', 'organic_video', 'creator'];
+  // The channel row of the summary report (canonical, 0.3) for "Top 5 · chiếm X% kênh".
+  const mix = (dataset.salesSummaries?.length ? channelMix(dataset, filter, 'placed') : null)?.channels;
+  const CHANNEL_OF: Partial<Record<ContentKind, SummaryChannel>> = { affiliate: 'affiliate', shop_video: 'video' };
   const byKind = kinds
     .map((kind) => {
       const rows = slice.affiliates.filter((a) => (a.contentType ?? 'affiliate') === kind);
+      const gmv = rows.reduce((s, r) => s + (r.gmv || 0), 0);
+      const channelGmv = mix?.find((c) => c.channel === CHANNEL_OF[kind])?.gmv ?? null;
       return {
         kind,
-        gmv: rows.reduce((s, r) => s + (r.gmv || 0), 0),
+        gmv,
         orders: rows.reduce((s, r) => s + (r.orders || 0), 0),
         commission: rows.reduce((s, r) => s + (r.commission || 0), 0),
         items: new Set(rows.map((r) => r.contentId ?? r.creatorId)).size,
+        channelGmv,
+        channelShare: channelGmv ? gmv / channelGmv : null,
       };
     })
     .filter((k) => k.items > 0);

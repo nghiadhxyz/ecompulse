@@ -21,7 +21,7 @@ import { channelFunnel, funnel, liveFunnel } from '../funnelEngine';
 import { emptyDataset, type CanonicalDataset } from '../model';
 import { sourceChecks, type SourceCheck } from '../canonicalSources';
 import { channelMix, summaryProducts } from '../summaryEngine';
-import { adsIntelligence, liveAudit } from '../growthEngines';
+import { adsIntelligence, FEW_BUYERS, liveAudit, videoAffiliate } from '../growthEngines';
 import { dailySeries } from '../timeseries';
 import { describeMismatch, type MismatchItem } from '../mismatch';
 import { fmtPerViewer, fmtShare } from '../format';
@@ -480,5 +480,21 @@ describe('Part 7 — livestream', () => {
     expect(la.undated!.avgViewers).toBe(mega.session.viewers);
     expect(Math.round(la.liveAdsRoas! * 100) / 100).toBe(1.02);
     expect(la.insight!.vi).toContain('Kênh Live gần như chưa hoạt động');
+  });
+});
+
+describe('Part 8 — video & affiliate', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('Top-5 share of channel, buyers and the few-buyers label', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const va = videoAffiliate(ds, { range: datasetDateBounds(ds)! });
+    const aff = va.byKind.find((k) => k.kind === 'affiliate')!;
+    const video = va.byKind.find((k) => k.kind === 'shop_video')!;
+    expect([aff.gmv, aff.channelGmv]).toEqual([9_500_341, 17_434_846]);
+    expect(Math.round(aff.channelShare! * 1000) / 10).toBe(54.5);
+    expect([video.gmv, video.channelGmv]).toEqual([997_188, 1_246_513]);
+    expect(Math.round(video.channelShare! * 1000) / 10).toBe(80.0);
+    const few = va.creators.filter((c) => c.buyers !== null && c.buyers <= FEW_BUYERS).map((c) => c.creatorId).sort();
+    expect(few).toEqual(['fa__uyvwlo', 'gocreview5sao']);
+    expect(va.videos.every((v) => v.kind === 'shop_video')).toBe(true);
   });
 });
