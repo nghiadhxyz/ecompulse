@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { CheckCircle2, HelpCircle, MinusCircle } from 'lucide-react';
 import { advancedStats, fmtByUnit, formatRangeVi, type TestResult } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
@@ -17,7 +17,8 @@ const VERDICT = {
 export const AdvancedStatsView: React.FC = () => {
   const { lang, dataset, baseFilter, range, previousRange } = useWorkspace();
   const vi = lang === 'vi';
-  const st = useMemo(() => advancedStats(dataset, baseFilter, previousRange), [dataset, baseFilter, previousRange]);
+  const [excludeSale, setExcludeSale] = useState(false);
+  const st = useMemo(() => advancedStats(dataset, baseFilter, previousRange, { excludeSaleDays: excludeSale }), [dataset, baseFilter, previousRange, excludeSale]);
 
   const diffText = (t: TestResult, v: number | null) => (v === null ? '—' : t.unit === 'ratio' ? `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(2).replace('.', vi ? ',' : '.')}pp` : `${v >= 0 ? '+' : '−'}${fmtByUnit(Math.abs(v), t.unit, lang)}`);
   const label = (key: string) => st.correlations.series.find((s) => s.key === key)!;
@@ -69,26 +70,43 @@ export const AdvancedStatsView: React.FC = () => {
       </Section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Section title={vi ? 'Tương quan theo ngày' : 'Daily correlation'} subtitle={vi ? 'Hệ số Pearson r (−1 … 1) giữa các chỉ số trong kỳ này' : 'Pearson r between daily series'}>
+        <Section
+          title={vi ? 'Tương quan theo ngày' : 'Daily correlation'}
+          subtitle={vi ? 'Pearson r và Spearman ρ (−1 … 1) giữa các chỉ số trong kỳ này · tương quan không phải nhân quả' : 'Pearson r and Spearman ρ · correlation is not causation'}
+          right={
+            <label className="text-xs text-slate-300 flex items-center gap-1.5">
+              <input type="checkbox" checked={excludeSale} onChange={(e) => setExcludeSale(e.target.checked)} />
+              {vi ? 'Bỏ ngày sale' : 'Exclude sale days'}
+            </label>
+          }
+        >
           {st.correlations.cells.length === 0 ? (
             <p className="text-sm text-slate-400">{vi ? 'Cần ít nhất 10 ngày dữ liệu.' : 'At least 10 days needed.'}</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-white/10">
               <table className="w-full text-xs">
                 <thead className="bg-white/[0.04] text-slate-400">
-                  <tr><Th left>{vi ? 'Cặp chỉ số' : 'Pair'}</Th><Th>r</Th><Th>n</Th><Th left>{vi ? 'Mức độ đi cùng' : 'Strength'}</Th></tr>
+                  <tr><Th left>{vi ? 'Cặp chỉ số' : 'Pair'}</Th><Th title="Pearson">r</Th><Th title="Spearman">ρ</Th><Th>n</Th><Th left>{vi ? 'Mức độ đi cùng' : 'Strength'}</Th></tr>
                 </thead>
                 <tbody>
-                  {[...st.correlations.cells].sort((a, b) => Math.abs(b.r ?? 0) - Math.abs(a.r ?? 0)).map((c) => {
+                  {[...st.correlations.cells].sort((a, b) => Number(a.formulaLinked) - Number(b.formulaLinked) || Math.abs(b.r ?? 0) - Math.abs(a.r ?? 0)).map((c) => {
                     const a = Math.abs(c.r ?? 0);
+                    const num = (v: number | null) => (v === null ? '—' : v.toFixed(2).replace('.', vi ? ',' : '.'));
                     return (
-                      <tr key={`${c.a}-${c.b}`} className="border-t border-white/5 text-slate-200">
+                      <tr key={`${c.a}-${c.b}`} className={`border-t border-white/5 ${c.formulaLinked ? 'text-slate-500' : 'text-slate-200'}`}>
                         <td className="px-2.5 py-1.5 whitespace-nowrap">{tr(lang, label(c.a).label)} × {tr(lang, label(c.b).label)}</td>
-                        <td className="px-2.5 py-1.5 text-right">{c.r === null ? '—' : c.r.toFixed(2).replace('.', vi ? ',' : '.')}</td>
+                        <td className="px-2.5 py-1.5 text-right">{num(c.r)}</td>
+                        <td className="px-2.5 py-1.5 text-right">{num(c.rho)}</td>
                         <td className="px-2.5 py-1.5 text-right">{c.n}</td>
                         <td className="px-2.5 py-1.5 text-slate-400 whitespace-nowrap">
-                          {c.r === null ? '—' : a >= 0.7 ? (vi ? 'Đi cùng mạnh' : 'Strong') : a >= 0.4 ? (vi ? 'Đi cùng vừa' : 'Moderate') : a >= 0.2 ? (vi ? 'Yếu' : 'Weak') : vi ? 'Gần như không' : 'None'}
-                          {c.r !== null && a >= 0.2 ? (c.r > 0 ? (vi ? ' (cùng chiều)' : ' (same direction)') : vi ? ' (ngược chiều)' : ' (opposite)') : ''}
+                          {c.formulaLinked ? (
+                            <span title={vi ? 'GMV = số đơn × AOV nên hai chỉ số này luôn liên quan' : 'GMV = orders × AOV'}>{vi ? 'Liên quan theo công thức' : 'Linked by formula'}</span>
+                          ) : (
+                            <>
+                              {c.r === null ? '—' : a >= 0.7 ? (vi ? 'Đi cùng mạnh' : 'Strong') : a >= 0.4 ? (vi ? 'Đi cùng vừa' : 'Moderate') : a >= 0.2 ? (vi ? 'Yếu' : 'Weak') : vi ? 'Gần như không' : 'None'}
+                              {c.r !== null && a >= 0.2 ? (c.r > 0 ? (vi ? ' (cùng chiều)' : ' (same direction)') : vi ? ' (ngược chiều)' : ' (opposite)') : ''}
+                            </>
+                          )}
                         </td>
                       </tr>
                     );

@@ -535,3 +535,28 @@ describe('Part 10 — what-if on a summary report', () => {
     expect(l2.base.profit).toBeCloseTo(55_423_617 * 0.3 - 6_065_775, 0);
   });
 });
+
+describe('Part 11 — advanced statistics', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('placed orders, same-stage refunds, orders series, Spearman', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const st = advancedStats(ds, { range }, { start: '2026-06-24', end: '2026-07-23' });
+    const r = (a: string, b: string) => {
+      const c = st.correlations.cells.find((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a))!;
+      return { r: Math.round(c.r! * 100) / 100, c };
+    };
+    expect(r('gmv', 'ads').r).toBe(0.85);
+    expect(r('gmv', 'clicks').r).toBe(0.69);
+    expect(r('orders', 'clicks').r).toBe(0.9);
+    expect(r('orders', 'ads').r).toBe(0.85);
+    expect(r('gmv', 'aov').c.formulaLinked).toBe(true);
+    expect(r('gmv', 'ads').c.rho).not.toBeNull();
+    const refund = st.tests.find((t) => t.key === 'refundRate')!;
+    expect([refund.current! * 519, refund.nCurrent]).toEqual([7, 519]);
+    expect(refund.verdict).toBe('no_comparison');
+    const wd = (i: number) => Math.round(st.weekday[i].index! * 100) / 100;
+    expect([wd(5), wd(4)]).toEqual([1.48, 0.55]);
+    const noSale = advancedStats(ds, { range }, { start: '2026-06-24', end: '2026-07-23' }, { excludeSaleDays: true });
+    expect(noSale.correlations.cells.find((x) => x.a === 'gmv' && x.b === 'ads')!.n).toBeLessThan(r('gmv', 'ads').c.n);
+  });
+});
