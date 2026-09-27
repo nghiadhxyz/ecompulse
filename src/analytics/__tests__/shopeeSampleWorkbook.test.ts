@@ -29,6 +29,9 @@ import { calendarPerformance } from '../campaignEngine';
 import { advancedStats } from '../statsEngine';
 import { stageFunnel } from '../summaryInsights';
 import { orderHealth } from '../orderHealthEngine';
+import { dataNotices } from '../dataNotices';
+import { sampleLevel } from '../sampleSize';
+import { fmtPortion } from '../format';
 
 const WORKBOOK = resolve(__dirname, '../../../Báo cáo mẫu.xlsx');
 /** A later export whose period rows disagree with its own days (samples/ is not committed). */
@@ -298,5 +301,38 @@ describe('0.4–0.5 — mismatch warnings and rates', () => {
     expect(fmtShare(20 / 14)).toBe('—');
     expect(fmtShare(0.049)).toBe('4,9%');
     expect(fmtPerViewer(13 / 6)).toBe('2,17 nhấp/người xem');
+  });
+});
+
+describe('0.6–0.8 — sample size, odd records, display', () => {
+  it.skipIf(!existsSync(WORKBOOK))('clean export: 0 red labels and exactly 3 grey notes', async () => {
+    const ds = await summaryWorkspace(WORKBOOK);
+    const notices = dataNotices(ds, datasetDateBounds(ds)!);
+    expect(notices.filter((n) => n.level === 'invalid')).toEqual([]);
+    expect(notices.map((n) => n.kind).sort()).toEqual(['atc_without_viewers', 'gmv_without_orders', 'unique_clicks_over_viewers']);
+    expect(notices.find((n) => n.kind === 'gmv_without_orders')!.ref.contentId).toBe('2160652184126021');
+    expect(notices.find((n) => n.kind === 'gmv_without_orders')!.detail.vi).toContain('146.200');
+    expect(notices.find((n) => n.kind === 'atc_without_viewers')!.ref.sessionIds).toHaveLength(4);
+    expect(notices.find((n) => n.kind === 'unique_clicks_over_viewers')!.detail.vi).toContain('13 lượt nhấp duy nhất > 6 người xem');
+  });
+
+  it.skipIf(!existsSync(NEW_WORKBOOK))('inconsistent file: negative subsidy and sessions over channel are red', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const notices = dataNotices(ds, datasetDateBounds(ds)!);
+    expect(notices.filter((n) => n.level === 'invalid').map((n) => n.kind).sort()).toEqual(['negative_subsidy', 'sessions_over_channel']);
+    expect(notices.find((n) => n.kind === 'gmv_without_orders')!.ref.contentId).toBe('2160652184126021');
+  });
+
+  it('sample levels and small shares', () => {
+    expect([1, 2, 3, 4, 5, 6].map(sampleLevel)).toEqual(['insufficient', 'insufficient', 'reference', 'reference', 'reference', 'ok']);
+    expect(fmtPortion(0.004)).toBe('<1%');
+    expect(fmtPortion(0)).toBe('0,0%');
+    expect(fmtPortion(1.2)).toBe('—');
+  });
+
+  it.skipIf(!existsSync(NEW_WORKBOOK))('no comparison period → "no_comparison", not "too few samples"', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const st = advancedStats(ds, { range: datasetDateBounds(ds)! }, { start: '2026-06-24', end: '2026-07-23' });
+    expect(st.tests.every((t) => t.verdict === 'no_comparison')).toBe(true);
   });
 });

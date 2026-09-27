@@ -164,7 +164,7 @@ export const AnomalyOpportunityView: React.FC = () => {
 
       <Section title={vi ? 'Cơ hội' : 'Opportunities'} subtitle={vi ? `${formatRangeVi(range)} so với ${formatRangeVi(previousRange)} · SKU có ít nhất 20 đơn` : `${formatRangeVi(range)} vs ${formatRangeVi(previousRange)} · SKUs with ≥ 20 orders`}>
         {opps.length === 0 ? (
-          <p className="text-sm text-slate-400">{vi ? 'Chưa thấy cơ hội rõ ràng trong khoảng này.' : 'No clear opportunity in this range.'}</p>
+          <p className="text-sm text-slate-400">{vi ? 'Không đủ dữ liệu để tìm cơ hội trong khoảng này.' : 'Not enough data to find opportunities in this range.'}</p>
         ) : (
           <ul className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
             {opps.map((o) => (

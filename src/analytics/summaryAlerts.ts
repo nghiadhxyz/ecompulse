@@ -37,7 +37,8 @@ const SOURCE_SHORT: Record<SourceId, Bilingual> = {
 };
 
 /** Fewer orders than this and a rate (cancel, refund…) is not called good or bad. */
-export const MIN_RATE_ORDERS = 30;
+import { MIN_RATE_ORDERS } from './sampleSize';
+export { MIN_RATE_ORDERS };
 /** Revenue further than this from its baseline goes to "Cần chú ý". */
 export const REVENUE_BASELINE_CHANGE = 0.3;
 const MIN_BASELINE_DAYS = 3;

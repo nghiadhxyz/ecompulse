@@ -4,10 +4,11 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { channelMix, describeMismatch, fmtPerViewer, fmtShare, isOverFull, OVER_FULL_NOTE, fmtCount, fmtMoneyCompact, fmtOrders, fmtRate, formatRangeVi, STAGE_BASIS, summaryProducts, SUMMARY_CHANNEL_LABELS, SUMMARY_TOP_N, type SummaryChannel, type SummaryStage } from '../../analytics';
+import { channelMix, dataNotices, fmtPortion, describeMismatch, fmtPerViewer, fmtShare, isOverFull, OVER_FULL_NOTE, fmtCount, fmtMoneyCompact, fmtOrders, fmtRate, formatRangeVi, STAGE_BASIS, summaryProducts, SUMMARY_CHANNEL_LABELS, SUMMARY_TOP_N, type SummaryChannel, type SummaryStage } from '../../analytics';
 import { useWorkspace } from '../seller/SellerContext';
 import { NotEnoughData, Section, tr } from '../seller/ui';
 import { MismatchBox } from './MismatchBox';
+import { NoticeBadge } from './DataNotices';
 import { ShareBar, Th } from '../analyst/ui';
 
 export const SUMMARY_STAGES: { key: SummaryStage; vi: string; en: string }[] = [
@@ -60,6 +61,7 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
   const vi = lang === 'vi';
   const [open, setOpen] = useState<string | null>(null);
   const mix = useMemo(() => channelMix(dataset, { range, platforms }, stage), [dataset, range, platforms, stage]);
+  const notices = useMemo(() => dataNotices(dataset, range, platforms), [dataset, range, platforms]);
   if (!(dataset.salesSummaries?.length)) return null;
   const uniqueTitle = mix.uniqueIsDistinct
     ? vi
@@ -97,9 +99,12 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
                         <td className="px-2.5 py-1.5 font-semibold whitespace-nowrap">
                           {c.sources.length > 0 ? expanded ? <ChevronDown className="inline w-3.5 h-3.5 mr-1" aria-hidden /> : <ChevronRight className="inline w-3.5 h-3.5 mr-1" aria-hidden /> : <span className="inline-block w-[18px]" />}
                           {tr(lang, SUMMARY_CHANNEL_LABELS[c.channel])}
+                          {notices.filter((n) => n.ref.channel === c.channel && n.kind === 'unique_clicks_over_viewers').map((n) => (
+                            <NoticeBadge key={n.id} level={n.level} lang={lang} detail={n.detail[lang]} />
+                          ))}
                         </td>
                         <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(c.gmv, lang)}</td>
-                        <td className="px-2.5 py-1.5 whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtShare(c.share, lang)}<ShareBar share={c.share} /></div></td>
+                        <td className="px-2.5 py-1.5 whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtPortion(c.share, lang)}<ShareBar share={c.share} /></div></td>
                         <td className="px-2.5 py-1.5 text-right">{fmtOrders(c.orders, lang)}</td>
                         <td className="px-2.5 py-1.5 text-right">{fmtCount(c.clicks, lang)}</td>
                         <RateCell v={c.clicks && c.orders !== null ? c.orders / c.clicks : null} lang={lang} digits={2} />
@@ -110,7 +115,7 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
                           <tr key={s.key} className="border-t border-white/5 text-slate-300 bg-white/[0.015]">
                             <td className="px-2.5 py-1 pl-9 whitespace-nowrap">{s.key}</td>
                             <td className="px-2.5 py-1 text-right whitespace-nowrap">{fmtMoneyCompact(s.gmv, lang)}</td>
-                            <td className="px-2.5 py-1 text-right text-slate-400 whitespace-nowrap">{fmtShare(s.share, lang)} {vi ? 'của kênh' : 'of channel'}</td>
+                            <td className="px-2.5 py-1 text-right text-slate-400 whitespace-nowrap">{fmtPortion(s.share, lang)} {vi ? 'của kênh' : 'of channel'}</td>
                             <td className="px-2.5 py-1 text-right">{fmtOrders(s.orders, lang)}</td>
                             <td className="px-2.5 py-1 text-right">{fmtCount(s.clicks, lang)}</td>
                             <RateCell v={s.clicks && s.orders !== null ? s.orders / s.clicks : null} lang={lang} digits={2} small />

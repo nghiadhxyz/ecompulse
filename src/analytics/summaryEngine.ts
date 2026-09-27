@@ -18,7 +18,7 @@ import { byGap, compareCopies, FILE_RATE_LABEL, periodMismatchItems, RECOMPUTED_
 import { fmtMoney, fmtOrders } from './format';
 
 export const SUMMARY_CHANNEL_LABELS: Record<SummaryChannel, Bilingual> = {
-  product_card: { vi: 'Thẻ sản phẩm (tự nhiên & tìm kiếm)', en: 'Product card' },
+  product_card: { vi: 'Thẻ sản phẩm (gồm cả lượt có quảng cáo)', en: 'Product card (incl. ad-driven visits)' },
   live: { vi: 'Livestream của shop', en: 'Shop live' },
   video: { vi: 'Video của shop', en: 'Shop video' },
   affiliate: { vi: 'Affiliate / KOC', en: 'Affiliate' },

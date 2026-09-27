@@ -17,6 +17,8 @@ import {
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
+import { SampleTag, SmallRateCell } from '../../workspace/SampleSize';
+import { REFERENCE_MAX_SAMPLES } from '../../../analytics';
 import { ChangeCell, Th } from '../ui';
 
 const BAR = '#3987e5';
@@ -41,15 +43,20 @@ export const CampaignCalendar: React.FC = () => {
     );
   }
 
+  // Profit per day needs COGS: without it the column is hidden (one note below the table).
+  const hasProfit = perf.byDayType.some((b) => b.profitPerDay !== null);
   const bucketRow = (x: BucketStats) => (
     <tr key={x.key} className="border-t border-white/5 text-slate-200">
-      <td className="px-2.5 py-2 font-semibold text-white">{tr(lang, x.label)}</td>
+      <td className="px-2.5 py-2 font-semibold text-white">
+        {tr(lang, x.label)}
+        <SampleTag n={x.days} lang={lang} />
+      </td>
       <td className="px-2.5 py-2 text-right">{x.days}</td>
       <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.gmvPerDay, lang)}</td>
       <td className="px-2.5 py-2 text-right">{fmtCount(x.ordersPerDay === null ? null : Math.round(x.ordersPerDay), lang)}</td>
       <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.aov, lang)}</td>
-      <td className="px-2.5 py-2 text-right">{fmtRate(x.cancelRate, lang)}</td>
-      <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.profitPerDay, lang)}</td>
+      <SmallRateCell rate={x.cancelRate} orders={x.ordersPerDay === null ? 0 : x.ordersPerDay * x.days} lang={lang} />
+      {hasProfit && <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.profitPerDay, lang)}</td>}
       <td className="px-2.5 py-2 text-right whitespace-nowrap">{x.upliftVsWeekday === null ? '—' : x.key === 'weekday' ? (vi ? 'mốc' : 'base') : fmtChange(x.upliftVsWeekday, lang)}</td>
     </tr>
   );
@@ -90,14 +97,14 @@ export const CampaignCalendar: React.FC = () => {
                 <Th>{vi ? 'Đơn/ngày' : 'Orders/day'}</Th>
                 <Th>AOV</Th>
                 <Th>{vi ? 'Hủy' : 'Cancel'}</Th>
-                <Th>{vi ? 'LN/ngày' : 'Profit/day'}</Th>
+                {hasProfit && <Th>{vi ? 'LN/ngày' : 'Profit/day'}</Th>}
                 <Th title={vi ? 'GMV/ngày so với ngày thường trong tuần' : 'GMV/day vs weekdays'}>{vi ? 'So với ngày thường' : 'Vs weekday'}</Th>
               </tr>
             </thead>
             <tbody>
               {perf.byDayType.map(bucketRow)}
               <tr className="border-t border-white/15 bg-white/[0.03]">
-                <td className="px-2.5 py-2 font-bold text-white" colSpan={8}>
+                <td className="px-2.5 py-2 font-bold text-white" colSpan={hasProfit ? 8 : 7}>
                   {vi ? 'Ngày sale so với ngày thường: ' : 'Sale vs normal days: '}
                   <span className="text-sky-300">{fmtMoneyCompact(perf.saleVsNormal.sale.gmvPerDay, lang)}</span> {vi ? 'so với' : 'vs'}{' '}
                   <span className="text-slate-300">{fmtMoneyCompact(perf.saleVsNormal.normal.gmvPerDay, lang)}</span> / {vi ? 'ngày' : 'day'} ({fmtChange(perf.saleVsNormal.uplift, lang)}) ·{' '}
@@ -107,10 +114,18 @@ export const CampaignCalendar: React.FC = () => {
             </tbody>
           </table>
         </div>
+        {!hasProfit && <p className="text-[11px] text-slate-500 mt-1.5">{vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận theo ngày.' : 'No COGS yet, so no profit per day.'}</p>}
       </Section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Section title={vi ? 'Theo thứ trong tuần' : 'By day of week'} subtitle={vi ? 'Chỉ ngày thường (đã loại ngày sale, ngày lương)' : 'Normal days only'}>
+        <Section
+          title={vi ? 'Theo thứ trong tuần' : 'By day of week'}
+          subtitle={
+            vi
+              ? `Chỉ ngày không sale${perf.byWeekday.some((w) => w.days > 0 && w.days <= REFERENCE_MAX_SAMPLES) ? ` · mỗi thứ chỉ có ${Math.min(...perf.byWeekday.filter((w) => w.days > 0).map((w) => w.days))}–${Math.max(...perf.byWeekday.map((w) => w.days))} ngày: tham khảo` : ''}`
+              : 'Non-sale days only'
+          }
+        >
           <div className="h-52" role="img" aria-label={vi ? 'GMV trung bình mỗi ngày theo thứ' : 'Average GMV per weekday'}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={perf.byWeekday.map((w) => ({ label: tr(lang, w.label), gmv: w.gmvPerDay, days: w.days }))}>

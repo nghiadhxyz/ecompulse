@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
-import { fmtChange, fmtCount, fmtMoneyCompact, fmtPp, fmtRate, type BreakdownRow, type Comparison, type Lang } from '../../analytics';
+import { fmtChange, fmtCount, fmtMoneyCompact, fmtPp, fmtRate, type BreakdownRow, type Comparison, type Lang, fmtPortion, fmtShare, MIN_RATE_ORDERS, SMALL_RATE_NOTE } from '../../analytics';
 
 /** Relative change for amounts, percentage points for rates. `goodWhenUp=false` flips colors. */
 export const ChangeCell: React.FC<{ c: Comparison; rate?: boolean; goodWhenUp?: boolean; lang: Lang }> = ({ c, rate, goodWhenUp = true, lang }) => {
@@ -49,7 +49,7 @@ function cell(row: BreakdownRow, col: BreakdownColumn, lang: Lang): React.ReactN
     case 'share':
       return (
         <>
-          {fmtRate(row.gmvShare, lang)}
+          {fmtPortion(row.gmvShare, lang)}
           <ShareBar share={row.gmvShare} />
         </>
       );
@@ -66,23 +66,27 @@ function cell(row: BreakdownRow, col: BreakdownColumn, lang: Lang): React.ReactN
     case 'cvr':
       return (
         <>
-          {fmtRate(c.cvr, lang, 2)} <span className="text-[10px]"><ChangeCell c={row.change.cvr} rate lang={lang} /></span>
+          {fmtShare(c.cvr, lang, 2)} {row.previous && <span className="text-[10px]"><ChangeCell c={row.change.cvr} rate lang={lang} /></span>}
         </>
       );
     case 'aov':
       return fmtMoneyCompact(c.aov, lang);
     case 'cancel':
+    case 'refund': {
+      // A rate on fewer than 30 orders is only shown, never coloured as better or worse.
+      const small = c.placed < MIN_RATE_ORDERS;
+      const rate = col === 'cancel' ? c.cancelRate : c.refundRate;
       return (
-        <>
-          {fmtRate(c.cancelRate, lang)} <span className="text-[10px]"><ChangeCell c={row.change.cancelRate} rate goodWhenUp={false} lang={lang} /></span>
-        </>
+        <span className={small ? 'text-slate-500' : ''} title={small ? SMALL_RATE_NOTE[lang] : undefined}>
+          {fmtRate(rate, lang)}{' '}
+          {!small && row.previous && (
+            <span className="text-[10px]">
+              <ChangeCell c={col === 'cancel' ? row.change.cancelRate : row.change.refundRate} rate goodWhenUp={false} lang={lang} />
+            </span>
+          )}
+        </span>
       );
-    case 'refund':
-      return (
-        <>
-          {fmtRate(c.refundRate, lang)} <span className="text-[10px]"><ChangeCell c={row.change.refundRate} rate goodWhenUp={false} lang={lang} /></span>
-        </>
-      );
+    }
     case 'net':
       return fmtMoneyCompact(c.netRevenue, lang);
     case 'profit':
@@ -109,7 +113,15 @@ export const BreakdownTable: React.FC<{
   onRowClick?: (row: BreakdownRow) => void;
   rowAction?: (row: BreakdownRow) => React.ReactNode;
   sublabel?: (row: BreakdownRow) => string | undefined;
-}> = ({ rows, columns, lang, firstHeader, onRowClick, rowAction, sublabel }) => (
+}> = ({ rows, columns: requested, lang, firstHeader, onRowClick, rowAction, sublabel }) => {
+  const vi = lang === 'vi';
+  if (rows.length === 0) return <p className="text-sm text-slate-400">{vi ? 'Không có dòng nào trong khoảng này.' : 'No rows in this range.'}</p>;
+  // No comparison period → no Δ columns. No COGS → no profit columns, one note instead.
+  const hasPrevious = rows.some((r) => r.previous !== null);
+  const hasProfit = rows.some((r) => r.current.profit !== null);
+  const columns = requested.filter((c) => (hasPrevious || !DELTA_COLUMNS.includes(c)) && (hasProfit || !PROFIT_COLUMNS.includes(c)));
+  return (
+  <>
   <div className="overflow-x-auto rounded-xl border border-white/10">
     <table className="w-full text-xs">
       <thead className="bg-white/[0.04] text-slate-400">
@@ -140,4 +152,12 @@ export const BreakdownTable: React.FC<{
       </tbody>
     </table>
   </div>
-);
+  {!hasProfit && requested.some((c) => PROFIT_COLUMNS.includes(c)) && (
+    <p className="text-[11px] text-slate-500 mt-1.5">{vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận và margin.' : 'No COGS yet, so no profit or margin.'}</p>
+  )}
+  </>
+  );
+};
+
+const DELTA_COLUMNS: BreakdownColumn[] = ['gmvChange', 'contribution', 'profitChange'];
+const PROFIT_COLUMNS: BreakdownColumn[] = ['profit', 'margin', 'profitChange'];

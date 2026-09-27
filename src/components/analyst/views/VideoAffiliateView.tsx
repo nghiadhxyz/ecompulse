@@ -1,13 +1,16 @@
 import React, { useMemo } from 'react';
-import { CONTENT_KIND_LABELS, fmtShare, isOverFull, OVER_FULL_NOTE, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi, PLATFORM_LABELS, videoAffiliate, type ContentRow } from '../../../analytics';
+import { dataNotices, CONTENT_KIND_LABELS, fmtShare, isOverFull, OVER_FULL_NOTE, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi, PLATFORM_LABELS, videoAffiliate, type ContentRow } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
+import { NoticeBadge } from '../../workspace/DataNotices';
 import { ChangeCell, Th } from '../ui';
 
 export const VideoAffiliateView: React.FC = () => {
   const { lang, dataset, baseFilter, previousRange, range, openEvidence, goTo } = useWorkspace();
   const vi = lang === 'vi';
   const va = useMemo(() => videoAffiliate(dataset, baseFilter, previousRange), [dataset, baseFilter, previousRange]);
+  const notices = useMemo(() => dataNotices(dataset, baseFilter.range, baseFilter.platforms).filter((n) => n.kind === 'gmv_without_orders'), [dataset, baseFilter.range, baseFilter.platforms]);
+  const noticeFor = (id?: string) => notices.find((n) => n.ref.contentId === id);
 
   if (!va.available) {
     return (
@@ -47,7 +50,10 @@ export const VideoAffiliateView: React.FC = () => {
             return (
               <tr key={r.key} className="border-t border-white/5 text-slate-200">
                 <td className="px-2.5 py-1.5 max-w-[260px]">
-                  <div className="font-semibold text-white truncate">{kind === 'creator' ? r.creatorId : r.title ?? r.contentId}</div>
+                  <div className="font-semibold text-white truncate">
+                    {kind === 'creator' ? r.creatorId : r.title ?? r.contentId}
+                    {noticeFor(kind === 'creator' ? r.creatorId : r.contentId) && <NoticeBadge level="notice" lang={lang} detail={noticeFor(kind === 'creator' ? r.creatorId : r.contentId)!.detail[lang]} />}
+                  </div>
                   <div className="text-[11px] text-slate-500">{PLATFORM_LABELS[r.platform]}{kind === 'video' ? ` · ${r.contentId} · ${tr(lang, CONTENT_KIND_LABELS[r.kind])}` : ''}</div>
                 </td>
                 <td className="px-2.5 py-1.5 text-right">{fmtCount(r.views, lang)}</td>

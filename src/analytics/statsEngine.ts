@@ -38,7 +38,8 @@ export interface TestResult {
   /** n per side (orders / clicks / days). */
   nCurrent: number;
   nPrevious: number;
-  verdict: 'significant' | 'not_significant' | 'insufficient';
+  /** no_comparison: the comparison period has no data at all (not a small sample). */
+  verdict: 'significant' | 'not_significant' | 'insufficient' | 'no_comparison';
 }
 
 export function twoProportionTest(x1: number, n1: number, x0: number, n0: number): { diff: number; lo: number; hi: number; p: number } | null {
@@ -65,7 +66,8 @@ export function welchTest(a: number[], b: number[]): { diff: number; lo: number;
   return { diff, lo: diff - 1.96 * se, hi: diff + 1.96 * se, p: se > 0 ? twoSidedP(diff / se) : diff === 0 ? 1 : 0 };
 }
 
-function verdictOf(p: number | null): TestResult['verdict'] {
+function verdictOf(p: number | null, nPrevious = 1): TestResult['verdict'] {
+  if (nPrevious === 0) return 'no_comparison';
   return p === null ? 'insufficient' : p < 0.05 ? 'significant' : 'not_significant';
 }
 
@@ -123,7 +125,7 @@ export function advancedStats(dataset: CanonicalDataset, requested: DatasetFilte
     const x0 = sum(prev, num);
     const n0 = hasDen(prev) ? sum(prev, den) : 0;
     const t = twoProportionTest(x1, n1, x0, n0);
-    tests.push({ key, label, unit: 'ratio', current: n1 ? x1 / n1 : null, previous: n0 ? x0 / n0 : null, difference: t?.diff ?? null, ciLow: t?.lo ?? null, ciHigh: t?.hi ?? null, pValue: t?.p ?? null, nCurrent: n1, nPrevious: n0, verdict: verdictOf(t?.p ?? null) });
+    tests.push({ key, label, unit: 'ratio', current: n1 ? x1 / n1 : null, previous: n0 ? x0 / n0 : null, difference: t?.diff ?? null, ciLow: t?.lo ?? null, ciHigh: t?.hi ?? null, pValue: t?.p ?? null, nCurrent: n1, nPrevious: n0, verdict: verdictOf(t?.p ?? null, n0) });
   };
   rateTest('cancelRate', { vi: 'Tỷ lệ hủy', en: 'Cancel rate' }, (r) => r.current.cancelled, (r) => r.current.placed);
   rateTest('refundRate', { vi: 'Tỷ lệ trả/hoàn', en: 'Refund rate' }, (r) => r.current.returned, (r) => r.current.valid);
@@ -140,7 +142,7 @@ export function advancedStats(dataset: CanonicalDataset, requested: DatasetFilte
     const b = fill(prev, previousRange);
     const t = welchTest(a, b);
     const mean = (x: number[]) => (x.length ? x.reduce((s, v) => s + v, 0) / x.length : null);
-    tests.push({ key, label, unit, current: mean(a), previous: mean(b), difference: t?.diff ?? null, ciLow: t?.lo ?? null, ciHigh: t?.hi ?? null, pValue: t?.p ?? null, nCurrent: a.length, nPrevious: b.length, verdict: verdictOf(t?.p ?? null) });
+    tests.push({ key, label, unit, current: mean(a), previous: mean(b), difference: t?.diff ?? null, ciLow: t?.lo ?? null, ciHigh: t?.hi ?? null, pValue: t?.p ?? null, nCurrent: a.length, nPrevious: b.length, verdict: verdictOf(t?.p ?? null, b.length) });
   };
   meanTest('gmvPerDay', { vi: 'GMV mỗi ngày', en: 'GMV per day' }, 'vnd', (r) => r.current.gmv);
   meanTest('ordersPerDay', { vi: 'Đơn mỗi ngày', en: 'Orders per day' }, 'count', (r) => r.current.placed);

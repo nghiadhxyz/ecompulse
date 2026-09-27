@@ -121,3 +121,9 @@ export function fmtPerViewer(v: number | null | undefined, lang: Lang = 'vi'): s
   const n = new Intl.NumberFormat(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(v);
   return lang === 'vi' ? `${n} nhấp/người xem` : `${n} clicks/viewer`;
 }
+
+/** A share of a whole (tỷ trọng): "<1%" below one percent, "—" above 100%. */
+export function fmtPortion(v: number | null | undefined, lang: Lang = 'vi', digits = 1): string {
+  if (v !== null && v !== undefined && v > 0 && v < 0.01) return '<1%';
+  return fmtShare(v, lang, digits);
+}

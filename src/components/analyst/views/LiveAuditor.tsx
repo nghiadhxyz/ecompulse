@@ -4,7 +4,9 @@ import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { ChangeCell, Th } from '../ui';
 import { FunnelView } from './TrafficFunnel';
-import { sourceChecks } from '../../../analytics';
+import { dataNotices } from '../../../analytics';
+import { SampleTag } from '../../workspace/SampleSize';
+import { DataNoticesList } from '../../workspace/DataNotices';
 import { ChannelWeekdayPanel } from '../../workspace/SummaryInsightPanels';
 
 const label = (r: LiveSessionRow) => `${sessionDateLabel(r.session)} · ${PLATFORM_LABELS[r.session.platform]}`;
@@ -13,7 +15,11 @@ export const LiveAuditor: React.FC = () => {
   const { lang, dataset, baseFilter, range, openEvidence, goTo } = useWorkspace();
   const vi = lang === 'vi';
   const la = useMemo(() => liveAudit(dataset, baseFilter), [dataset, baseFilter]);
-  const liveInvalid = useMemo(() => sourceChecks(dataset, baseFilter.platforms).filter((c) => c.metric === 'liveSessions' && c.invalid), [dataset, baseFilter.platforms]);
+  // Odd live records: grey notes (Shopee's own inconsistencies) and red invalid relations.
+  const liveNotices = useMemo(
+    () => dataNotices(dataset, baseFilter.range, baseFilter.platforms).filter((n) => n.kind === 'atc_without_viewers' || n.kind === 'sessions_over_channel' || (n.kind === 'unique_clicks_over_viewers' && n.ref.channel === 'live')),
+    [dataset, baseFilter.range, baseFilter.platforms],
+  );
   const [aId, setAId] = useState<string | null>(null);
   const [bId, setBId] = useState<string | null>(null);
 
@@ -57,7 +63,7 @@ export const LiveAuditor: React.FC = () => {
           <tbody>
             {rows.map((g) => (
               <tr key={g.key} className="border-t border-white/5 text-slate-200">
-                <td className="px-2.5 py-1.5 whitespace-nowrap">{tr(lang, g.label)}</td>
+                <td className="px-2.5 py-1.5 whitespace-nowrap">{tr(lang, g.label)}<SampleTag n={g.sessions} lang={lang} /></td>
                 <td className="px-2.5 py-1.5 text-right">{g.sessions}</td>
                 <td className="px-2.5 py-1.5 text-right">{fmtCount(g.avgViewers === null ? null : Math.round(g.avgViewers), lang)}</td>
                 <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(g.gmvPerHour, lang)}</td>
@@ -93,12 +99,7 @@ export const LiveAuditor: React.FC = () => {
           {vi ? `Top ${la.sessions.length} phiên live theo báo cáo Shopee — Shopee chỉ liệt kê Top 5, không phải tất cả phiên live.` : `Top ${la.sessions.length} live sessions from the Shopee report — not all sessions.`}
         </p>
       )}
-      {liveInvalid.map((c) => (
-        <p key={c.id} className="text-xs font-semibold text-[#f08080] rounded-xl border border-[#d03b3b]/40 bg-[#d03b3b]/10 px-3 py-2">
-          {vi ? 'Không hợp lệ: ' : 'Invalid: '}
-          {tr(lang, c.invalid!)}
-        </p>
-      ))}
+      <DataNoticesList notices={liveNotices} lang={lang} />
       {la.notes.map((n, i) => (
         <p key={i} className="text-xs text-[#fab219]">{tr(lang, n)}</p>
       ))}
@@ -156,6 +157,9 @@ export const LiveAuditor: React.FC = () => {
             </tbody>
           </table>
         </div>
+        {la.ranking.length === 0 && (
+          <p className="text-sm text-slate-400 mt-2">{vi ? 'Báo cáo không có thời lượng phiên nên chưa tính được GMV/giờ.' : 'The report has no session durations, so GMV/hour cannot be computed.'}</p>
+        )}
         <p className="text-[11px] text-slate-500 mt-2">{vi ? 'Dòng tô vàng: người xem tăng nhưng đơn giảm so với phiên trước. Lợi nhuận live = đơn gắn với phiên, chưa trừ chi phí tổ chức live (host, quà tặng) nếu chưa nhập.' : 'Highlighted: more viewers but fewer orders than the previous session.'}</p>
       </Section>
 

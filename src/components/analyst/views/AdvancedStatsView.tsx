@@ -4,12 +4,14 @@ import { advancedStats, fmtByUnit, formatRangeVi, type TestResult } from '../../
 import { useWorkspace } from '../../seller/SellerContext';
 import { Section, tr } from '../../seller/ui';
 import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
+import { SampleTag } from '../../workspace/SampleSize';
 import { Th } from '../ui';
 
 const VERDICT = {
   significant: { icon: CheckCircle2, vi: 'Khác biệt rõ (p < 0,05)', en: 'Significant (p < 0.05)', cls: 'text-sky-300' },
   not_significant: { icon: MinusCircle, vi: 'Có thể chỉ là dao động', en: 'Could be noise', cls: 'text-slate-400' },
   insufficient: { icon: HelpCircle, vi: 'Chưa đủ mẫu', en: 'Too few samples', cls: 'text-[#fab219]' },
+  no_comparison: { icon: HelpCircle, vi: 'Không có kỳ so sánh', en: 'No comparison period', cls: 'text-slate-400' },
 };
 
 export const AdvancedStatsView: React.FC = () => {
@@ -20,20 +22,25 @@ export const AdvancedStatsView: React.FC = () => {
   const diffText = (t: TestResult, v: number | null) => (v === null ? '—' : t.unit === 'ratio' ? `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(2).replace('.', vi ? ',' : '.')}pp` : `${v >= 0 ? '+' : '−'}${fmtByUnit(Math.abs(v), t.unit, lang)}`);
   const label = (key: string) => st.correlations.series.find((s) => s.key === key)!;
 
+  // No data at all in the comparison period: no Δ columns, no "so với" line.
+  const hasComparison = st.tests.some((t) => t.verdict !== 'no_comparison');
   return (
     <div className="space-y-4">
       <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
-      <Section title={vi ? 'Kiểm định khác biệt giữa hai kỳ' : 'Period difference tests'} subtitle={`${formatRangeVi(range)} ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}>
+      <Section
+        title={vi ? 'Kiểm định khác biệt giữa hai kỳ' : 'Period difference tests'}
+        subtitle={hasComparison ? `${formatRangeVi(range)} ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}` : `${formatRangeVi(range)} · ${vi ? 'Không có kỳ so sánh' : 'No comparison period'}`}
+      >
         <div className="overflow-x-auto rounded-xl border border-white/10">
           <table className="w-full text-xs">
             <thead className="bg-white/[0.04] text-slate-400">
               <tr>
                 <Th left>{vi ? 'Chỉ số' : 'Metric'}</Th>
-                <Th>{vi ? 'Kỳ so sánh' : 'Comparison'}</Th>
+                {hasComparison && <Th>{vi ? 'Kỳ so sánh' : 'Comparison'}</Th>}
                 <Th>{vi ? 'Kỳ này' : 'Current'}</Th>
-                <Th>{vi ? 'Chênh lệch' : 'Difference'}</Th>
-                <Th title={vi ? 'Khoảng tin cậy 95% của chênh lệch' : '95% confidence interval'}>{vi ? 'Khoảng tin cậy 95%' : '95% CI'}</Th>
-                <Th>p</Th>
+                {hasComparison && <Th>{vi ? 'Chênh lệch' : 'Difference'}</Th>}
+                {hasComparison && <Th title={vi ? 'Khoảng tin cậy 95% của chênh lệch' : '95% confidence interval'}>{vi ? 'Khoảng tin cậy 95%' : '95% CI'}</Th>}
+                {hasComparison && <Th>p</Th>}
                 <Th title={vi ? 'Cỡ mẫu (đơn / lượt nhấp / ngày)' : 'Sample size'}>n</Th>
                 <Th left>{vi ? 'Kết luận' : 'Verdict'}</Th>
               </tr>
@@ -44,11 +51,11 @@ export const AdvancedStatsView: React.FC = () => {
                 return (
                   <tr key={t.key} className="border-t border-white/5 text-slate-200">
                     <td className="px-2.5 py-1.5 whitespace-nowrap">{tr(lang, t.label)}</td>
-                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap text-slate-400">{fmtByUnit(t.previous, t.unit, lang)}</td>
+                    {hasComparison && <td className="px-2.5 py-1.5 text-right whitespace-nowrap text-slate-400">{fmtByUnit(t.previous, t.unit, lang)}</td>}
                     <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtByUnit(t.current, t.unit, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{diffText(t, t.difference)}</td>
-                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap text-slate-400">{t.ciLow === null ? '—' : `${diffText(t, t.ciLow)} … ${diffText(t, t.ciHigh)}`}</td>
-                    <td className="px-2.5 py-1.5 text-right">{t.pValue === null ? '—' : t.pValue < 0.001 ? '< 0,001' : t.pValue.toFixed(3).replace('.', vi ? ',' : '.')}</td>
+                    {hasComparison && <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{diffText(t, t.difference)}</td>}
+                    {hasComparison && <td className="px-2.5 py-1.5 text-right whitespace-nowrap text-slate-400">{t.ciLow === null ? '—' : `${diffText(t, t.ciLow)} … ${diffText(t, t.ciHigh)}`}</td>}
+                    {hasComparison && <td className="px-2.5 py-1.5 text-right">{t.pValue === null ? '—' : t.pValue < 0.001 ? '< 0,001' : t.pValue.toFixed(3).replace('.', vi ? ',' : '.')}</td>}
                     <td className="px-2.5 py-1.5 text-right whitespace-nowrap text-slate-400">{t.nCurrent.toLocaleString('vi-VN')} / {t.nPrevious.toLocaleString('vi-VN')}</td>
                     <td className={`px-2.5 py-1.5 whitespace-nowrap ${V.cls}`}>
                       <span className="inline-flex items-center gap-1"><V.icon className="w-3.5 h-3.5" aria-hidden /> {vi ? V.vi : V.en}</span>
@@ -96,7 +103,7 @@ export const AdvancedStatsView: React.FC = () => {
           <div className="space-y-1.5">
             {st.weekday.map((w) => (
               <div key={w.weekday} className="flex items-center gap-2 text-xs">
-                <span className="w-16 text-slate-300">{tr(lang, w.label)}</span>
+                <span className="w-28 text-slate-300">{tr(lang, w.label)}<SampleTag n={w.days} lang={lang} /></span>
                 <div className="flex-1 h-2 rounded bg-white/[0.06] overflow-hidden" aria-hidden>
                   <div className="h-full bg-[#3987e5]" style={{ width: `${Math.min(100, ((w.index ?? 0) / 1.5) * 100)}%` }} />
                 </div>

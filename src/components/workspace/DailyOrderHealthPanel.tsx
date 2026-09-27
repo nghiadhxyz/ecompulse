@@ -3,9 +3,9 @@
  * refunded counts per day. Statuses per order, reasons and per-SKU rates need an order export.
  */
 import React, { useMemo } from 'react';
-import { computeKpis, fmtCount, fmtDay, fmtRate, formatRangeVi, orderHealth, PLATFORM_LABELS, type Platform } from '../../analytics';
+import { computeKpis, MIN_DAY_ORDERS, MIN_RATE_ORDERS, SMALL_RATE_NOTE, fmtCount, fmtDay, fmtRate, formatRangeVi, orderHealth, PLATFORM_LABELS, type Platform } from '../../analytics';
 import { useWorkspace } from '../seller/SellerContext';
-import { GhostButton, Section } from '../seller/ui';
+import { GhostButton, Section, tr } from '../seller/ui';
 import { Th } from '../analyst/ui';
 
 export const DailyOrderHealthPanel: React.FC = () => {
@@ -50,12 +50,12 @@ export const DailyOrderHealthPanel: React.FC = () => {
             </thead>
             <tbody>
               {days.map((d) => (
-                <tr key={d.key} className="border-t border-white/5 text-slate-200">
+                <tr key={d.key} className={`border-t border-white/5 ${d.placed < MIN_DAY_ORDERS ? 'text-slate-500' : 'text-slate-200'}`} title={d.placed < MIN_DAY_ORDERS ? (vi ? `Dưới ${MIN_DAY_ORDERS} đơn trong ngày` : `Fewer than ${MIN_DAY_ORDERS} orders`) : undefined}>
                   <td className="px-2.5 py-1 whitespace-nowrap">{fmtDay(d.key)}</td>
                   <td className="px-2.5 py-1 text-right">{d.placed}</td>
                   <td className="px-2.5 py-1 text-right">{d.cancelled}</td>
-                  <td className="px-2.5 py-1">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-2.5 py-1" title={d.placed < MIN_RATE_ORDERS ? tr(lang, SMALL_RATE_NOTE) : undefined}>
+                    <div className={`flex items-center justify-end gap-2 ${d.placed < MIN_RATE_ORDERS ? 'opacity-60' : ''}`}>
                       {fmtRate(d.cancelRate, lang)}
                       <span className="w-20 h-1.5 rounded bg-white/[0.06] overflow-hidden" aria-hidden>
                         <span className="block h-full bg-[#3987e5]" style={{ width: `${((d.cancelRate ?? 0) / maxRate) * 100}%` }} />
