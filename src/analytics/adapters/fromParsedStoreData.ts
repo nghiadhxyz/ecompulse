@@ -131,6 +131,8 @@ function fromOverviewSheets(rawSheets: Record<string, RawSheetTable>, platform: 
       } else {
         row.confirmedGmv = num(col.gmv);
         row.confirmedOrders = num(col.orders);
+        row.confirmedCancelledOrders = num(col.cancelled);
+        row.confirmedCancelledGmv = num(col.cancelledGmv);
       }
       row.visits ??= num(col.visits);
       row.productClicks ??= num(col.clicks);

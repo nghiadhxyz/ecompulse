@@ -200,6 +200,9 @@ export interface DailyMetric {
   paidOrders?: number;
   confirmedGmv?: number;
   confirmedOrders?: number;
+  /** Cancellations as the confirmed-order sheet reports them. */
+  confirmedCancelledOrders?: number;
+  confirmedCancelledGmv?: number;
   /** Placed-order sales excluding Shopee's subsidy ("Doanh số không bao gồm trợ giá bởi Shopee"). */
   placedNoSubsidyGmv?: number;
   cancelledOrders?: number;

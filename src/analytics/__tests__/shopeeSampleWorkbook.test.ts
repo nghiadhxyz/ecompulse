@@ -28,7 +28,7 @@ import { anomalyScan } from '../anomalyScan';
 import { calendarPerformance } from '../campaignEngine';
 import { advancedStats } from '../statsEngine';
 import { stageFunnel } from '../summaryInsights';
-import { orderHealth } from '../orderHealthEngine';
+import { orderHealth, stageCancellations } from '../orderHealthEngine';
 import { dataNotices } from '../dataNotices';
 import { sampleLevel } from '../sampleSize';
 import { fmtPortion } from '../format';
@@ -365,5 +365,23 @@ describe('Part 1 — products & combos', () => {
     // 1.4: the other channel tabs are checked too.
     expect(sp.mismatches.some((m) => m.key.includes('|video|'))).toBe(true);
     expect(sp.mismatches.some((m) => m.key.includes('|affiliate|'))).toBe(true);
+  });
+});
+
+describe('Part 2 — order health', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('same-stage rates, cancel rate by value, cancellations by stage', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const k = computeKpis(ds, { range }).metrics;
+    expect([k.refundedOrders.value, k.orders.value]).toEqual([7, 519]);
+    expect(k.refundRate.value).toBeCloseTo(7 / 519, 10);
+    expect(computeKpis(ds, { range, stage: 'paid' }).metrics.refundRate.value).toBeCloseTo(4 / 422, 10);
+    const sc = stageCancellations(ds, { range });
+    expect(sc.fromPeriodRow).toBe(true);
+    expect([sc.cancelledGmv, sc.gmv]).toEqual([22_421_831, 78_626_020]);
+    expect(Math.round(sc.valueRate! * 1000) / 10).toBe(28.5);
+    expect(sc.byStage.map((s) => s.cancelled)).toEqual([102, 48, 9]);
+    // Daily table: cancelled sales per day.
+    expect(orderHealth(ds, { range }).byDate.some((d) => (d.cancelledGmv ?? 0) > 0)).toBe(true);
   });
 });

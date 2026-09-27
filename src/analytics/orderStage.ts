@@ -45,7 +45,7 @@ export function stageDay(d: DailyMetric, stage: SummaryStage): StageDay {
   if (stage === 'paid') {
     return { gmv: d.paidGmv, orders: d.paidOrders, cancelledOrders: d.paidCancelledOrders, cancelledGmv: d.paidCancelledGmv, refundedOrders: d.paidRefundedOrders, refundedGmv: d.paidRefundedGmv };
   }
-  if (stage === 'confirmed') return { gmv: d.confirmedGmv, orders: d.confirmedOrders };
+  if (stage === 'confirmed') return { gmv: d.confirmedGmv, orders: d.confirmedOrders, cancelledOrders: d.confirmedCancelledOrders, cancelledGmv: d.confirmedCancelledGmv };
   return { gmv: d.placedGmv, orders: d.placedOrders, cancelledOrders: d.cancelledOrders, cancelledGmv: d.cancelledGmv, refundedOrders: d.refundedOrders, refundedGmv: d.refundedGmv };
 }
 
