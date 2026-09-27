@@ -79,7 +79,9 @@ export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map
             <div className="flex items-center gap-3">
               <div className="relative h-9 flex-1 overflow-hidden rounded-control bg-surface-2">
                 <div className="h-full rounded-control border-l-4" style={{ width: `${Math.max(2, (v / max) * 100)}%`, background: `color-mix(in srgb, ${color} 22%, transparent)`, borderColor: color }} />
-                <span className="absolute inset-y-0 left-3 flex items-center text-sm font-semibold text-fg">{name(k)}</span>
+                <span className="absolute inset-y-0 left-3 right-2 flex items-center text-sm font-semibold text-fg" title={name(k)}>
+                  <span className="truncate">{name(k)}</span>
+                </span>
               </div>
               <span className="w-24 shrink-0 text-right text-sm font-semibold tabular text-fg">{fmtCount(v, lang)}</span>
             </div>
