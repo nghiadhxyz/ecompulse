@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { customerIntelligence, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi, PLATFORM_LABELS, RFM_SEGMENTS, segmentEvidenceRange } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
+import { Button, SectionCard } from '../../ui/primitives';
+import { TABLE } from '../../ui/data';
 import { ShareBar, Th } from '../ui';
 import { CustomerTrendPanel } from '../../workspace/SummaryInsightPanels';
 
@@ -15,7 +17,7 @@ export const CustomersView: React.FC = () => {
       <div className="space-y-4">
         <CustomerTrendPanel />
         <Section title={vi ? 'Phân nhóm RFM, cohort (cần mã người mua)' : 'RFM & cohorts (need buyer IDs)'}>
-          <NotEnoughData lang={lang} reason={tr(lang, ci.unavailable!)} action={<button onClick={() => goTo('dataHub')} className="text-xs underline">Data Hub</button>} />
+          <NotEnoughData lang={lang} reason={tr(lang, ci.unavailable!)} action={<Button onClick={() => goTo('dataHub')}>Data Hub</Button>} />
         </Section>
       </div>
     );
@@ -26,7 +28,7 @@ export const CustomersView: React.FC = () => {
   return (
     <div className="space-y-4">
       <Section title={vi ? 'Khách hàng' : 'Customers'} subtitle={vi ? `${formatRangeVi(range)} · mã khách ẩn danh theo sàn` : `${formatRangeVi(range)} · pseudonymous per platform`}>
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
           {[
             { l: vi ? 'Khách mua' : 'Customers', v: fmtCount(k.customers, lang) },
             { l: vi ? 'Khách mới' : 'New', v: fmtCount(k.newCustomers, lang) },
@@ -35,14 +37,14 @@ export const CustomersView: React.FC = () => {
             { l: vi ? 'Mua ≥ 2 lần trong kỳ' : '2+ orders in period', v: fmtRate(k.repeatWithinRange, lang) },
             { l: vi ? 'GMV / khách' : 'GMV / customer', v: fmtMoneyCompact(k.gmvPerCustomer, lang) },
           ].map((x) => (
-            <div key={x.l} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-              <div className="text-[11px] text-slate-400">{x.l}</div>
-              <div className="text-lg font-black text-white">{x.v}</div>
+            <div key={x.l} className="min-w-0 rounded-control border border-line bg-surface-2 p-3">
+              <div className="truncate text-small text-muted">{x.l}</div>
+              <div className="mt-0.5 text-xl font-bold tabular text-fg">{x.v}</div>
             </div>
           ))}
         </div>
         {ci.byPlatform.length > 1 && (
-          <p className="text-xs text-slate-400 mt-2">
+          <p className="mt-3 text-small text-muted">
             {vi ? 'Tỷ lệ khách quay lại theo sàn: ' : 'Returning share by platform: '}
             {ci.byPlatform.map((p) => `${PLATFORM_LABELS[p.platform]} ${fmtRate(p.returningShare, lang)} (${fmtCount(p.customers, lang)} khách)`).join(' · ')}
           </p>
@@ -50,9 +52,9 @@ export const CustomersView: React.FC = () => {
       </Section>
 
       <Section title={vi ? 'Phân nhóm RFM' : 'RFM segments'} subtitle={vi ? 'Mức gần đây (R), số lần mua (F), giá trị mua (M) tính đến cuối kỳ, trên toàn bộ lịch sử có trong dữ liệu.' : 'Recency, frequency, monetary as of the period end.'}>
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-xs">
-            <thead className="bg-white/[0.04] text-slate-400">
+        <div className={TABLE.frame}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
                 <Th left>{vi ? 'Nhóm' : 'Segment'}</Th>
                 <Th>{vi ? 'Số khách' : 'Customers'}</Th>
@@ -65,17 +67,27 @@ export const CustomersView: React.FC = () => {
             </thead>
             <tbody>
               {ci.segments.map((s) => (
-                <tr key={s.segment} className="border-t border-white/5 text-slate-200">
-                  <td className="px-2.5 py-1.5">
-                    <div className="font-semibold">{tr(lang, RFM_SEGMENTS[s.segment].label)}</div>
-                    <div className="text-[10px] text-slate-500">{tr(lang, RFM_SEGMENTS[s.segment].hint)}</div>
+                <tr key={s.segment} className={`${TABLE.tr} text-fg`}>
+                  <td className="px-3 py-1.5">
+                    <div className="font-medium">{tr(lang, RFM_SEGMENTS[s.segment].label)}</div>
+                    <div className="text-small text-muted">{tr(lang, RFM_SEGMENTS[s.segment].hint)}</div>
                   </td>
-                  <td className="px-2.5 py-1.5 text-right">{fmtCount(s.customers, lang)}</td>
-                  <td className="px-2.5 py-1.5 text-right whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtRate(s.share, lang)}<ShareBar share={s.share} /></div></td>
-                  <td className="px-2.5 py-1.5 text-right whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtRate(s.gmvShare, lang)}<ShareBar share={s.gmvShare} /></div></td>
-                  <td className="px-2.5 py-1.5 text-right">{s.avgOrders.toFixed(2).replace('.', vi ? ',' : '.')}</td>
-                  <td className="px-2.5 py-1.5 text-right">{Math.round(s.avgRecency)}</td>
-                  <td className="px-2.5 py-1.5 text-right">
+                  <td className={`${TABLE.td} text-right`}>{fmtCount(s.customers, lang)}</td>
+                  <td className={`${TABLE.td} text-right`}>
+                    <div className="flex items-center justify-end gap-2">
+                      {fmtRate(s.share, lang)}
+                      <ShareBar share={s.share} />
+                    </div>
+                  </td>
+                  <td className={`${TABLE.td} text-right`}>
+                    <div className="flex items-center justify-end gap-2">
+                      {fmtRate(s.gmvShare, lang)}
+                      <ShareBar share={s.gmvShare} />
+                    </div>
+                  </td>
+                  <td className={`${TABLE.td} text-right`}>{s.avgOrders.toFixed(2).replace('.', vi ? ',' : '.')}</td>
+                  <td className={`${TABLE.td} text-right`}>{Math.round(s.avgRecency)}</td>
+                  <td className={`${TABLE.td} text-right`}>
                     <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: tr(lang, RFM_SEGMENTS[s.segment].label), filter: { range: segmentEvidenceRange(dataset, range.end), platforms, customerIds: s.customerIds } })} />
                   </td>
                 </tr>
@@ -85,10 +97,15 @@ export const CustomersView: React.FC = () => {
         </div>
       </Section>
 
-      <Section title={vi ? 'Cohort theo tháng mua đầu tiên' : 'Monthly cohorts'} subtitle={vi ? 'Tỷ lệ khách của mỗi tháng quay lại mua ở các tháng sau.' : 'Share of each month\'s new customers ordering again later.'}>
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-xs">
-            <thead className="bg-white/[0.04] text-slate-400">
+      <SectionCard
+        title={vi ? 'Cohort theo tháng mua đầu tiên' : 'Monthly cohorts'}
+        description={vi ? 'Tỷ lệ khách của mỗi tháng quay lại mua ở các tháng sau.' : "Share of each month's new customers ordering again later."}
+        notesLabel={vi ? 'Ghi chú' : 'Notes'}
+        notes={ci.notes.map((n) => tr(lang, n))}
+      >
+        <div className={TABLE.frame}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
                 <Th left>{vi ? 'Tháng đầu' : 'Cohort'}</Th>
                 <Th>{vi ? 'Số khách' : 'Customers'}</Th>
@@ -99,11 +116,14 @@ export const CustomersView: React.FC = () => {
             </thead>
             <tbody>
               {ci.cohorts.map((c) => (
-                <tr key={c.cohort} className="border-t border-white/5 text-slate-200">
-                  <td className="px-2.5 py-1.5">{c.cohort.slice(5)}/{c.cohort.slice(0, 4)}</td>
-                  <td className="px-2.5 py-1.5 text-right">{fmtCount(c.customers, lang)}</td>
+                <tr key={c.cohort} className="h-11 border-t border-line text-fg">
+                  <td className={TABLE.td}>
+                    {c.cohort.slice(5)}/{c.cohort.slice(0, 4)}
+                  </td>
+                  <td className={`${TABLE.td} text-right`}>{fmtCount(c.customers, lang)}</td>
                   {c.retention.map((r, i) => (
-                    <td key={i} className="px-2.5 py-1.5 text-right" style={{ background: r === null ? undefined : `rgba(57,135,229,${0.1 + 0.5 * (r / maxRet)})` }}>
+                    // Heat cell: primary at 8–40% under dark text (contrast stays ≥ 4.5:1).
+                    <td key={i} className={`${TABLE.td} text-right`} style={{ background: r === null ? undefined : `color-mix(in srgb, var(--primary) ${Math.round(8 + 32 * (r / maxRet))}%, transparent)` }}>
                       {fmtRate(r, lang)}
                     </td>
                   ))}
@@ -112,12 +132,7 @@ export const CustomersView: React.FC = () => {
             </tbody>
           </table>
         </div>
-        <ul className="mt-3 space-y-1">
-          {ci.notes.map((n, i) => (
-            <li key={i} className="text-xs text-slate-400">• {tr(lang, n)}</li>
-          ))}
-        </ul>
-      </Section>
+      </SectionCard>
     </div>
   );
 };
