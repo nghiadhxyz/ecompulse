@@ -18,6 +18,17 @@ export const adCvr = (orders: number, clicks: number) => safeDivide(orders, clic
 export const cpa = (spend: number, orders: number) => safeDivide(spend, orders);
 export const roas = (attributedRevenue: number, spend: number) => safeDivide(attributedRevenue, spend);
 
+/**
+ * Margin before ads from the shop-wide estimates in Settings (0.9): gross margin − fees.
+ * Null when the gross margin was not entered.
+ */
+export function estimatedMarginBeforeAds(settings?: { estimatedGrossMargin?: number; estimatedFeeRate?: number }): number | null {
+  if (settings?.estimatedGrossMargin === undefined) return null;
+  return settings.estimatedGrossMargin - (settings.estimatedFeeRate ?? 0);
+}
+
+export const ESTIMATE_LABEL = { vi: 'ước tính theo số bạn nhập', en: 'estimate from your inputs' };
+
 /** Null when there is no positive margin before ads (no ROAS can break even). */
 export function breakEvenRoas(marginBeforeAds: number | null): number | null {
   if (marginBeforeAds === null || !(marginBeforeAds > 0)) return null;

@@ -53,12 +53,14 @@ export const AdsIntelligenceView: React.FC = () => {
     );
   }
   const t = ai.totals;
+  // Margin from the shop-wide estimates in Settings (0.9), not from COGS.
+  const est = t.marginIsEstimate ? ` · ${vi ? 'ước tính theo số bạn nhập' : 'estimate from your inputs'}` : '';
   const tiles = [
     { l: vi ? 'Chi phí Ads' : 'Spend', v: fmtMoneyCompact(t.spend, lang) },
     { l: vi ? 'Doanh thu quy đổi' : 'Attributed revenue', v: fmtMoneyCompact(t.attributedRevenue, lang) },
     { l: 'ROAS', v: fmtMultiple(t.roas, lang) },
-    { l: vi ? 'ROAS hòa vốn (shop)' : 'Break-even ROAS', v: fmtMultiple(t.breakEvenRoas, lang) },
-    { l: vi ? 'Lời sau Ads (ước tính)' : 'Profit after ads', v: t.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(t.estimatedProfitAfterAds, lang), bad: (t.estimatedProfitAfterAds ?? 0) < 0 },
+    { l: `${vi ? 'ROAS hòa vốn (shop)' : 'Break-even ROAS'}${est}`, v: fmtMultiple(t.breakEvenRoas, lang) },
+    { l: `${vi ? 'Lời sau Ads (ước tính)' : 'Profit after ads'}${est}`, v: t.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(t.estimatedProfitAfterAds, lang), bad: (t.estimatedProfitAfterAds ?? 0) < 0 },
     { l: vi ? 'Ngân sách dưới hòa vốn' : 'Spend below break-even', v: ai.campaigns.some((c) => c.breakEvenRoas !== null) ? `${fmtMoneyCompact(ai.spendBelowBreakEven, lang)} (${fmtRate(t.spend ? ai.spendBelowBreakEven / t.spend : null, lang, 0)})` : '—', bad: ai.spendBelowBreakEven > 0 },
   ];
 
@@ -130,7 +132,7 @@ export const AdsIntelligenceView: React.FC = () => {
         </div>
         <p className="text-[11px] text-slate-500 mt-2">
           {vi
-            ? 'Lời sau Ads = doanh thu quy đổi × biên lợi nhuận trước Ads của SKU − chi phí. Doanh thu quy đổi do sàn báo cáo, có thể trùng với đơn tự nhiên. * = thiếu một số chi phí.'
+            ? `Lời sau Ads = doanh thu quy đổi × biên lợi nhuận trước Ads${t.marginIsEstimate ? ' (biên gộp − phí sàn bạn nhập ở Cài đặt, ước tính theo số bạn nhập)' : ' của SKU'} − chi phí. Doanh thu quy đổi do sàn báo cáo, có thể trùng với đơn tự nhiên. * = thiếu một số chi phí.`
             : 'Profit after ads = attributed revenue × margin before ads − spend. Attribution is the platform’s own.'}
         </p>
       </Section>

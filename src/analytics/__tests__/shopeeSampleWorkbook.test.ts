@@ -14,7 +14,7 @@ import { subsidyDependence } from '../summaryInsights';
 import { breakdown } from '../breakdownEngine';
 import * as XLSX from 'xlsx';
 import { importShopeeSalesAnalysis } from '../importers/shopeeSalesAnalysis';
-import { mergeIntoWorkspace } from '../workspace';
+import { mergeIntoWorkspace, withCostSettings } from '../workspace';
 import { buildDailyBrief } from '../dailyBrief';
 import { questionUnavailable } from '../dolphinEvidence';
 import { funnel } from '../funnelEngine';
@@ -334,5 +334,20 @@ describe('0.6–0.8 — sample size, odd records, display', () => {
     const ds = await summaryWorkspace(NEW_WORKBOOK);
     const st = advancedStats(ds, { range: datasetDateBounds(ds)! }, { start: '2026-06-24', end: '2026-07-23' });
     expect(st.tests.every((t) => t.verdict === 'no_comparison')).toBe(true);
+  });
+});
+
+describe('0.9 — shop-wide margin and fee estimates', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('break-even ROAS and profit after Ads from the entered margin, labelled as estimate', async () => {
+    const base = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(base)!;
+    expect(adsIntelligence(base, { range }).totals.breakEvenRoas).toBeNull();
+    const ds = withCostSettings(base, { estimatedGrossMargin: 0.4, estimatedFeeRate: 0.1 });
+    const ai = adsIntelligence(ds, { range });
+    expect(ai.totals.marginIsEstimate).toBe(true);
+    expect(ai.totals.breakEvenRoas).toBeCloseTo(1 / 0.3, 10);
+    expect(ai.campaigns.every((c) => c.breakEvenRoas !== null && c.marginIsEstimate)).toBe(true);
+    const c = ai.campaigns[0];
+    expect(c.estimatedProfitAfterAds).toBeCloseTo(c.attributedRevenue! * 0.3 - c.spend!, 4);
   });
 });

@@ -363,6 +363,13 @@ export interface CostSettings {
   noSellerShippingDeclared?: boolean;
   /** Per-SKU unit COGS entered by the user; overrides catalog values. */
   skuCogs?: Record<string, number>;
+  /**
+   * Shop-wide estimates for summary reports (no COGS per order): gross margin and platform
+   * fees as a share of sales. Used for break-even ROAS, profit after Ads and What-If, and
+   * every result is labelled "ước tính theo số bạn nhập".
+   */
+  estimatedGrossMargin?: number;
+  estimatedFeeRate?: number;
 }
 
 export interface DatasetSource {

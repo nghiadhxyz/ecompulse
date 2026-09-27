@@ -87,6 +87,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
     onChange({ ...settings, [field]: rates });
   };
 
+  // Shop-wide estimates (0.9): stored as a fraction, entered as a percentage.
+  const setEstimate = (field: 'estimatedGrossMargin' | 'estimatedFeeRate', raw: string) => {
+    const v = toNumber(raw);
+    const next = { ...settings };
+    if (raw.trim() === '' || v === undefined || v < 0 || v > 100) delete next[field];
+    else next[field] = v / 100;
+    onChange(next);
+  };
+
   const invalidDraft = Object.values(drafts).some((raw) => raw.trim() !== '' && (toNumber(raw) === undefined || toNumber(raw)! < 0));
 
   return (
@@ -218,6 +227,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+          <div className="text-sm font-bold text-white">{vi ? 'Ước tính cho cả shop (khi chưa có giá vốn)' : 'Shop-wide estimates (without COGS)'}</div>
+          <p className="text-[11px] text-slate-500 mb-2">
+            {vi
+              ? 'Dùng cho ROAS hòa vốn, lợi nhuận sau Ads và What-If khi chỉ có báo cáo tổng hợp. Kết quả luôn ghi "ước tính theo số bạn nhập".'
+              : 'Used for break-even ROAS, profit after Ads and What-If with summary reports. Results are labelled as estimates.'}
+          </p>
+          <div className="flex flex-wrap gap-4 text-xs">
+            {([
+              { field: 'estimatedGrossMargin' as const, vi: 'Biên lợi nhuận gộp ước tính (%)', en: 'Estimated gross margin (%)', tip: vi ? '(Giá bán − giá vốn) / giá bán, trung bình cả shop' : '(Price − COGS) / price, shop average' },
+              { field: 'estimatedFeeRate' as const, vi: 'Phí sàn (%)', en: 'Platform fees (%)', tip: vi ? 'Tổng phí sàn, phí thanh toán, phí dịch vụ trên doanh số' : 'All platform, payment and service fees on sales' },
+            ]).map((f) => (
+              <label key={f.field} className="flex items-center gap-1.5 text-slate-300">
+                {vi ? f.vi : f.en} <HelpTip text={f.tip} />
+                <input
+                  inputMode="decimal"
+                  defaultValue={settings[f.field] !== undefined ? String(+(settings[f.field]! * 100).toFixed(3)) : ''}
+                  onBlur={(e) => setEstimate(f.field, e.target.value)}
+                  placeholder={vi ? 'chưa nhập' : 'not set'}
+                  aria-label={vi ? f.vi : f.en}
+                  className="w-20 bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
+                />
+                <span className="text-slate-500">%</span>
+              </label>
+            ))}
+          </div>
         </div>
         <div className="mt-4 space-y-2">
           <label className="flex items-start gap-2 text-sm text-slate-200">
