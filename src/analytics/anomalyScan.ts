@@ -20,6 +20,10 @@ import { addDays, enumerateDays, type DateRange } from './period';
 import { fmtChange, fmtRate } from './format';
 import { placedOnly } from './orderStage';
 import type { Bilingual } from './metric';
+import { channelMix, summaryProducts } from './summaryEngine';
+import { NEW_BUYER_SHARE_OPPORTUNITY, LOW_REPEAT_RATE } from './summaryAlerts';
+import { videoAffiliate } from './growthEngines';
+import { MIN_RATE_ORDERS } from './sampleSize';
 
 export type ScanMetric = 'gmv' | 'orders' | 'cancelRate' | 'profit';
 
@@ -113,7 +117,15 @@ export function anomalyScan(dataset: CanonicalDataset, requested: DatasetFilter,
   return { metric, points, flagged: points.filter((p) => p.flagged), notes };
 }
 
-export type OpportunityKind = 'efficiency_growth' | 'high_cvr_low_traffic' | 'high_margin_low_share';
+export type OpportunityKind =
+  | 'efficiency_growth'
+  | 'high_cvr_low_traffic'
+  | 'high_margin_low_share'
+  // Summary reports (no order file), 9.3
+  | 'low_ctr_high_reach'
+  | 'high_ctr_low_reach'
+  | 'new_buyers'
+  | 'strong_koc';
 
 export interface Opportunity {
   kind: OpportunityKind;
@@ -125,8 +137,90 @@ export interface Opportunity {
   metrics: { gmvChange: number | null; cvr: number | null; cvrChange: number | null; margin: number | null; clicksChange: number | null; gmvShare: number | null; clickShare: number | null };
 }
 
+/** Product-card CTR below / above these multiples of the channel's CTR (9.3). */
+export const LOW_CTR_MULTIPLE = 0.5;
+export const HIGH_CTR_MULTIPLE = 1.5;
+/** A KOC with at least this many buyers brings repeatable sales, not one big order. */
+export const STRONG_KOC_BUYERS = 10;
+
+const noMetrics = { gmvChange: null, cvr: null, cvrChange: null, margin: null, clicksChange: null, gmvShare: null, clickShare: null };
+
+/**
+ * Opportunities from a summary report (no order file): Top-5 product-card rows against the
+ * product-card channel, the whole-period buyer mix, and the Top-5 affiliates.
+ */
+export function summaryOpportunities(dataset: CanonicalDataset, filter: DatasetFilter): Opportunity[] {
+  const out: Opportunity[] = [];
+  const pct = (v: number) => `${(v * 100).toFixed(2).replace('.', ',')}%`;
+  const card = channelMix(dataset, filter, 'placed').channels.find((c) => c.channel === 'product_card');
+  const channelCtr = card?.impressions && card.clicks !== null ? card.clicks / card.impressions : null;
+  const rows = summaryProducts(dataset, filter).byChannel.find((c) => c.channel === 'product_card')?.rows.filter((r) => r.impressions && r.ctr !== null) ?? [];
+  if (channelCtr && rows.length >= 3) {
+    const imps = rows.map((r) => r.impressions!).sort((a, b) => a - b);
+    const medianImp = imps[Math.floor((imps.length - 1) / 2)];
+    for (const r of rows) {
+      const facts = `CTR ${pct(r.ctr!)} so với ${pct(channelCtr)} của cả kênh Thẻ sản phẩm, ${r.impressions!.toLocaleString('vi-VN')} lượt hiển thị`;
+      if (r.ctr! < channelCtr * LOW_CTR_MULTIPLE && r.impressions! >= medianImp) {
+        out.push({
+          kind: 'low_ctr_high_reach',
+          sku: r.sku,
+          label: r.name,
+          title: { vi: `${r.name}: nhiều người thấy nhưng ít người nhấp`, en: `${r.name}: seen a lot, clicked little` },
+          message: { vi: `${facts}. Ảnh bìa, giá hiển thị hoặc tên sản phẩm có thể chưa hấp dẫn.`, en: `CTR ${pct(r.ctr!)} vs channel ${pct(channelCtr)}.` },
+          check: { vi: 'Thử đổi ảnh bìa / tiêu đề và so CTR sau 1–2 tuần.', en: 'Test a new cover image or title and compare CTR.' },
+          metrics: noMetrics,
+        });
+      } else if (r.ctr! >= channelCtr * HIGH_CTR_MULTIPLE && r.impressions! <= medianImp) {
+        out.push({
+          kind: 'high_ctr_low_reach',
+          sku: r.sku,
+          label: r.name,
+          title: { vi: `${r.name}: ít người thấy nhưng nhấp nhiều`, en: `${r.name}: clicked a lot, seen little` },
+          message: { vi: `${facts}. Sản phẩm hút khách khi được thấy — có thể còn dư địa nếu tăng hiển thị.`, en: `CTR ${pct(r.ctr!)} vs channel ${pct(channelCtr)}.` },
+          check: { vi: 'Kiểm tra tồn kho rồi thử tăng hiển thị (Ads, live, affiliate) có kiểm soát.', en: 'Check stock and test more exposure.' },
+          metrics: noMetrics,
+        });
+      }
+    }
+  }
+  // Buyer mix of the whole report period (distinct counts, never summed from days).
+  const period = (dataset.periodTotals ?? []).find((p) => p.stage === 'placed' && p.start >= filter.range.start && p.end <= filter.range.end && (!filter.platforms?.length || filter.platforms.includes(p.platform)));
+  if (period?.newBuyers !== undefined && period.existingBuyers !== undefined) {
+    const buyers = period.newBuyers + period.existingBuyers;
+    const share = buyers ? period.newBuyers / buyers : 0;
+    if (buyers >= MIN_RATE_ORDERS && share >= NEW_BUYER_SHARE_OPPORTUNITY && (period.repeatRate === undefined || period.repeatRate < LOW_REPEAT_RATE)) {
+      out.push({
+        kind: 'new_buyers',
+        sku: '',
+        label: '',
+        title: { vi: `${Math.round(share * 100)}% người mua là khách mới`, en: `${Math.round(share * 100)}% of buyers are new` },
+        message: { vi: `${period.newBuyers} khách mới, ${period.existingBuyers} khách cũ${period.repeatRate !== undefined ? `, tỉ lệ quay lại ${pct(period.repeatRate)}` : ''}. Với hàng tiêu dùng mua lặp lại, còn dư địa giữ chân khách.`, en: `${period.newBuyers} new, ${period.existingBuyers} existing buyers.` },
+        check: { vi: 'Xem có voucher / tin nhắn mời mua lại cho khách đã mua chưa.', en: 'Check follow-up offers to past buyers.' },
+        metrics: noMetrics,
+      });
+    }
+  }
+  // KOCs whose sales come from many buyers, not one or two large orders.
+  for (const c of videoAffiliate(dataset, filter).creators) {
+    if (c.buyers === null || c.buyers < STRONG_KOC_BUYERS) continue;
+    out.push({
+      kind: 'strong_koc',
+      sku: '',
+      label: c.creatorId,
+      title: { vi: `KOC ${c.creatorId}: nhiều đơn từ nhiều người mua`, en: `KOC ${c.creatorId}: many orders from many buyers` },
+      message: {
+        vi: `${(c.orders ?? 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} đơn, ${c.buyers} người mua, doanh số ${(c.gmv ?? 0).toLocaleString('vi-VN')}đ. Doanh số đều, không phụ thuộc một đơn lớn.`,
+        en: `${c.orders} orders from ${c.buyers} buyers.`,
+      },
+      check: { vi: 'Cân nhắc tăng hợp tác (mẫu thử, hoa hồng) với KOC này.', en: 'Consider working more with this creator.' },
+      metrics: noMetrics,
+    });
+  }
+  return out;
+}
+
 export function findOpportunities(dataset: CanonicalDataset, filter: DatasetFilter, previousRange: DateRange): Opportunity[] {
-  if (dataset.orders.length === 0) return [];
+  if (dataset.orders.length === 0) return summaryOpportunities(dataset, filter);
   const rows = breakdown(dataset, filter, 'sku', previousRange).rows.filter((r) => r.current.placed >= 20);
   const shop = computeKpis(dataset, filter).metrics;
   const shopCvr = shop.cvr.value;

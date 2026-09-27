@@ -22,6 +22,10 @@ const KIND_LABEL = {
   efficiency_growth: { vi: 'Hiệu quả tăng', en: 'Efficiency up' },
   high_cvr_low_traffic: { vi: 'Chuyển đổi cao, ít traffic', en: 'High CVR, low traffic' },
   high_margin_low_share: { vi: 'Biên cao, tỷ trọng nhỏ', en: 'High margin, small share' },
+  low_ctr_high_reach: { vi: 'CTR thấp, hiển thị cao', en: 'Low CTR, high reach' },
+  high_ctr_low_reach: { vi: 'CTR cao, hiển thị thấp', en: 'High CTR, low reach' },
+  new_buyers: { vi: 'Giữ chân khách', en: 'Retention' },
+  strong_koc: { vi: 'KOC hiệu quả', en: 'Strong KOC' },
 };
 
 export const AnomalyOpportunityView: React.FC = () => {
@@ -162,13 +166,20 @@ export const AnomalyOpportunityView: React.FC = () => {
         />
       )}
 
-      <Section title={vi ? 'Cơ hội' : 'Opportunities'} subtitle={vi ? `${formatRangeVi(range)} so với ${formatRangeVi(previousRange)} · SKU có ít nhất 20 đơn` : `${formatRangeVi(range)} vs ${formatRangeVi(previousRange)} · SKUs with ≥ 20 orders`}>
+      <Section
+        title={vi ? 'Cơ hội' : 'Opportunities'}
+        subtitle={
+          dataset.orders.length === 0
+            ? vi ? `${formatRangeVi(range)} · từ báo cáo tổng hợp (Top 5 sản phẩm, người mua cả kỳ, Top 5 affiliate)` : `${formatRangeVi(range)} · from the summary report`
+            : vi ? `${formatRangeVi(range)} so với ${formatRangeVi(previousRange)} · SKU có ít nhất 20 đơn` : `${formatRangeVi(range)} vs ${formatRangeVi(previousRange)} · SKUs with ≥ 20 orders`
+        }
+      >
         {opps.length === 0 ? (
           <p className="text-sm text-slate-400">{vi ? 'Không đủ dữ liệu để tìm cơ hội trong khoảng này.' : 'Not enough data to find opportunities in this range.'}</p>
         ) : (
           <ul className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
             {opps.map((o) => (
-              <li key={`${o.kind}-${o.sku}`} className="rounded-xl border border-[#0ca30c]/30 bg-[#0ca30c]/[0.04] p-3">
+              <li key={`${o.kind}-${o.sku}-${o.label}`} className="rounded-xl border border-[#0ca30c]/30 bg-[#0ca30c]/[0.04] p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="text-sm font-bold text-white flex items-center gap-1.5"><Lightbulb className="w-4 h-4 text-[#4ade80] shrink-0" aria-hidden /> {tr(lang, o.title)}</div>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-[#0ca30c]/40 text-[#4ade80] whitespace-nowrap">{tr(lang, KIND_LABEL[o.kind])}</span>
@@ -180,7 +191,7 @@ export const AnomalyOpportunityView: React.FC = () => {
                     {o.metrics.gmvShare !== null && `${vi ? 'Tỷ trọng GMV' : 'GMV share'} ${fmtRate(o.metrics.gmvShare, lang)}`}
                     {o.metrics.margin !== null && ` · margin ${fmtRate(o.metrics.margin, lang)}`}
                   </span>
-                  <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: tr(lang, o.title), filter: { range, platforms, skus: [o.sku] } })} />
+                  {o.sku && dataset.orders.length > 0 && <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: tr(lang, o.title), filter: { range, platforms, skus: [o.sku] } })} />}
                 </div>
               </li>
             ))}

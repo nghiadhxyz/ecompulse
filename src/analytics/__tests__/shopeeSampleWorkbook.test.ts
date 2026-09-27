@@ -25,7 +25,7 @@ import { adsIntelligence, FEW_BUYERS, liveAudit, videoAffiliate } from '../growt
 import { dailySeries } from '../timeseries';
 import { describeMismatch, type MismatchItem } from '../mismatch';
 import { fmtPerViewer, fmtShare } from '../format';
-import { anomalyScan } from '../anomalyScan';
+import { anomalyScan, findOpportunities } from '../anomalyScan';
 import { calendarPerformance, campaignResult } from '../campaignEngine';
 import { advancedStats } from '../statsEngine';
 import { customerTrend, stageFunnel } from '../summaryInsights';
@@ -496,5 +496,21 @@ describe('Part 8 — video & affiliate', () => {
     const few = va.creators.filter((c) => c.buyers !== null && c.buyers <= FEW_BUYERS).map((c) => c.creatorId).sort();
     expect(few).toEqual(['fa__uyvwlo', 'gocreview5sao']);
     expect(va.videos.every((v) => v.kind === 'shop_video')).toBe(true);
+  });
+});
+
+describe('Part 9 — anomalies & opportunities', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('opportunities from the summary report', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const opps = findOpportunities(ds, { range }, { start: '2026-06-24', end: '2026-07-23' });
+    const low = opps.filter((o) => o.kind === 'low_ctr_high_reach');
+    const high = opps.filter((o) => o.kind === 'high_ctr_low_reach');
+    expect(low.map((o) => o.label)).toEqual([expect.stringContaining('Combo 10 Xách')]);
+    expect(low[0].message.vi).toContain('0,69%');
+    expect(high.map((o) => o.label)).toEqual([expect.stringContaining('Cao Đạm 41N')]);
+    expect(high[0].message.vi).toContain('4,03%');
+    expect(opps.find((o) => o.kind === 'new_buyers')!.title.vi).toBe('82% người mua là khách mới');
+    expect(opps.filter((o) => o.kind === 'strong_koc').map((o) => o.label).sort()).toEqual(['lephuong310797', 'o2pkj3o42u']);
   });
 });

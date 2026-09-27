@@ -126,7 +126,11 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
   const vi = lang === 'vi';
   const d = useMemo(() => sourceDrivers(dataset, before, after, { platforms, excludeDates }), [dataset, before, after, platforms, excludeDates]);
   if (!(dataset.salesSummaries ?? []).some((r) => r.dimension === 'source' && r.periodStart === undefined)) return null;
-  const top = d.sources.filter((s) => Math.abs(s.delta) >= 1).slice(0, 8);
+  const top = d.sources.filter((s) => Math.abs(s.delta) >= 1).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 8);
+  // A share of a small total change is noise: the column shows only when the total moved ≥ 20% (9.2).
+  const totalChange = d.available ? d.after.gmvPerDay - d.before.gmvPerDay : 0;
+  const showShare = d.available && d.before.gmvPerDay > 0 && Math.abs(totalChange) >= 0.2 * d.before.gmvPerDay;
+  const channels = [...d.channels].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   return (
     <Section
       title={title ?? (vi ? 'Doanh số tăng/giảm do nguồn nào' : 'Which sources moved sales')}
@@ -148,21 +152,21 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
                   <Th>{vi ? 'Trước (TB/ngày)' : 'Before (/day)'}</Th>
                   <Th>{vi ? 'Sau (TB/ngày)' : 'After (/day)'}</Th>
                   <Th>{vi ? 'Thay đổi' : 'Change'}</Th>
-                  <Th title={vi ? 'Phần của tổng thay đổi; âm = đi ngược chiều tổng' : 'Share of the total change'}>{vi ? 'Tỷ trọng thay đổi' : 'Share of change'}</Th>
+                  {showShare && <Th title={vi ? 'Phần của tổng thay đổi; âm = đi ngược chiều tổng' : 'Share of the total change'}>{vi ? 'Tỷ trọng thay đổi' : 'Share of change'}</Th>}
                 </tr>
               </thead>
               <tbody>
-                {d.channels.map((c) => (
+                {channels.map((c) => (
                   <tr key={c.channel} className="border-t border-white/5 text-slate-100 font-semibold">
                     <td className="px-2.5 py-1.5">{tr(lang, SUMMARY_CHANNEL_LABELS[c.channel])}</td>
                     <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(c.before, lang)}</td>
                     <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(c.after, lang)}</td>
                     <td className={`px-2.5 py-1.5 text-right ${c.delta < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`}>{signed(c.delta, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtRate(c.shareOfChange, lang, 0)}</td>
+                    {showShare && <td className="px-2.5 py-1.5 text-right">{fmtRate(c.shareOfChange, lang, 0)}</td>}
                   </tr>
                 ))}
                 <tr className="border-t border-white/10 text-slate-400">
-                  <td colSpan={5} className="px-2.5 py-1 text-[11px]">{vi ? 'Nguồn thay đổi nhiều nhất' : 'Largest source changes'}</td>
+                  <td colSpan={showShare ? 5 : 4} className="px-2.5 py-1 text-[11px]">{vi ? 'Nguồn thay đổi nhiều nhất (xếp theo độ lớn thay đổi)' : 'Largest source changes'}</td>
                 </tr>
                 {top.map((s) => (
                   <tr key={`${s.channel}|${s.source}`} className="border-t border-white/5 text-slate-300">
@@ -172,14 +176,16 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
                     <td className="px-2.5 py-1 text-right">{fmtMoneyCompact(s.before, lang)}</td>
                     <td className="px-2.5 py-1 text-right">{fmtMoneyCompact(s.after, lang)}</td>
                     <td className={`px-2.5 py-1 text-right ${s.delta < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`}>{signed(s.delta, lang)}</td>
-                    <td className="px-2.5 py-1 text-right">{fmtRate(s.shareOfChange, lang, 0)}</td>
+                    {showShare && <td className="px-2.5 py-1 text-right">{fmtRate(s.shareOfChange, lang, 0)}</td>}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
-            {vi ? `Cỡ mẫu: ${d.before.days} ngày trước, ${d.after.days} ngày sau.` : `Sample: ${d.before.days} days before, ${d.after.days} after.`}
+            {vi
+              ? `So sánh ${d.after.days} ngày với trung bình ${d.before.days} ngày.${showShare ? '' : ' Tổng doanh số thay đổi dưới 20% nên không chia tỷ trọng thay đổi.'}`
+              : `${d.after.days} day(s) vs the average of ${d.before.days} days.`}
           </p>
           <SummaryNotes notes={d.notes} lang={lang} />
         </>
