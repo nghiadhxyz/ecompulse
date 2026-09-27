@@ -133,6 +133,8 @@ export interface AdPerformance {
   attributedRevenue?: number;
   /** ROAS as the report prints it — only compared with revenue ÷ spend, never used. */
   reportedRoas?: number;
+  /** Revenue of the ad's paid orders (paid-order sheet, period rows only). Excludes cancellations. */
+  paidRevenue?: number;
 }
 
 export interface LiveSession {

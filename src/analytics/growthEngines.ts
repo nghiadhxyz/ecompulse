@@ -17,13 +17,20 @@ import { fmtMoney, fmtOrders } from './format';
 
 // ============================================================ ADS INTELLIGENCE
 
-export type AdEfficiency = 'profitable' | 'below_break_even' | 'unknown';
+/** likely_loss: ROAS below 1,5 with no margin known — almost surely losing money. */
+export type AdEfficiency = 'profitable' | 'below_break_even' | 'likely_loss' | 'unknown';
+
+/** Robust score above which a day's ROAS is marked unusual. */
+export const ROAS_OUTLIER_SCORE = 3.5;
+
+/** Below this ROAS a campaign almost surely loses money, whatever the margin (6.3). */
+export const LIKELY_LOSS_ROAS = 1.5;
 
 export interface AdsIntelligence {
   available: boolean;
   campaigns: (AdCampaignRow & { efficiency: AdEfficiency; spendShare: number | null })[];
   totals: ReturnType<typeof adsSummary>['totals'];
-  daily: { date: string; spend: number; revenue: number | null; roas: number | null; clicks: number | null }[];
+  daily: { date: string; spend: number; revenue: number | null; roas: number | null; clicks: number | null; roasOutlier: boolean }[];
   byPlatform: { platform: Platform; spend: number; revenue: number | null; roas: number | null; profitAfterAds: number | null }[];
   /** Spend on campaigns below break-even ROAS. */
   spendBelowBreakEven: number;
@@ -40,7 +47,15 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
   const totalSpend = summary.totals.spend;
   const campaigns = summary.rows.map((r) => ({
     ...r,
-    efficiency: (r.roas === null || r.breakEvenRoas === null ? 'unknown' : r.roas >= r.breakEvenRoas ? 'profitable' : 'below_break_even') as AdEfficiency,
+    efficiency: (r.roas === null
+      ? 'unknown'
+      : r.breakEvenRoas !== null
+        ? r.roas >= r.breakEvenRoas
+          ? 'profitable'
+          : 'below_break_even'
+        : r.roas < LIKELY_LOSS_ROAS
+          ? 'likely_loss'
+          : 'unknown') as AdEfficiency,
     spendShare: totalSpend && r.spend !== null ? r.spend / totalSpend : null,
   }));
   // The chart by day always uses the daily rows, even when the totals above use the
@@ -52,8 +67,19 @@ export function adsIntelligence(dataset: CanonicalDataset, filter: DatasetFilter
     const hasRev = rows.some((a) => typeof a.attributedRevenue === 'number');
     const revenue = hasRev ? rows.reduce((s, a) => s + (a.attributedRevenue || 0), 0) : null;
     const hasClicks = rows.some((a) => typeof a.clicks === 'number');
-    return { date, spend, revenue, roas: revenue !== null ? safeDivide(revenue, spend) : null, clicks: hasClicks ? rows.reduce((s, a) => s + (a.clicks || 0), 0) : null };
+    return { date, spend, revenue, roas: revenue !== null ? safeDivide(revenue, spend) : null, clicks: hasClicks ? rows.reduce((s, a) => s + (a.clicks || 0), 0) : null, roasOutlier: false };
   });
+  // Unusual ROAS days (6.4): robust score against the median day, as in anomalyScan.ts.
+  const roasDays = daily.filter((d) => d.roas !== null && d.spend > 0);
+  if (roasDays.length >= 7) {
+    const med = (xs: number[]) => {
+      const s = [...xs].sort((a, b) => a - b);
+      return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+    };
+    const m = med(roasDays.map((d) => d.roas!));
+    const mad = Math.max(med(roasDays.map((d) => Math.abs(d.roas! - m))), m * 0.1);
+    for (const d of roasDays) d.roasOutlier = mad > 0 && Math.abs((0.6745 * (d.roas! - m)) / mad) >= ROAS_OUTLIER_SCORE;
+  }
   const platforms = Array.from(new Set(campaigns.map((c) => c.platform)));
   const byPlatform = platforms.map((platform) => {
     const rows = campaigns.filter((c) => c.platform === platform);

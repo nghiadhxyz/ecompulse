@@ -107,6 +107,8 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
   const platform = 'shopee' as const;
   const summaries: SalesSummaryRow[] = [];
   const ads: AdPerformance[] = [];
+  /** Paid-order revenue per ad row of a period ("start|end|name"), joined to the placed rows at the end. */
+  const paidAdRevenue = new Map<string, number>();
   const live = new Map<string, LiveSession>();
   const content = new Map<string, AffiliatePerformance>();
   const products = new Map<string, Product>();
@@ -227,6 +229,7 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
         if (!daily && period) {
           if (channel === 'ads') {
             const spend = spendI >= 0 ? num(r[spendI]) : undefined;
+            if (stage === 'paid' && metrics.gmv !== undefined) paidAdRevenue.set(`${period.start}|${period.end}|${a}`, metrics.gmv);
             if (stage === 'placed') {
               const roasI = col('ROAS quảng cáo');
               ads.push({ date: period.end, periodStart: period.start, platform, campaignId: `shopee-ads:${a}`, adName: a, adType: a, spend, impressions: metrics.impressions, orders: metrics.orders, attributedRevenue: metrics.gmv, reportedRoas: roasI >= 0 ? num(r[roasI]) : undefined });
@@ -387,6 +390,11 @@ export function importShopeeSalesAnalysis(input: { fileName: string; sheets: She
   // rounded days.
   ds.salesSummaries = summaries;
   ds.reportedFigures = reported;
+  for (const a of ads) {
+    if (a.periodStart === undefined) continue;
+    const paid = paidAdRevenue.get(`${a.periodStart}|${a.date}|${a.adName}`);
+    if (paid !== undefined) a.paidRevenue = paid;
+  }
   ds.ads = ads;
   ds.liveSessions = [...live.values()];
   ds.affiliates = [...content.values()];

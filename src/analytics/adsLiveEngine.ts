@@ -25,6 +25,9 @@ export interface AdCampaignRow {
   attributedRevenue: number | null;
   orders: number | null;
   roas: number | null;
+  /** Revenue of paid orders only (no cancellations) and its ROAS — whole report period only. */
+  paidRevenue: number | null;
+  paidRoas: number | null;
   impressions: number | null;
   clicks: number | null;
   ctr: number | null;
@@ -56,7 +59,7 @@ function sumOrNull(rows: AdPerformance[], pick: (a: AdPerformance) => number | u
 export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): AdsSummary {
   const slice = sliceDataset(dataset, filter);
   const empty = {
-    spend: 0, attributedRevenue: null, orders: null, roas: null, impressions: null, clicks: null, ctr: null, cpc: null, cvr: null, cpa: null,
+    spend: 0, attributedRevenue: null, orders: null, roas: null, paidRevenue: null, paidRoas: null, impressions: null, clicks: null, ctr: null, cpc: null, cvr: null, cpa: null,
     marginBeforeAds: null, breakEvenRoas: null, estimatedProfitAfterAds: null, marginIsPartial: false, marginIsEstimate: false,
   };
   if (dataset.ads.length === 0) return { available: false, rows: [], totals: empty };
@@ -86,6 +89,8 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
   const build = (key: string, rows: AdPerformance[], name: string, platform: Platform, sku?: string): AdCampaignRow => {
     const spend = sumOrNull(rows, (r) => r.spend);
     const revenue = sumOrNull(rows, (r) => r.attributedRevenue);
+    // Only when every row carries it (period rows of a report with a paid-order sheet).
+    const paidRevenue = rows.length > 0 && rows.every((r) => r.paidRevenue !== undefined) ? rows.reduce((s, r) => s + r.paidRevenue!, 0) : null;
     const orders = sumOrNull(rows, (r) => r.orders);
     const impressions = sumOrNull(rows, (r) => r.impressions);
     const clicks = sumOrNull(rows, (r) => r.clicks);
@@ -109,6 +114,8 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
       orders,
       // Computed here, never read from the report; null when spend is missing or 0.
       roas: revenue !== null && spend !== null ? roas(revenue, spend) : null,
+      paidRevenue,
+      paidRoas: paidRevenue !== null && spend !== null ? roas(paidRevenue, spend) : null,
       impressions,
       clicks,
       ctr: clicks !== null && impressions !== null ? ctr(clicks, impressions) : null,
