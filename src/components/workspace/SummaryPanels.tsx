@@ -212,7 +212,15 @@ export const SummaryProductsPanel: React.FC = () => {
                       <div className="text-[10px] text-slate-500">{r.sku}</div>
                     </td>
                     <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.gmv, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.paidGmv, lang)}</td>
+                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
+                      {r.paidGmv === null ? (
+                        <span className="text-slate-500" title={vi ? 'Sản phẩm này không nằm trong Top 5 của sheet đơn đã thanh toán, nên file không có số.' : 'Not in the paid-orders Top 5, so the file has no figure.'}>
+                          {vi ? 'Ngoài top 5' : 'Not in top 5'}
+                        </span>
+                      ) : (
+                        fmtMoneyCompact(r.paidGmv, lang)
+                      )}
+                    </td>
                     <td className="px-2.5 py-1.5 text-right">{fmtOrders(r.orders, lang)}</td>
                     <td className="px-2.5 py-1.5 text-right">{fmtCount(r.units, lang)}</td>
                     <td className="px-2.5 py-1.5 text-right">{fmtCount(r.buyers, lang)}</td>

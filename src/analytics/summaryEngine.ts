@@ -78,14 +78,16 @@ export function summaryMismatches(dataset: CanonicalDataset, filter: DatasetFilt
 export function rateMismatches(rows: SalesSummaryRow[], channelGmv: (r: SalesSummaryRow) => number | null): MismatchItem[] {
   const out: MismatchItem[] = [];
   for (const r of rows) {
-    if (!r.reported || r.periodStart === undefined || r.channel !== 'product_card' || r.dimension === 'channel') continue;
+    if (!r.reported || r.periodStart === undefined || r.dimension === 'channel') continue;
     const name = r.dimension === 'sku' ? `${r.label ?? r.key} (${r.key})` : r.key;
-    const add = (what: string, reported: number | undefined, computed: number | null) => {
+    const add = (what: string, reported: number | undefined, computed: number | null, rounding = 0) => {
+      // The file prints orders with 2 decimals, so a CVR recomputed from them can be off by ±0,005 / clicks.
+      if (reported !== undefined && computed !== null && Math.abs(reported - computed) <= rounding + 1e-4) return;
       const m = compareCopies(`rate|${summaryRowKey(r)}|${what}`, { vi: `${name} — ${what}`, en: `${name} — ${what}` }, 'ratio', { label: RECOMPUTED_LABEL, value: computed }, { label: FILE_RATE_LABEL, value: reported });
       if (m) out.push(m);
     };
     add('CTR', r.reported.ctr, r.impressions ? (r.clicks ?? 0) / r.impressions : null);
-    add('CVR', r.reported.cvr, r.clicks ? (r.orders ?? 0) / r.clicks : null);
+    add('CVR', r.reported.cvr, r.clicks ? (r.orders ?? 0) / r.clicks : null, r.clicks ? 0.005 / r.clicks : 0);
     const ch = channelGmv(r);
     add('tỷ lệ doanh số', r.reported.share, ch ? (r.gmv ?? 0) / ch : null);
   }
@@ -303,18 +305,38 @@ export function summaryProducts(dataset: CanonicalDataset, filter: DatasetFilter
       }))
       .sort((a, b) => b.gmv - a.gmv);
     const chGmv = mix.channels.find((c) => c.channel === channel)?.gmv ?? null;
+    // Share of the channel's sales (canonical channel row, 0.3), same figure in title and note.
     return { channel, rows, coverage: chGmv ? Math.min(1, rows.reduce((s, r) => s + r.gmv, 0) / chGmv) : null };
   }).filter((c) => c.rows.length > 0);
+  // The file's own "Tỷ lệ doanh số" column, added up per channel, vs the recomputed share.
+  const topShareMismatches: MismatchItem[] = [];
+  for (const c of byChannel) {
+    const printed = placed.filter((r) => r.channel === c.channel && r.periodStart !== undefined && r.reported?.share !== undefined);
+    if (printed.length === 0 || c.coverage === null) continue;
+    const printedSum = printed.reduce((s, r) => s + r.reported!.share!, 0);
+    // Each printed share is rounded to 0,01%, so the sum can drift by that much per row.
+    if (Math.abs(printedSum - c.coverage) <= printed.length * 0.00005 + 1e-4) continue;
+    const label = SUMMARY_CHANNEL_LABELS[c.channel];
+    const m = compareCopies(
+      `topshare|${c.channel}`,
+      { vi: `Top ${SUMMARY_TOP_N} ${label.vi} — tỷ trọng trong kênh`, en: `Top ${SUMMARY_TOP_N} ${label.en} — share of channel` },
+      'ratio',
+      { label: RECOMPUTED_LABEL, value: c.coverage },
+      { label: { vi: 'cộng cột "Tỷ lệ doanh số"', en: 'sum of the share column' }, value: printedSum },
+    );
+    if (m) topShareMismatches.push(m);
+  }
   const listed = [...map.values()].reduce((s, r) => s + r.gmv, 0);
   const coverage = mix.total ? Math.min(1, listed / mix.total) : null;
+  // No share here: the panel shows the selected channel's share, the one number used for this table.
   notes.push({
-    vi: `Shopee chỉ liệt kê Top ${SUMMARY_TOP_N} sản phẩm mỗi kênh — không phải tất cả sản phẩm. Các sản phẩm này chiếm khoảng ${coverage === null ? '—' : Math.round(coverage * 100) + '%'} doanh số. Số đơn có thể lẻ vì Shopee chia đơn cho nhiều nguồn.`,
-    en: `Shopee lists only the top ${SUMMARY_TOP_N} products per channel (≈${coverage === null ? '—' : Math.round(coverage * 100) + '%'} of sales).`,
+    vi: `Shopee chỉ liệt kê Top ${SUMMARY_TOP_N} sản phẩm mỗi kênh — không phải tất cả sản phẩm. Số đơn có thể lẻ vì Shopee chia đơn cho nhiều nguồn.`,
+    en: `Shopee lists only the top ${SUMMARY_TOP_N} products per channel.`,
   });
   notes.push({ vi: 'Chưa có giá vốn theo đơn nên chưa tính được lợi nhuận sản phẩm — cần file xuất đơn hàng.', en: 'No per-order COGS: product profit needs an order export.' });
   const p = placed.find((r) => r.periodStart);
   const rows = [...map.values()].map(({ channels: _c, ...r }) => r).sort((a, b) => b.gmv - a.gmv);
-  const mismatches = rateMismatches(placed, (r) => mix.channels.find((c) => c.channel === r.channel)?.gmv ?? null);
+  const mismatches = [...topShareMismatches, ...rateMismatches(placed, (r) => mix.channels.find((c) => c.channel === r.channel)?.gmv ?? null)].sort(byGap);
   return { available: true, period: p ? { start: p.periodStart!, end: p.date } : null, rows, byChannel, coverage, mismatches, notes };
 }
 

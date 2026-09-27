@@ -351,3 +351,19 @@ describe('0.9 — shop-wide margin and fee estimates', () => {
     expect(c.estimatedProfitAfterAds).toBeCloseTo(c.attributedRevenue! * 0.3 - c.spend!, 4);
   });
 });
+
+describe('Part 1 — products & combos', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('Top-5 share on the canonical channel row, flagged against the file column', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const sp = summaryProducts(ds, { range: datasetDateBounds(ds)! });
+    const card = sp.byChannel.find((c) => c.channel === 'product_card')!;
+    expect(Math.round(card.coverage! * 1000) / 10).toBe(33.7);
+    const top = sp.mismatches.find((m) => m.key === 'topshare|product_card')!;
+    expect(Math.round(top.other.value * 1000) / 10).toBe(42.4);
+    // The note never carries a second, different share.
+    expect(sp.notes.some((n) => /\d+%/.test(n.vi))).toBe(false);
+    // 1.4: the other channel tabs are checked too.
+    expect(sp.mismatches.some((m) => m.key.includes('|video|'))).toBe(true);
+    expect(sp.mismatches.some((m) => m.key.includes('|affiliate|'))).toBe(true);
+  });
+});
