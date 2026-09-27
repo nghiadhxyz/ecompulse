@@ -29,16 +29,14 @@ import { NotEnoughData, Section, tr } from '../seller/ui';
 import { ShareBar, Th } from '../analyst/ui';
 import { MismatchBox } from './MismatchBox';
 import { SummaryNotes } from './SummaryPanels';
+import { CHART, axisProps, gridProps, tooltipProps } from '../../theme/chart';
+import { TABLE } from '../ui/data';
 
-const BAR = '#3987e5';
-const SECOND = '#8b93a3';
-const tooltipStyle = { background: '#0b1024', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, fontSize: 12 };
-const axisTick = { fill: '#94a3b8', fontSize: 10 };
 
 const GrainPicker: React.FC<{ grain: SeriesGrain; onChange: (g: SeriesGrain) => void; vi: boolean }> = ({ grain, onChange, vi }) => (
   <div className="flex gap-1" role="group" aria-label={vi ? 'Theo' : 'By'}>
     {(['day', 'week'] as SeriesGrain[]).map((g) => (
-      <button key={g} onClick={() => onChange(g)} aria-pressed={grain === g} className={`px-2 py-1 rounded-lg text-xs font-semibold border ${grain === g ? 'bg-white/15 border-white/30 text-white' : 'border-white/10 text-slate-400'}`}>
+      <button key={g} onClick={() => onChange(g)} aria-pressed={grain === g} className={`px-2 py-1 rounded-lg text-xs font-semibold border ${grain === g ? 'bg-primary-soft border-primary/30 text-primary' : 'border-line text-muted'}`}>
         {g === 'day' ? (vi ? 'Ngày' : 'Day') : vi ? 'Tuần' : 'Week'}
       </button>
     ))}
@@ -67,7 +65,7 @@ export const SubsidyPanel: React.FC = () => {
       ) : (
         <>
           {s.warnings.map((w) => (
-            <p key={w.vi} className="text-[11px] text-[#f08080] font-semibold leading-snug mb-2" role="alert">
+            <p key={w.vi} className="text-[11px] text-down font-semibold leading-snug mb-2" role="alert">
               ⚠ {w[lang]}
             </p>
           ))}
@@ -76,18 +74,18 @@ export const SubsidyPanel: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
               {/* Invalid days have no share: the line breaks there instead of dipping below zero. */}
               <LineChart data={s.points.map((p) => ({ label: bucketLabel(p.key, grain, vi), share: p.share }))}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" tick={axisTick} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
-                <YAxis tickFormatter={(v: number) => fmtRate(v, lang, 0)} tick={axisTick} width={40} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [fmtRate(v, lang), vi ? '% trợ giá' : 'Subsidy share']} />
-                <Line isAnimationActive={false} type="monotone" dataKey="share" stroke={BAR} strokeWidth={2} dot={grain === 'week'} connectNulls={false} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="label" tick={axisProps.tick} tickLine={false} minTickGap={16} axisLine={{ stroke: CHART.grid }} />
+                <YAxis tickFormatter={(v: number) => fmtRate(v, lang, 0)} tick={axisProps.tick} width={40} tickLine={false} axisLine={false} />
+                <Tooltip {...tooltipProps} formatter={(v: number) => [fmtRate(v, lang), vi ? '% trợ giá' : 'Subsidy share']} />
+                <Line isAnimationActive={false} type="monotone" dataKey="share" stroke={CHART.primary} strokeWidth={2} dot={grain === 'week'} connectNulls={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
           {grain === 'week' && (
-            <div className="overflow-x-auto rounded-xl border border-white/10 mt-2">
-              <table className="w-full text-xs">
-                <thead className="bg-white/[0.04] text-slate-400">
+            <div className={TABLE.frame}>
+              <table className={TABLE.table}>
+                <thead className={TABLE.thead}>
                   <tr>
                     <Th left>{vi ? 'Tuần bắt đầu' : 'Week of'}</Th>
                     <Th title={vi ? 'Cỡ mẫu' : 'Sample size'}>{vi ? 'Số ngày' : 'Days'}</Th>
@@ -99,13 +97,13 @@ export const SubsidyPanel: React.FC = () => {
                 </thead>
                 <tbody>
                   {s.points.map((p) => (
-                    <tr key={p.key} className="border-t border-white/5 text-slate-200">
-                      <td className="px-2.5 py-1.5">{fmtDay(p.key)}</td>
-                      <td className="px-2.5 py-1.5 text-right">{p.days}</td>
-                      <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(p.gmv, lang)}</td>
-                      <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(p.noSubsidyGmv, lang)}</td>
-                      <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(p.subsidy, lang)}</td>
-                      <td className="px-2.5 py-1.5 text-right">{fmtRate(p.share, lang)}</td>
+                    <tr key={p.key} className="h-11 border-t border-line hover:bg-hover text-fg">
+                      <td className="px-3">{fmtDay(p.key)}</td>
+                      <td className="px-3 text-right">{p.days}</td>
+                      <td className="px-3 text-right">{fmtMoneyCompact(p.gmv, lang)}</td>
+                      <td className="px-3 text-right">{fmtMoneyCompact(p.noSubsidyGmv, lang)}</td>
+                      <td className="px-3 text-right">{fmtMoneyCompact(p.subsidy, lang)}</td>
+                      <td className="px-3 text-right">{fmtRate(p.share, lang)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -144,9 +142,9 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
         <NotEnoughData lang={lang} reason={tr(lang, d.notes[0])} />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
-            <table className="w-full text-xs">
-              <thead className="bg-white/[0.04] text-slate-400">
+          <div className={TABLE.frame}>
+            <table className={TABLE.table}>
+              <thead className={TABLE.thead}>
                 <tr>
                   <Th left>{vi ? 'Kênh / nguồn' : 'Channel / source'}</Th>
                   <Th>{vi ? 'Trước (TB/ngày)' : 'Before (/day)'}</Th>
@@ -157,32 +155,32 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
               </thead>
               <tbody>
                 {channels.map((c) => (
-                  <tr key={c.channel} className="border-t border-white/5 text-slate-100 font-semibold">
-                    <td className="px-2.5 py-1.5">{tr(lang, SUMMARY_CHANNEL_LABELS[c.channel])}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(c.before, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(c.after, lang)}</td>
-                    <td className={`px-2.5 py-1.5 text-right ${c.delta < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`}>{signed(c.delta, lang)}</td>
-                    {showShare && <td className="px-2.5 py-1.5 text-right">{fmtRate(c.shareOfChange, lang, 0)}</td>}
+                  <tr key={c.channel} className="h-11 border-t border-line hover:bg-hover text-fg font-semibold">
+                    <td className="px-3">{tr(lang, SUMMARY_CHANNEL_LABELS[c.channel])}</td>
+                    <td className="px-3 text-right">{fmtMoneyCompact(c.before, lang)}</td>
+                    <td className="px-3 text-right">{fmtMoneyCompact(c.after, lang)}</td>
+                    <td className={`px-3 text-right ${c.delta < 0 ? 'text-down' : 'text-up'}`}>{signed(c.delta, lang)}</td>
+                    {showShare && <td className="px-3 text-right">{fmtRate(c.shareOfChange, lang, 0)}</td>}
                   </tr>
                 ))}
-                <tr className="border-t border-white/10 text-slate-400">
-                  <td colSpan={showShare ? 5 : 4} className="px-2.5 py-1 text-[11px]">{vi ? 'Nguồn thay đổi nhiều nhất (xếp theo độ lớn thay đổi)' : 'Largest source changes'}</td>
+                <tr className="h-11 border-t border-line hover:bg-hover text-muted">
+                  <td colSpan={showShare ? 5 : 4} className="px-3 text-[11px]">{vi ? 'Nguồn thay đổi nhiều nhất (xếp theo độ lớn thay đổi)' : 'Largest source changes'}</td>
                 </tr>
                 {top.map((s) => (
-                  <tr key={`${s.channel}|${s.source}`} className="border-t border-white/5 text-slate-300">
-                    <td className="px-2.5 py-1 pl-6">
-                      {s.source} <span className="text-slate-500">· {tr(lang, SUMMARY_CHANNEL_LABELS[s.channel]).split(' (')[0]}</span>
+                  <tr key={`${s.channel}|${s.source}`} className="h-11 border-t border-line hover:bg-hover text-fg">
+                    <td className="px-3 pl-6">
+                      {s.source} <span className="text-muted">· {tr(lang, SUMMARY_CHANNEL_LABELS[s.channel]).split(' (')[0]}</span>
                     </td>
-                    <td className="px-2.5 py-1 text-right">{fmtMoneyCompact(s.before, lang)}</td>
-                    <td className="px-2.5 py-1 text-right">{fmtMoneyCompact(s.after, lang)}</td>
-                    <td className={`px-2.5 py-1 text-right ${s.delta < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`}>{signed(s.delta, lang)}</td>
-                    {showShare && <td className="px-2.5 py-1 text-right">{fmtRate(s.shareOfChange, lang, 0)}</td>}
+                    <td className="px-3 text-right">{fmtMoneyCompact(s.before, lang)}</td>
+                    <td className="px-3 text-right">{fmtMoneyCompact(s.after, lang)}</td>
+                    <td className={`px-3 text-right ${s.delta < 0 ? 'text-down' : 'text-up'}`}>{signed(s.delta, lang)}</td>
+                    {showShare && <td className="px-3 text-right">{fmtRate(s.shareOfChange, lang, 0)}</td>}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">
+          <p className="text-[11px] text-muted mt-1">
             {vi
               ? `So sánh ${d.after.days} ngày với trung bình ${d.before.days} ngày.${showShare ? '' : ' Tổng doanh số thay đổi dưới 20% nên không chia tỷ trọng thay đổi.'}`
               : `${d.after.days} day(s) vs the average of ${d.before.days} days.`}
@@ -209,9 +207,9 @@ export const StageFunnelPanel: React.FC = () => {
         <NotEnoughData lang={lang} reason={tr(lang, f.notes[0])} />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
-            <table className="w-full text-xs">
-              <thead className="bg-white/[0.04] text-slate-400">
+          <div className={TABLE.frame}>
+            <table className={TABLE.table}>
+              <thead className={TABLE.thead}>
                 <tr>
                   <Th left>{vi ? 'Kênh / nguồn' : 'Channel / source'}</Th>
                   <Th>{vi ? 'Đặt' : 'Placed'}</Th>
@@ -229,19 +227,19 @@ export const StageFunnelPanel: React.FC = () => {
                   const row = (r: typeof c, sub: boolean) => (
                     <tr
                       key={`${r.channel}|${r.source ?? ''}`}
-                      className={`border-t border-white/5 ${sub ? 'text-slate-300 bg-white/[0.015]' : 'text-slate-100 font-semibold cursor-pointer hover:bg-white/[0.03]'}`}
+                      className={`h-11 border-t border-line hover:bg-hover ${sub ? 'text-fg bg-surface-2' : 'text-fg font-semibold cursor-pointer '}`}
                       onClick={sub ? undefined : () => setOpen(expanded ? null : c.channel)}
                       aria-expanded={sub ? undefined : expanded}
                     >
-                      <td className={`px-2.5 py-1.5 whitespace-nowrap ${sub ? 'pl-8' : ''}`}>{sub ? r.source : tr(lang, SUMMARY_CHANNEL_LABELS[r.channel])}</td>
-                      <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.placed.gmv, lang)} <span className="text-slate-500">· {fmtOrders(r.placed.orders, lang)}</span></td>
-                      <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.confirmed.gmv, lang)}</td>
-                      <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.paid.gmv, lang)} <span className="text-slate-500">· {fmtOrders(r.paid.orders, lang)}</span></td>
-                      <td className="px-2.5 py-1.5 whitespace-nowrap" title={r.paidRateGmv === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>
+                      <td className={`px-3 whitespace-nowrap ${sub ? 'pl-8' : ''}`}>{sub ? r.source : tr(lang, SUMMARY_CHANNEL_LABELS[r.channel])}</td>
+                      <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.placed.gmv, lang)} <span className="text-muted">· {fmtOrders(r.placed.orders, lang)}</span></td>
+                      <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.confirmed.gmv, lang)}</td>
+                      <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.paid.gmv, lang)} <span className="text-muted">· {fmtOrders(r.paid.orders, lang)}</span></td>
+                      <td className="px-3 whitespace-nowrap" title={r.paidRateGmv === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>
                         <div className="flex items-center justify-end gap-2">{fmtRate(r.paidRateGmv, lang)}<ShareBar share={r.paidRateGmv} /></div>
                       </td>
-                      <td className="px-2.5 py-1.5 text-right" title={r.paidRateOrders === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>{fmtRate(r.paidRateOrders, lang)}</td>
-                      <td className="px-2.5 py-1.5 text-right text-[#f08080]">{r.lostGmv === null ? '—' : fmtMoneyCompact(r.lostGmv, lang)}</td>
+                      <td className="px-3 text-right" title={r.paidRateOrders === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>{fmtRate(r.paidRateOrders, lang)}</td>
+                      <td className="px-3 text-right text-down">{r.lostGmv === null ? '—' : fmtMoneyCompact(r.lostGmv, lang)}</td>
                     </tr>
                   );
                   return (
@@ -275,9 +273,9 @@ export const ChannelWeekdayPanel: React.FC<{ channel: SummaryChannel }> = ({ cha
         <NotEnoughData lang={lang} title={vi ? 'Chưa đủ dữ liệu' : 'Not enough data yet'} reason={tr(lang, w.notes[0])} />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
-            <table className="w-full text-xs">
-              <thead className="bg-white/[0.04] text-slate-400">
+          <div className={TABLE.frame}>
+            <table className={TABLE.table}>
+              <thead className={TABLE.thead}>
                 <tr>
                   <Th left>{vi ? 'Thứ' : 'Weekday'}</Th>
                   <Th title={vi ? 'Cỡ mẫu' : 'Sample size'}>{vi ? 'Số ngày' : 'Days'}</Th>
@@ -289,17 +287,17 @@ export const ChannelWeekdayPanel: React.FC<{ channel: SummaryChannel }> = ({ cha
               </thead>
               <tbody>
                 {w.buckets.map((b) => (
-                  <tr key={b.weekday} className={`border-t border-white/5 ${b.insufficient ? 'text-slate-500' : 'text-slate-200'}`}>
-                    <td className="px-2.5 py-1.5">{tr(lang, b.label)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{b.days}</td>
+                  <tr key={b.weekday} className={`h-11 border-t border-line hover:bg-hover ${b.insufficient ? 'text-muted' : 'text-fg'}`}>
+                    <td className="px-3">{tr(lang, b.label)}</td>
+                    <td className="px-3 text-right">{b.days}</td>
                     {b.insufficient ? (
-                      <td colSpan={4} className="px-2.5 py-1.5 text-right italic">{vi ? 'Chưa đủ dữ liệu' : 'Not enough data'}</td>
+                      <td colSpan={4} className="px-3 text-right italic">{vi ? 'Chưa đủ dữ liệu' : 'Not enough data'}</td>
                     ) : (
                       <>
-                        <td className="px-2.5 py-1.5 text-right">{`${b.activeDays}/${b.days}`}</td>
-                        <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(b.gmv, lang)}</td>
-                        <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(b.gmvPerDay, lang)}</td>
-                        <td className="px-2.5 py-1.5 text-right">{fmtOrders(b.orders, lang)}</td>
+                        <td className="px-3 text-right">{`${b.activeDays}/${b.days}`}</td>
+                        <td className="px-3 text-right">{fmtMoneyCompact(b.gmv, lang)}</td>
+                        <td className="px-3 text-right">{fmtMoneyCompact(b.gmvPerDay, lang)}</td>
+                        <td className="px-3 text-right">{fmtOrders(b.orders, lang)}</td>
                       </>
                     )}
                   </tr>
@@ -332,7 +330,7 @@ export const CustomerTrendPanel: React.FC = () => {
       ) : (
         <>
           {!pt && (
-            <p className="text-[11px] text-slate-400 mb-2">
+            <p className="text-[11px] text-muted mb-2">
               {vi
                 ? 'Tỉ lệ quay lại: Không tính được — chỉ Shopee có số này (dòng tổng cả kỳ, công thức không công khai). Chọn trọn kỳ báo cáo để xem.'
                 : 'Repeat rate: cannot be computed — only the Shopee period row has it. Select the whole report period.'}
@@ -355,9 +353,9 @@ export const CustomerTrendPanel: React.FC = () => {
                   tip: vi ? 'Số của Shopee ở dòng tổng cả kỳ. Công thức không công khai (khách cũ ÷ người mua ra số khác), nên không tự tính và không tính được cho một phần kỳ.' : "Shopee's own period figure; its formula is not published, so it is not recomputed.",
                 },
               ].map((x) => (
-                <div key={x.l} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2" title={'tip' in x ? x.tip : undefined}>
-                  <div className="text-[11px] text-slate-400">{x.l}{'tip' in x && <span className="ml-1 text-slate-500" aria-hidden>ⓘ</span>}</div>
-                  <div className="text-base font-bold text-white">{x.v}</div>
+                <div key={x.l} className="rounded-xl border border-line bg-surface-2 px-3 py-2" title={'tip' in x ? x.tip : undefined}>
+                  <div className="text-[11px] text-muted">{x.l}{'tip' in x && <span className="ml-1 text-muted" aria-hidden>ⓘ</span>}</div>
+                  <div className="text-base font-bold text-fg">{x.v}</div>
                 </div>
               ))}
             </div>
@@ -365,13 +363,13 @@ export const CustomerTrendPanel: React.FC = () => {
           <div className="h-52" role="img" aria-label={vi ? 'Người mua mới và hiện tại theo thời gian' : 'New and existing buyers over time'}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={t.points.map((p) => ({ label: bucketLabel(p.key, grain, vi), newBuyers: p.newBuyers, existingBuyers: p.existingBuyers }))} barCategoryGap={2}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" tick={axisTick} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
-                <YAxis tick={axisTick} width={32} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [fmtCount(v, lang), `${n === 'newBuyers' ? (vi ? 'Mới' : 'New') : vi ? 'Hiện tại' : 'Existing'}${summed}`]} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="label" tick={axisProps.tick} tickLine={false} minTickGap={16} axisLine={{ stroke: CHART.grid }} />
+                <YAxis tick={axisProps.tick} width={32} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip {...tooltipProps} formatter={(v: number, n: string) => [fmtCount(v, lang), `${n === 'newBuyers' ? (vi ? 'Mới' : 'New') : vi ? 'Hiện tại' : 'Existing'}${summed}`]} />
                 <Legend formatter={(n: string) => `${n === 'newBuyers' ? (vi ? 'Người mua mới' : 'New') : vi ? 'Người mua hiện tại' : 'Existing'}${summed}`} wrapperStyle={{ fontSize: 11 }} />
-                <Bar isAnimationActive={false} dataKey="newBuyers" stackId="b" fill={BAR} maxBarSize={20} />
-                <Bar isAnimationActive={false} dataKey="existingBuyers" stackId="b" fill={SECOND} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <Bar isAnimationActive={false} dataKey="newBuyers" stackId="b" fill={CHART.primary} maxBarSize={20} />
+                <Bar isAnimationActive={false} dataKey="existingBuyers" stackId="b" fill={CHART.muted} radius={[4, 4, 0, 0]} maxBarSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>
