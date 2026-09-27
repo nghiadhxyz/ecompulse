@@ -68,7 +68,7 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
   const content = (() => {
     if (loading) {
       return (
-        <div className="glass-panel rounded-2xl p-10 text-center text-sm text-slate-300" aria-live="polite">
+        <div className="bg-surface border border-line shadow-card rounded-2xl p-10 text-center text-sm text-fg" aria-live="polite">
           <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" aria-hidden />
           {vi ? 'Đang tải dữ liệu đã lưu trên máy…' : 'Loading saved data…'}
         </div>
@@ -77,9 +77,9 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
     if (view === 'data' || !dataset) {
       if (view !== 'data' && view !== 'settings') {
         return (
-          <div className="glass-panel rounded-2xl p-6 sm:p-10 text-center">
-            <h2 className="text-lg sm:text-xl font-black text-white">{vi ? 'Bắt đầu với dữ liệu của shop' : 'Start with your shop data'}</h2>
-            <p className="text-sm text-slate-400 mt-1.5 max-w-lg mx-auto">
+          <div className="bg-surface border border-line shadow-card rounded-2xl p-6 sm:p-10 text-center">
+            <h2 className="text-lg sm:text-xl font-black text-fg">{vi ? 'Bắt đầu với dữ liệu của shop' : 'Start with your shop data'}</h2>
+            <p className="text-sm text-muted mt-1.5 max-w-lg mx-auto">
               {vi
                 ? 'Nhập file xuất đơn hàng từ Shopee, TikTok Shop hoặc Lazada. File được xử lý ngay trên máy của bạn.'
                 : 'Import order exports from Shopee, TikTok Shop or Lazada. Files are processed on your device.'}
@@ -144,9 +144,9 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
       <SellerProvider value={ctx}>
         <div className="space-y-4">
           {ws.sourceKind === 'demo' && (
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-sky-200 rounded-xl border border-sky-400/20 bg-sky-500/[0.06] px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-control bg-info-soft px-3 py-2 text-sm text-info">
               <span>{vi ? 'Bạn đang xem dữ liệu demo của một shop mẫu (01/07–30/09/2025).' : 'You are viewing demo data of a sample shop (01/07–30/09/2025).'}</span>
-              <button onClick={ws.exitDemo} className="font-bold underline underline-offset-2 hover:text-white">
+              <button type="button" onClick={ws.exitDemo} className="inline-flex min-h-10 items-center font-semibold underline underline-offset-2">
                 {ws.hasImported ? (vi ? 'Quay lại dữ liệu của tôi' : 'Back to my data') : vi ? 'Thoát demo' : 'Exit demo'}
               </button>
             </div>
@@ -184,15 +184,15 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
   }
 
   return (
-    <div className="pb-20 md:pb-0">
+    <div className="mx-auto w-full max-w-[1440px] pb-20 md:pb-0">
       {/* Desktop / tablet navigation */}
-      <nav className="hidden md:flex gap-1 overflow-x-auto mb-4 p-1 rounded-2xl bg-white/[0.03] border border-white/10" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
+      <nav className="mb-4 hidden gap-1 overflow-x-auto rounded-card border border-line bg-surface p-1.5 shadow-card md:flex" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
         {NAV.map((n) => (
           <button
             key={n.key}
             onClick={() => setView(n.key)}
             aria-current={view === n.key ? 'page' : undefined}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold whitespace-nowrap ${view === n.key ? 'bg-sky-600 text-white' : 'text-slate-300 hover:bg-white/[0.06]'}`}
+            className={`flex min-h-10 items-center gap-2 rounded-control px-3.5 text-sm font-medium whitespace-nowrap ${view === n.key ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-hover hover:text-fg'}`}
           >
             <n.icon className="w-4 h-4" aria-hidden /> {vi ? n.vi : n.en}
           </button>
@@ -202,13 +202,13 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
       {content ?? analytics}
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#070a18]/95 backdrop-blur border-t border-white/10 grid grid-cols-7" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-line grid grid-cols-7" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
         {NAV.map((n) => (
           <button
             key={n.key}
             onClick={() => setView(n.key)}
             aria-current={view === n.key ? 'page' : undefined}
-            className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${view === n.key ? 'text-sky-300' : 'text-slate-400'}`}
+            className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${view === n.key ? 'text-primary' : 'text-muted'}`}
           >
             <n.icon className="w-5 h-5" aria-hidden />
             <span className="truncate max-w-full px-0.5">{vi ? n.short : n.en}</span>

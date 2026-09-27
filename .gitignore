@@ -10,3 +10,7 @@ coverage/
 
 # Real sample exports (may contain customer data) — never commit
 samples/
+
+# Redesign screenshots (before/after) stay local — only the README is committed
+docs/redesign/*
+!docs/redesign/README.md

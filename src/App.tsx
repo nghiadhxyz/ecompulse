@@ -10,6 +10,7 @@ import { ArrowLeft } from 'lucide-react';
 import { WorkspaceModeSelector } from './components/onboarding/WorkspaceModeSelector';
 import { getSavedWorkspaceMode, saveWorkspaceMode, WorkspaceMode } from './utils/workspacePreferences';
 import { canonicalFromParsedStoreData } from './analytics';
+import { useTheme } from './theme/useTheme';
 // Workspaces and the classic dashboards load on demand to keep the initial bundle small.
 const SellerWorkspace = lazy(() => import('./components/seller/SellerWorkspace').then((m) => ({ default: m.SellerWorkspace })));
 const InternalFinanceModule = lazy(() => import('./components/internal-finance/InternalFinanceModule').then((m) => ({ default: m.InternalFinanceModule })));
@@ -35,6 +36,9 @@ export default function App() {
   // Analyst Mode opens the new workspace; the classic dashboard stays one click away.
   const [analystClassic, setAnalystClassic] = useState<boolean>(false);
   const analystMode = analysisTrack === 'marketplace' && workspaceMode === 'analyst' && !analystClassic;
+  // Seller / Analyst workspace: light by default, dark as an option. Landing and classic stay as they were.
+  const workspaceShell = sellerMode || analystMode;
+  const [theme, setTheme] = useTheme();
 
   // One canonical dataset per loaded file; every analytics view reads from it.
   const canonicalData = useMemo(
@@ -90,7 +94,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070a18] text-slate-100 antialiased flex flex-col selection:bg-purple-500 selection:text-white">
+    <div
+      data-theme={workspaceShell ? theme : undefined}
+      className={workspaceShell ? 'ep-app min-h-screen antialiased flex flex-col' : 'min-h-screen bg-[#070a18] text-slate-100 antialiased flex flex-col selection:bg-purple-500 selection:text-white'}
+    >
       {/* Navigation Header only shown when not on top landing portal */}
       {analysisTrack !== 'portal' && (
         <Header
@@ -111,11 +118,13 @@ export default function App() {
           workspaceMode={workspaceMode}
           onOpenWorkspaceMode={() => setIsModeSelectorOpen(true)}
           hideDataControls={sellerMode || analystMode}
+          theme={workspaceShell ? theme : undefined}
+          onToggleTheme={workspaceShell ? () => setTheme(theme === 'light' ? 'dark' : 'light') : undefined}
         />
       )}
 
       {/* Main Content View Container */}
-      <main className={`flex-1 w-full mx-auto ${analysisTrack === 'portal' ? 'px-0 pt-0 pb-0' : 'max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-12'}`}>
+      <main className={`flex-1 w-full mx-auto ${analysisTrack === 'portal' ? 'px-0 pt-0 pb-0' : workspaceShell ? 'px-4 lg:px-6 pt-4 pb-12' : 'max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-12'}`}>
         {/* =========================================================================
             TRACK 0: TOP-LEVEL LANDING PAGE & TRACK SELECTION PORTAL
         ========================================================================= */}

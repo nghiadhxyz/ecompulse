@@ -14,9 +14,9 @@ export const MismatchBox: React.FC<{ items: MismatchItem[]; lang: Lang; note?: s
   const vi = lang === 'vi';
   const shown = all ? items : items.slice(0, TOP);
   return (
-    <div className="mt-2 rounded-xl border border-[#d03b3b]/45 bg-[#d03b3b]/[0.08] px-3 py-2 text-[11px] text-[#fca5a5]" role="alert">
-      <div className="flex items-center gap-1.5 font-bold text-[#f08080]">
-        <AlertOctagon className="w-3.5 h-3.5" aria-hidden />
+    <div className="mt-3 rounded-control bg-mismatch-soft px-3 py-2.5 text-small text-mismatch" role="alert">
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-mismatch">
+        <AlertOctagon className="h-4 w-4" aria-hidden />
         {MISMATCH_TITLE[lang]} ({items.length})
       </div>
       <ul className="mt-1 space-y-0.5">
@@ -24,10 +24,10 @@ export const MismatchBox: React.FC<{ items: MismatchItem[]; lang: Lang; note?: s
           <li key={m.key}>• {describeMismatch(m)[lang]}</li>
         ))}
       </ul>
-      <div className="mt-1 flex flex-wrap items-center gap-2 text-slate-400">
+      <div className="mt-1 flex flex-wrap items-center gap-2 text-note">
         {note && <span>{note}</span>}
         {items.length > TOP && (
-          <button onClick={() => setAll(!all)} className="text-sky-300 underline underline-offset-2">
+          <button type="button" onClick={() => setAll(!all)} className="inline-flex min-h-10 items-center font-semibold text-primary hover:underline">
             {all ? (vi ? 'Thu gọn' : 'Show less') : vi ? `Xem tất cả ${items.length}` : `Show all ${items.length}`}
           </button>
         )}
@@ -40,7 +40,7 @@ export const MismatchBox: React.FC<{ items: MismatchItem[]; lang: Lang; note?: s
 export const ChartTotalNote: React.FC<{ chartTotal: number | null; kpi: number | null; lang: Lang; tolerance: number }> = ({ chartTotal, kpi, lang, tolerance }) => {
   if (chartTotal === null || kpi === null || Math.abs(chartTotal - kpi) <= tolerance) return null;
   return (
-    <p className="text-[11px] font-semibold text-[#f08080] mt-1.5">
+    <p className="mt-2 inline-flex rounded-control bg-mismatch-soft px-2.5 py-1 text-small text-mismatch">
       {lang === 'vi'
         ? `Tổng biểu đồ ${fmtMoneyCompact(chartTotal, lang)} ≠ KPI ${fmtMoneyCompact(kpi, lang)} — dữ liệu không khớp: biểu đồ cộng các ngày, thẻ KPI dùng dòng tổng cả kỳ.`
         : `Chart total ${fmtMoneyCompact(chartTotal, lang)} ≠ KPI ${fmtMoneyCompact(kpi, lang)} — the chart adds the days, the card uses the period row.`}

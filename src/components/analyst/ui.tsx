@@ -1,25 +1,25 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
-import { fmtChange, fmtCount, fmtMoneyCompact, fmtPp, fmtRate, type BreakdownRow, type Comparison, type Lang, fmtPortion, fmtShare, MIN_RATE_ORDERS, SMALL_RATE_NOTE } from '../../analytics';
+import { fmtCount, fmtMoneyCompact, fmtPp, fmtRate, type BreakdownRow, type Comparison, type Lang, fmtPortion, fmtShare, MIN_RATE_ORDERS, SMALL_RATE_NOTE } from '../../analytics';
+import { TABLE, Th, ShareBar } from '../ui/data';
 
-/** Relative change for amounts, percentage points for rates. `goodWhenUp=false` flips colors. */
+export { Th, ShareBar };
+
+/** Table change cell: ↑/↓ always shown with the colour; % for amounts, pp for rates. */
 export const ChangeCell: React.FC<{ c: Comparison; rate?: boolean; goodWhenUp?: boolean; lang: Lang }> = ({ c, rate, goodWhenUp = true, lang }) => {
-  if (c.direction === 'unknown' || c.absoluteDelta === null) return <span className="text-slate-600">—</span>;
-  if (!rate && c.percentageDelta === null) return <span className="text-slate-400">{lang === 'vi' ? 'mới' : 'new'}</span>;
-  const good = c.direction === 'flat' ? null : (c.direction === 'up') === goodWhenUp;
-  const color = good === null ? 'text-slate-400' : good ? 'text-[#4ade80]' : 'text-[#f08080]';
-  return <span className={color}>{rate ? fmtPp(c.percentagePointDelta ?? null, lang) : fmtChange(c.percentageDelta, lang)}</span>;
+  if (c.direction === 'unknown' || c.absoluteDelta === null) return <span className="text-muted">—</span>;
+  if (!rate && c.percentageDelta === null) return <span className="text-muted">{lang === 'vi' ? 'mới' : 'new'}</span>;
+  const flat = c.direction === 'flat';
+  const good = flat ? null : (c.direction === 'up') === goodWhenUp;
+  const color = good === null ? 'text-muted' : good ? 'text-up' : 'text-down';
+  const arrow = flat ? '→' : c.direction === 'up' ? '↑' : '↓';
+  const value = rate ? fmtPp(c.percentagePointDelta ?? null, lang).replace(/^[+−-]/, '') : fmtRate(Math.abs(c.percentageDelta ?? 0), lang);
+  return (
+    <span className={`font-medium tabular ${color}`}>
+      <span aria-hidden>{arrow}</span> {value}
+    </span>
+  );
 };
-
-export const ShareBar: React.FC<{ share: number | null }> = ({ share }) => (
-  <span className="inline-block w-14 h-1.5 rounded-full bg-white/[0.07] align-middle ml-1.5" aria-hidden>
-    <span className="block h-1.5 rounded-full bg-[#3987e5]" style={{ width: `${Math.max(0, Math.min(1, share ?? 0)) * 100}%` }} />
-  </span>
-);
-
-export const Th: React.FC<{ children: React.ReactNode; left?: boolean; title?: string }> = ({ children, left, title }) => (
-  <th title={title} className={`font-semibold px-2.5 py-2 whitespace-nowrap ${left ? 'text-left' : 'text-right'}`}>{children}</th>
-);
 
 export type BreakdownColumn = 'gmv' | 'share' | 'gmvChange' | 'contribution' | 'orders' | 'units' | 'clicks' | 'cvr' | 'aov' | 'cancel' | 'refund' | 'net' | 'profit' | 'margin' | 'profitChange';
 
@@ -56,7 +56,7 @@ function cell(row: BreakdownRow, col: BreakdownColumn, lang: Lang): React.ReactN
     case 'gmvChange':
       return <ChangeCell c={row.change.gmv} lang={lang} />;
     case 'contribution':
-      return row.gmvContribution === null ? <span className="text-slate-600">—</span> : <span className={row.gmvContribution < 0 ? 'text-[#f08080]' : 'text-slate-200'}>{fmtRate(row.gmvContribution, lang, 0)}</span>;
+      return row.gmvContribution === null ? <span className="text-muted">—</span> : <span className={row.gmvContribution < 0 ? 'text-down' : 'text-fg'}>{fmtRate(row.gmvContribution, lang, 0)}</span>;
     case 'orders':
       return fmtCount(c.placed, lang);
     case 'units':
@@ -77,7 +77,7 @@ function cell(row: BreakdownRow, col: BreakdownColumn, lang: Lang): React.ReactN
       const small = c.placed < MIN_RATE_ORDERS;
       const rate = col === 'cancel' ? c.cancelRate : c.refundRate;
       return (
-        <span className={small ? 'text-slate-500' : ''} title={small ? SMALL_RATE_NOTE[lang] : undefined}>
+        <span className={small ? 'text-muted' : ''} title={small ? SMALL_RATE_NOTE[lang] : undefined}>
           {fmtRate(rate, lang)}{' '}
           {!small && row.previous && (
             <span className="text-[10px]">
@@ -91,11 +91,11 @@ function cell(row: BreakdownRow, col: BreakdownColumn, lang: Lang): React.ReactN
       return fmtMoneyCompact(c.netRevenue, lang);
     case 'profit':
       return c.profit === null ? (
-        <span className="text-slate-500" title={c.profitDetail?.warnings[0]?.[lang]}>{lang === 'vi' ? 'Thiếu giá vốn' : 'No COGS'}</span>
+        <span className="text-muted" title={c.profitDetail?.warnings[0]?.[lang]}>{lang === 'vi' ? 'Thiếu giá vốn' : 'No COGS'}</span>
       ) : (
-        <span className={c.profit < 0 ? 'text-[#f08080] font-semibold' : 'font-semibold'}>
+        <span className={c.profit < 0 ? 'text-down font-semibold' : 'font-semibold'}>
           {fmtMoneyCompact(c.profit, lang)}
-          {!c.profitComplete && <span className="text-[#fab219]" title={c.profitDetail?.warnings.map((w) => w[lang]).join('\n')}>*</span>}
+          {!c.profitComplete && <span className="text-warn" title={c.profitDetail?.warnings.map((w) => w[lang]).join('\n')}>*</span>}
         </span>
       );
     case 'margin':
@@ -115,45 +115,45 @@ export const BreakdownTable: React.FC<{
   sublabel?: (row: BreakdownRow) => string | undefined;
 }> = ({ rows, columns: requested, lang, firstHeader, onRowClick, rowAction, sublabel }) => {
   const vi = lang === 'vi';
-  if (rows.length === 0) return <p className="text-sm text-slate-400">{vi ? 'Không có dòng nào trong khoảng này.' : 'No rows in this range.'}</p>;
+  if (rows.length === 0) return <p className="text-sm text-muted">{vi ? 'Không có dòng nào trong khoảng này.' : 'No rows in this range.'}</p>;
   // No comparison period → no Δ columns. No COGS → no profit columns, one note instead.
   const hasPrevious = rows.some((r) => r.previous !== null);
   const hasProfit = rows.some((r) => r.current.profit !== null);
   const columns = requested.filter((c) => (hasPrevious || !DELTA_COLUMNS.includes(c)) && (hasProfit || !PROFIT_COLUMNS.includes(c)));
   return (
   <>
-  <div className="overflow-x-auto rounded-xl border border-white/10">
-    <table className="w-full text-xs">
-      <thead className="bg-white/[0.04] text-slate-400">
+  <div className={TABLE.frame}>
+    <table className={TABLE.table}>
+      <thead className={TABLE.thead}>
         <tr>
-          <Th left>{firstHeader}</Th>
+          <Th left className="sticky left-0 z-20 bg-surface-2">{firstHeader}</Th>
           {columns.map((c) => (
             <Th key={c} title={HEAD[c].title}>{HEAD[c][lang]}</Th>
           ))}
-          {rowAction && <th className="px-2.5 py-2" />}
+          {rowAction && <th className={TABLE.th} />}
         </tr>
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.key} className={`border-t border-white/5 text-slate-200 ${onRowClick ? 'hover:bg-white/[0.04] cursor-pointer' : ''}`} onClick={onRowClick ? () => onRowClick(r) : undefined}>
-            <td className="px-2.5 py-2 max-w-[280px]">
+          <tr key={r.key} className={`${TABLE.tr} text-fg ${onRowClick ? 'cursor-pointer' : ''}`} onClick={onRowClick ? () => onRowClick(r) : undefined}>
+            <td className="sticky left-0 z-10 max-w-[280px] bg-surface px-3 py-1.5" title={r.label}>
               <div className="flex items-center gap-1">
-                <span className="font-semibold text-white truncate">{r.label}</span>
-                {onRowClick && <ChevronRight className="w-3 h-3 text-slate-500 shrink-0" aria-hidden />}
+                <span className="truncate font-medium text-fg">{r.label}</span>
+                {onRowClick && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />}
               </div>
-              {sublabel?.(r) && <div className="text-[11px] text-slate-500 truncate">{sublabel(r)}</div>}
+              {sublabel?.(r) && <div className="truncate text-small text-muted">{sublabel(r)}</div>}
             </td>
             {columns.map((c) => (
-              <td key={c} className="px-2.5 py-2 text-right whitespace-nowrap">{cell(r, c, lang)}</td>
+              <td key={c} className={`${TABLE.td} text-right`}>{cell(r, c, lang)}</td>
             ))}
-            {rowAction && <td className="px-2.5 py-2 text-right" onClick={(e) => e.stopPropagation()}>{rowAction(r)}</td>}
+            {rowAction && <td className={`${TABLE.td} text-right`} onClick={(e) => e.stopPropagation()}>{rowAction(r)}</td>}
           </tr>
         ))}
       </tbody>
     </table>
   </div>
   {!hasProfit && requested.some((c) => PROFIT_COLUMNS.includes(c)) && (
-    <p className="text-[11px] text-slate-500 mt-1.5">{vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận và margin.' : 'No COGS yet, so no profit or margin.'}</p>
+    <p className="mt-2 text-small text-muted">{vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận và margin.' : 'No COGS yet, so no profit or margin.'}</p>
   )}
   </>
   );
