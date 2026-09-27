@@ -211,6 +211,8 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
       openEvidence: setEvidence,
       goTo,
       focus,
+      settings: ws.costSettings,
+      updateSettings: ws.updateSettings,
     };
     const showFilters = ANALYTICS_VIEWS.includes(view) && view !== 'alerts' && view !== 'mapping' && view !== 'dataQuality' && view !== 'changeImpact' && view !== 'actions';
     return (

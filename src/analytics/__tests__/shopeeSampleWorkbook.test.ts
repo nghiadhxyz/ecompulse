@@ -26,7 +26,7 @@ import { dailySeries } from '../timeseries';
 import { describeMismatch, type MismatchItem } from '../mismatch';
 import { fmtPerViewer, fmtShare } from '../format';
 import { anomalyScan } from '../anomalyScan';
-import { calendarPerformance } from '../campaignEngine';
+import { calendarPerformance, campaignResult } from '../campaignEngine';
 import { advancedStats } from '../statsEngine';
 import { customerTrend, stageFunnel } from '../summaryInsights';
 import { orderHealth, stageCancellations } from '../orderHealthEngine';
@@ -433,5 +433,22 @@ describe('Part 4 — traffic & funnel', () => {
     const f = liveFunnel(ds, { start: '2026-08-01', end: '2026-08-01' });
     expect(f.stages.addToCart).toBe(2);
     expect(f.labels?.impressions?.vi).toBe('Người xem');
+  });
+});
+
+describe('Part 5 — campaign & calendar', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('suggests 25/07 and 08/08; confirming 25/07 moves the 8.8 baseline', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const perf = calendarPerformance(ds, { range });
+    expect(perf.showByDayOfMonth).toBe(false);
+    const dates = perf.suggestedSaleDays.map((s) => s.date);
+    expect(dates).toEqual(expect.arrayContaining(['2026-07-25', '2026-08-08']));
+    expect(perf.suggestedSaleDays.find((s) => s.date === '2026-07-25')!.reasons[0].vi).toContain('MEGA LIVE 25.7');
+    const d88 = { campaignId: 'AUTO-2026-08-08', name: '8.8', type: 'double_day' as const, range: { start: '2026-08-08', end: '2026-08-08' }, auto: true };
+    expect(Math.round(campaignResult(ds, d88).uplift! * 1000) / 10).toBe(192.5);
+    const confirmed = withCostSettings(ds, { confirmedSaleDays: ['2026-07-25'] });
+    expect(Math.round(campaignResult(confirmed, d88).uplift! * 100)).toBe(243);
+    expect(calendarPerformance(confirmed, { range }).suggestedSaleDays.map((s) => s.date)).not.toContain('2026-07-25');
   });
 });

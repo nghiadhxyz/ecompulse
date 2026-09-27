@@ -137,6 +137,8 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
       openEvidence: setEvidence,
       goTo: (v: WorkspaceView) => SELLER_VIEWS.includes(v as SellerView) && setView(v as SellerView),
       focus: null,
+      settings: costSettings,
+      updateSettings: ws.updateSettings,
     };
     analytics = (
       <SellerProvider value={ctx}>

@@ -373,6 +373,8 @@ export interface CostSettings {
    */
   estimatedGrossMargin?: number;
   estimatedFeeRate?: number;
+  /** Sale / campaign days the user confirmed or entered by hand (ISO dates). */
+  confirmedSaleDays?: string[];
 }
 
 export interface DatasetSource {

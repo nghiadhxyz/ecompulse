@@ -52,8 +52,19 @@ export interface CalendarEntry {
   auto: boolean;
 }
 
-/** Campaigns from the dataset, or auto-recognised double days when none are defined. */
+/**
+ * Campaigns from the dataset plus the sale days the user confirmed (Settings / Campaign page);
+ * when the dataset defines no campaign, double days are recognised automatically.
+ */
 export function campaignCalendar(dataset: CanonicalDataset, within?: DateRange): CalendarEntry[] {
+  const confirmed: CalendarEntry[] = (dataset.costSettings?.confirmedSaleDays ?? []).map((d) => ({
+    campaignId: `CONFIRMED-${d}`,
+    name: `${Number(d.slice(8, 10))}.${Number(d.slice(5, 7))}`,
+    type: 'mega_sale' as CampaignType,
+    range: { start: d, end: d },
+    auto: false,
+  }));
+  const overlaps = (c: CalendarEntry) => !within || (c.range.end >= within.start && c.range.start <= within.end);
   const defined: CalendarEntry[] = dataset.campaigns.map((c) => ({
     campaignId: c.campaignId,
     name: c.name,
@@ -61,7 +72,15 @@ export function campaignCalendar(dataset: CanonicalDataset, within?: DateRange):
     range: { start: c.startDate, end: c.endDate },
     auto: false,
   }));
-  if (defined.length > 0) return defined.filter((c) => !within || (c.range.end >= within.start && c.range.start <= within.end));
+  if (defined.length > 0) return [...defined, ...confirmed].filter(overlaps);
+  if (confirmed.length > 0) {
+    const autoDays = autoDoubleDays(dataset, within).filter((a) => !confirmed.some((c) => c.range.start === a.range.start));
+    return [...confirmed.filter(overlaps), ...autoDays];
+  }
+  return autoDoubleDays(dataset, within);
+}
+
+function autoDoubleDays(dataset: CanonicalDataset, within?: DateRange): CalendarEntry[] {
   const bounds = within ?? dataRange(dataset);
   if (!bounds) return [];
   return enumerateDays(bounds)
@@ -149,6 +168,10 @@ export interface CalendarPerformance {
   /** Normal days only (sale days excluded) so a mega sale does not skew a weekday. */
   byWeekday: BucketStats[];
   byDayOfMonth: (BucketStats & { saleDays: number })[];
+  /** False with less than 2 months of data: a day of the month is seen only once. */
+  showByDayOfMonth: boolean;
+  /** Days that look like sale days and are not in the calendar yet (5.4). */
+  suggestedSaleDays: SaleDaySuggestion[];
   saleVsNormal: { sale: BucketStats; normal: BucketStats; uplift: number | null };
   warnings: Bilingual[];
 }
@@ -176,6 +199,8 @@ export function calendarPerformance(dataset: CanonicalDataset, requested: Datase
     const ds = days.filter((d) => Number(d.slice(8, 10)) === dom);
     return { ...bucket(String(dom), { vi: `Ngày ${dom}`, en: `Day ${dom}` }, ds, facts), saleDays: ds.filter((d) => !['weekday', 'weekend'].includes(typeOf.get(d)!)).length };
   }).filter((b) => b.days > 0);
+  // Day-of-month patterns need each day of the month seen at least twice (5.3).
+  const showByDayOfMonth = days.length >= MIN_DAYS_FOR_DAY_OF_MONTH;
 
   const saleDays = days.filter((d) => !normalDays.includes(d));
   const sale = bucket('sale', { vi: 'Ngày sale / chiến dịch', en: 'Sale days' }, saleDays, facts);
@@ -209,9 +234,61 @@ export function calendarPerformance(dataset: CanonicalDataset, requested: Datase
     byDayType,
     byWeekday,
     byDayOfMonth,
+    showByDayOfMonth,
+    suggestedSaleDays: suggestSaleDays(dataset, range, calendar, facts),
     saleVsNormal: { sale, normal, uplift: sale.gmvPerDay !== null && normal.gmvPerDay ? sale.gmvPerDay / normal.gmvPerDay - 1 : null },
     warnings,
   };
+}
+
+export const MIN_DAYS_FOR_DAY_OF_MONTH = 56;
+/** Sales at least this many times the median day look like a sale day. */
+export const SALE_DAY_MULTIPLE = 2.5;
+
+export interface SaleDaySuggestion {
+  date: string;
+  reasons: Bilingual[];
+  /** Already a double day in the automatic calendar (shown for confirmation). */
+  autoDoubleDay: boolean;
+}
+
+/**
+ * Days that look like sales and are not confirmed yet: a campaign date in a live-session title
+ * ("MEGA LIVE 25.7" → 25/07), or placed sales ≥ 2,5 × the median day of the range.
+ * Suggestions only — the user confirms them or enters the calendar by hand.
+ */
+export function suggestSaleDays(dataset: CanonicalDataset, range: DateRange, calendar: CalendarEntry[], facts: Map<string, DayFacts>): SaleDaySuggestion[] {
+  const confirmed = new Set(calendar.filter((c) => !c.auto).flatMap((c) => enumerateDays(c.range)));
+  const auto = new Set(calendar.filter((c) => c.auto).map((c) => c.range.start));
+  const out = new Map<string, SaleDaySuggestion>();
+  const add = (date: string, reason: Bilingual) => {
+    if (!isInRange(date, range) || confirmed.has(date)) return;
+    const s = out.get(date) ?? { date, reasons: [], autoDoubleDay: auto.has(date) };
+    s.reasons.push(reason);
+    out.set(date, s);
+  };
+  for (const s of dataset.liveSessions) {
+    const m = s.title?.match(/(?:^|[^\d])(\d{1,2})[./](\d{1,2})(?![\d./])/);
+    if (!m) continue;
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    if (day < 1 || day > 31 || month < 1 || month > 12) continue;
+    // The year of the session's period (sessions are period rows in summary reports).
+    const years = new Set([(s.periodStart ?? s.date).slice(0, 4), s.date.slice(0, 4)]);
+    for (const y of years) add(`${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`, { vi: `Tên phiên live "${s.title}"`, en: `Live title "${s.title}"` });
+  }
+  const gmvs = enumerateDays(range).map((d) => facts.get(d)?.gmv ?? 0).sort((a, b) => a - b);
+  const median = gmvs.length ? (gmvs.length % 2 ? gmvs[(gmvs.length - 1) / 2] : (gmvs[gmvs.length / 2 - 1] + gmvs[gmvs.length / 2]) / 2) : 0;
+  if (median > 0) {
+    for (const d of enumerateDays(range)) {
+      const g = facts.get(d)?.gmv ?? 0;
+      if (g >= SALE_DAY_MULTIPLE * median) {
+        const x = (g / median).toFixed(1).replace('.', ',');
+        add(d, { vi: `Doanh số đơn đặt gấp ${x} lần ngày trung vị`, en: `Placed sales ${(g / median).toFixed(1)}× the median day` });
+      }
+    }
+  }
+  return [...out.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface CampaignResult {
