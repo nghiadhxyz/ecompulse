@@ -113,10 +113,21 @@ const cogsCache = new WeakMap<CanonicalDataset, Map<string, number>>();
 function catalogCogs(dataset: CanonicalDataset): Map<string, number> {
   let map = cogsCache.get(dataset);
   if (!map) {
+    // Match on SKU ("SKU sản phẩm"), falling back to the product ID ("Mã sản phẩm").
     map = new Map();
+    const byProductId = new Map<string, number>();
     for (const p of dataset.products) {
-      if (typeof p.unitCogs === 'number' && Number.isFinite(p.unitCogs)) map.set(p.sku, p.unitCogs);
+      if (typeof p.unitCogs !== 'number' || !Number.isFinite(p.unitCogs)) continue;
+      map.set(p.sku, p.unitCogs);
+      if (p.productId) byProductId.set(p.productId, p.unitCogs);
     }
+    for (const p of dataset.products) {
+      if (map.has(p.sku)) continue;
+      // An order line keyed by product ID, or an order SKU the catalog lists under another SKU.
+      const viaId = byProductId.get(p.sku) ?? (p.productId ? byProductId.get(p.productId) : undefined);
+      if (viaId !== undefined) map.set(p.sku, viaId);
+    }
+    for (const [id, cogs] of byProductId) if (!map.has(id)) map.set(id, cogs);
     cogsCache.set(dataset, map);
   }
   return map;

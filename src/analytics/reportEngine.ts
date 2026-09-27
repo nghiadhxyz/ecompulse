@@ -55,7 +55,7 @@ export function cellText(c: Cell, lang: 'vi' | 'en' = 'vi'): string {
 }
 
 const KPI_ROWS: { key: KpiKey; label: string }[] = [
-  { key: 'gmv', label: 'GMV (đơn hợp lệ)' },
+  { key: 'gmv', label: 'GMV (đơn đặt)' },
   { key: 'netRevenue', label: 'Doanh thu thuần' },
   { key: 'profit', label: 'Lợi nhuận ước tính' },
   { key: 'margin', label: 'Margin' },

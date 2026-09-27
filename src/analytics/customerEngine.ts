@@ -5,7 +5,8 @@
  * read. The same person on two platforms has two different IDs, so every figure is
  * "customers per platform account", which the UI states.
  *
- * - New vs returning: returning = a valid order before the range start. With less than
+ * - New vs returning (in range): buyers of the placed orders, cancelled ones included, as the
+ *   Shopee report counts them; returning = any order before the range start. With less than
  *   90 days of history before the range, "new" may include older customers (noted).
  * - RFM as of the range end over all history up to that day: R = days since last valid
  *   order (score by quintile, recent = 5), F = valid orders (1 → 1, 2 → 3, 3 → 4, 4+ → 5),
@@ -151,7 +152,19 @@ export function customerIntelligence(dataset: CanonicalDataset, filter: { range:
     byCustomer.set(key, c);
   }
 
-  // In-range new vs returning
+  // In-range new vs returning: placed orders (every status), as the Shopee report.
+  const placedByCustomer = new Map<string, { platform: Platform; dates: string[]; gmvInRange: number; ordersInRange: number }>();
+  for (const o of dataset.orders) {
+    if (!o.customerId || o.orderDate > filter.range.end || (plat && !plat.has(o.platform))) continue;
+    const key = `${o.platform}|${o.customerId}`;
+    const c = placedByCustomer.get(key) ?? { platform: o.platform, dates: [], gmvInRange: 0, ordersInRange: 0 };
+    c.dates.push(o.orderDate);
+    if (isInRange(o.orderDate, filter.range)) {
+      c.gmvInRange += gmvOf(o.orderId);
+      c.ordersInRange += 1;
+    }
+    placedByCustomer.set(key, c);
+  }
   let customers = 0;
   let newC = 0;
   let returningC = 0;
@@ -160,7 +173,7 @@ export function customerIntelligence(dataset: CanonicalDataset, filter: { range:
   let gmvReturning = 0;
   let ordersIn = 0;
   const platStats = new Map<Platform, { customers: number; returning: number }>();
-  for (const c of byCustomer.values()) {
+  for (const c of placedByCustomer.values()) {
     if (c.ordersInRange === 0) continue;
     customers++;
     ordersIn += c.ordersInRange;

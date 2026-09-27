@@ -313,15 +313,16 @@ const SPECS: TableSpec[] = [
     kind: 'catalog',
     platform: 'generic',
     label: 'Danh mục sản phẩm',
-    signature: ['SKU', 'Mã SKU', 'Seller SKU', 'SKU phân loại hàng', 'sku'],
+    signature: ['SKU', 'SKU sản phẩm', 'Mã SKU', 'Seller SKU', 'SKU phân loại hàng', 'sku'],
     minSignature: 1,
     columns: {
-      sku: ['SKU', 'Mã SKU', 'Seller SKU', 'SKU phân loại hàng', 'sku'],
+      sku: ['SKU', 'SKU sản phẩm', 'Mã SKU', 'Seller SKU', 'SKU phân loại hàng', 'sku'],
+      productId: ['Mã sản phẩm', 'Product ID', 'product_id'],
       name: ['Tên sản phẩm', 'Product name', 'Tên', 'product_name'],
       category: ['Ngành hàng', 'Danh mục', 'Category', 'category'],
       subcategory: ['Nhóm hàng', 'Danh mục con', 'Niche', 'Subcategory', 'subcategory'],
-      cogs: ['Giá vốn', 'Giá vốn đơn vị', 'COGS', 'Unit COGS', 'unit_cogs', 'Cost', 'Unit cost'],
-      price: ['Giá bán', 'Giá niêm yết', 'list_price'],
+      cogs: ['Giá vốn', 'Giá vốn đơn vị', 'Giá vốn / sản phẩm', 'COGS', 'Unit COGS', 'unit_cogs', 'Cost', 'Unit cost'],
+      price: ['Giá bán', 'Giá niêm yết', 'Giá bán niêm yết', 'list_price'],
     },
     required: [['sku'], ['category', 'subcategory', 'cogs']],
   },
@@ -337,12 +338,17 @@ export interface DetectedTable {
   columns: Record<string, number>;
 }
 
+/** "Giá vốn (VND)" → "Giá vốn": a trailing unit in brackets does not change the column. */
+const withoutUnit = (h: unknown) => normalizeHeader(String(h ?? '').replace(/\s*\((vnd|vnđ|đ|d|₫|%|g|kg)\)\s*$/i, ''));
+
 function resolve(headers: unknown[], spec: TableSpec): Record<string, number> {
   const norm = headers.map(normalizeHeader);
+  const bare = headers.map(withoutUnit);
   const out: Record<string, number> = {};
   for (const [field, candidates] of Object.entries(spec.columns)) {
     for (const c of candidates) {
-      const i = norm.indexOf(normalizeHeader(c));
+      let i = norm.indexOf(normalizeHeader(c));
+      if (i < 0) i = bare.indexOf(normalizeHeader(c));
       if (i >= 0) {
         out[field] = i;
         break;
@@ -491,6 +497,7 @@ export function importTableReport(input: WorkbookInput, detected: DetectedTable)
       const cogs = num(row, 'cogs');
       const p: Product = {
         sku,
+        productId: text(row, 'productId') || undefined,
         name: text(row, 'name') || undefined,
         category: text(row, 'category') || undefined,
         subcategory: text(row, 'subcategory') || undefined,

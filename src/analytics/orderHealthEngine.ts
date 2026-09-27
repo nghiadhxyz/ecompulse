@@ -219,6 +219,19 @@ export interface StageCancellations {
  */
 export function stageCancellations(dataset: CanonicalDataset, filter: DatasetFilter): StageCancellations {
   const slice = sliceDataset(dataset, filter);
+  // Order export: cancellations of the placed orders, by count and by value.
+  if (slice.orders.length > 0) {
+    const cancelledIds = new Set(slice.orders.filter((o) => isCancelled(o.status)).map((o) => o.orderId));
+    const gmv = slice.lines.reduce((s, l) => s + (l.grossAmount || 0), 0);
+    const cancelledGmv = slice.lines.filter((l) => cancelledIds.has(l.orderId)).reduce((s, l) => s + (l.grossAmount || 0), 0);
+    return {
+      byStage: [{ stage: 'placed', cancelled: cancelledIds.size, orders: slice.orders.length }],
+      cancelledGmv,
+      gmv,
+      valueRate: gmv ? cancelledGmv / gmv : null,
+      fromPeriodRow: false,
+    };
+  }
   const figures = (stage: SummaryStage) => {
     const totals = usablePeriodTotals(slice, stage);
     const add = (pick: (x: { cancelledOrders?: number; cancelledGmv?: number; orders?: number; gmv?: number }) => number | undefined) => {

@@ -63,8 +63,9 @@ describe('order export detection & import', () => {
     const m = computeKpis(r.dataset, { range: { start: '2025-09-01', end: '2025-09-02' } }).metrics;
     expect(m.orders.value).toBe(2);
     expect(m.cancelledOrders.value).toBe(1);
-    expect(m.gmv.value).toBe(563_000);
-    expect(m.netRevenue.value).toBe(543_000);
+    // Placed orders, the cancelled one included (as the Shopee report); net = sales − cancelled − refunds.
+    expect(m.gmv.value).toBe(822_000);
+    expect(m.netRevenue.value).toBe(563_000);
   });
 
   it('imports a TikTok Shop export, skipping the description row and mapping returns', () => {
@@ -181,5 +182,46 @@ describe('workspace merge', () => {
     expect(ws.orders).toHaveLength(4);
     expect(new Set(ws.orders.map((o) => o.orderId)).size).toBe(4);
     expect(ws.orderLines).toHaveLength(6);
+  });
+});
+
+describe('Shopee returns (5)', () => {
+  const headers = ['Mã đơn hàng', 'Ngày đặt hàng', 'Trạng Thái Đơn Hàng', 'Trạng thái Trả hàng/Hoàn tiền', 'SKU sản phẩm', 'Mã sản phẩm', 'Tên sản phẩm', 'Số lượng', 'Số lượng sản phẩm được hoàn trả', 'Tổng giá bán (sản phẩm)', 'Số tiền hoàn lại', 'Người Mua'];
+  const rows = [
+    ['R1', '2025-09-01 10:00', 'Trả hàng/Hoàn tiền', '', 'A', '11', 'Sản phẩm A', 1, 0, 100_000, 60_000, 'u1'],
+    ['R2', '2025-09-01 11:00', 'Hoàn thành', 'Đã chấp nhận yêu cầu trả hàng/hoàn tiền', 'A', '11', 'Sản phẩm A', 1, 0, 100_000, 100_000, 'u2'],
+    ['R3', '2025-09-01 12:00', 'Hoàn thành', '', 'A', '11', 'Sản phẩm A', 1, 0, 50_000, '', 'u3'],
+    ['R3', '2025-09-01 12:00', 'Hoàn thành', '', 'B', '22', 'Sản phẩm B', 1, 1, 30_000, 30_000, 'u3'],
+    ['OK', '2025-09-01 13:00', 'Hoàn thành', '', 'B', '22', 'Sản phẩm B', 2, 0, 60_000, '', 'u4'],
+  ];
+  const input: WorkbookInput = { fileName: 'Order.all.xlsx', sheets: [{ name: 'orders', rows: [headers, ...rows] }] };
+
+  it('flags a return by status, by the return-status column or by returned items', () => {
+    const det = detectReport(input);
+    if (det.kind !== 'orders') throw new Error('not detected');
+    const r = importOrderExport(input, det);
+    const st = Object.fromEntries(r.dataset.orders.map((o) => [o.orderId, o.status]));
+    expect(st).toEqual({ R1: 'returned', R2: 'returned', R3: 'returned', OK: 'completed' });
+    expect(r.dataset.orders.find((o) => o.orderId === 'R1')!.refundAmount).toBe(60_000);
+    const m = computeKpis(r.dataset, { range: { start: '2025-09-01', end: '2025-09-01' } }).metrics;
+    expect([m.refundedOrders.value, m.orders.value]).toEqual([3, 4]);
+    expect(m.refundRate.value).toBeCloseTo(3 / 4, 10);
+    expect(r.dataset.products.find((p) => p.sku === 'A')!.productId).toBe('11');
+  });
+});
+
+describe('COGS catalog headers (6)', () => {
+  it('reads "Giá vốn (VND)" and keeps the product ID for matching', () => {
+    const input: WorkbookInput = {
+      fileName: 'Danh_muc_SKU_gia_von.xlsx',
+      sheets: [
+        { name: 'Huong_dan', rows: [['Hướng dẫn'], ['']] },
+        { name: 'SKU_gia_von', rows: [['Mã sản phẩm', 'SKU', 'Tên sản phẩm', 'Ngành hàng', 'Giá vốn (VND)'], ['11', 'A', 'Sản phẩm A', 'Nước mắm', 27_000]] },
+      ],
+    };
+    const t = detectTableReport(input)!;
+    expect(t.spec.kind).toBe('catalog');
+    const p = importTableReport(input, t).dataset.products[0];
+    expect([p.sku, p.productId, p.unitCogs]).toEqual(['A', '11', 27_000]);
   });
 });

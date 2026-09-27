@@ -1,14 +1,16 @@
 /**
  * KPI Engine — the single implementation of business KPI formulas.
  *
- * Definitions (order grain)
+ * Definitions (order grain) — placed orders, as the Shopee report counts them, so an order
+ * export and a summary report of the same period give the same figures:
  *   orders          = orders placed in the period (all statuses)
  *   validOrders     = orders − cancelled − failed delivery
- *   gmv             = Σ line gross amount of valid orders (before shop discount)
- *   netRevenue      = gmv − seller discount − refund            (see profitEngine)
- *   aov             = gmv / validOrders
+ *   gmv             = Σ line gross amount of every placed order, cancellations included
+ *   netRevenue      = gmv − cancelled sales − refunds   (seller vouchers only in profit)
+ *   aov             = gmv / orders
  *   cancelRate      = cancelled (incl. failed delivery) / orders
- *   refundRate      = (returned + refunded) / validOrders
+ *   refundRate      = (returned + refunded) / orders
+ *   buyers          = distinct buyers of the placed orders (buyers of cancelled orders too)
  *   completionRate  = (delivered + completed) / orders
  *   cvr             = orders / product clicks (product-page views) — Shopee's definition
  *   visits          = daily unique visitors; only reported for single-day periods
@@ -255,26 +257,46 @@ function orderGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
   const valid = placed - cancelled;
 
   let placedGmv = 0;
+  let cancelledGmv = 0;
   let units = 0;
+  const grossById = new Map<string, number>();
   for (const l of lines) {
     placedGmv += l.grossAmount || 0;
+    grossById.set(l.orderId, (grossById.get(l.orderId) ?? 0) + (l.grossAmount || 0));
     const status = statusById.get(l.orderId);
+    if (status && isCancelled(status)) cancelledGmv += l.grossAmount || 0;
     if (status && isValidOrder(status)) units += l.quantity || 0;
   }
+  // Refunds of returned / refunded orders (the importer fills the amount when the file has none).
+  let refundGmv = 0;
+  for (const o of orders) if ((o.status === 'returned' || o.status === 'refunded') && !isCancelled(o.status)) refundGmv += o.refundAmount ?? grossById.get(o.orderId) ?? 0;
 
   const ordersM = ok(placed, 'count');
   const validM = ok(valid, 'count');
-  const gmv = profit.gmv;
-  const visits = trafficVisits(slice);
+  // Placed-order sales, cancellations included — Shopee's "Tổng doanh số" (đơn đã đặt).
+  const gmv = ok(placedGmv, 'vnd');
+  // "Trọn kỳ" is judged per file: when a summary report covers the range, its period row
+  // gives the distinct visitors (never a sum of days).
+  const visits = trafficVisits(slice, usablePeriodTotals(slice, 'placed'));
   const { adSpend, roas } = adMetrics(slice);
 
-  const validWithCustomer = orders.filter((o) => isValidOrder(o.status) && o.customerId).length;
+  // Buyers of every placed order (a buyer whose order was cancelled still bought).
+  const withCustomer = orders.filter((o) => o.customerId).length;
   const buyers =
-    valid > 0 && validWithCustomer === valid
-      ? ok(new Set(orders.filter((o) => isValidOrder(o.status)).map((o) => o.customerId)).size, 'count')
-      : valid === 0
+    placed > 0 && withCustomer === placed
+      ? ok(new Set(orders.map((o) => o.customerId)).size, 'count')
+      : placed === 0
         ? ok(0, 'count')
-        : need('count', 'Không có mã khách hàng cho tất cả đơn hợp lệ.', 'Customer identifier is missing on some valid orders.', 'order.customerId');
+        : need('count', 'Không có mã khách hàng cho tất cả đơn.', 'Customer identifier is missing on some orders.', 'order.customerId');
+  const netRevenue: MetricResult = {
+    ...ok(placedGmv - cancelledGmv - refundGmv, 'vnd'),
+    notes: [
+      {
+        vi: `Doanh số đơn đặt ${fmtVnd(placedGmv)} − doanh số hủy ${fmtVnd(cancelledGmv)} − tiền hoàn ${fmtVnd(refundGmv)}. Voucher shop chịu được trừ ở phần lợi nhuận.`,
+        en: 'Placed sales − cancelled sales − refunds. Seller vouchers are deducted in profit.',
+      },
+    ],
+  };
 
   return {
     gmv,
@@ -282,17 +304,18 @@ function orderGrainMetrics(slice: DatasetSlice, profit: ProfitResult): Record<Kp
     // "Tiền về" by payment day only exists in platform summary reports.
     paidGmv: need('vnd', 'Chỉ có trong báo cáo tổng hợp của sàn.', 'Summary reports only.'),
     paidOrders: need('count', 'Chỉ có trong báo cáo tổng hợp của sàn.', 'Summary reports only.'),
-    netRevenue: profit.netRevenue,
+    netRevenue,
     orders: ordersM,
     validOrders: validM,
     completedOrders: ok(completed, 'count'),
     cancelledOrders: ok(cancelled, 'count'),
     returnedOrders: ok(returned, 'count'),
-    refundedOrders: ok(refunded, 'count'),
+    // "Đơn đã hoàn trả / hoàn tiền": returns and refunds together, as in the Shopee report.
+    refundedOrders: ok(returned + refunded, 'count'),
     units: ok(units, 'count'),
-    aov: ratioMetric(gmv, validM, 'vnd', ZERO_DENOM),
+    aov: ratioMetric(gmv, ordersM, 'vnd', ZERO_DENOM),
     cancelRate: ratioMetric(ok(cancelled, 'count'), ordersM, 'ratio', ZERO_DENOM),
-    refundRate: ratioMetric(ok(returned + refunded, 'count'), validM, 'ratio', ZERO_DENOM),
+    refundRate: ratioMetric(ok(returned + refunded, 'count'), ordersM, 'ratio', ZERO_DENOM),
     completionRate: ratioMetric(ok(completed, 'count'), ordersM, 'ratio', ZERO_DENOM),
     visits,
     cvr: ratioMetric(ordersM, productClicks(slice), 'ratio', ZERO_DENOM),
