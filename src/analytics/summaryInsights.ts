@@ -418,6 +418,8 @@ export interface CustomerTrend {
   points: CustomerTrendPoint[];
   /** Whole report period: the platform's distinct counts. */
   periodTotal: { buyers: number | null; newBuyers: number | null; existingBuyers: number | null; potentialBuyers: number | null; repeatRate: number | null; newShare: number | null } | null;
+  /** Existing / potential buyers added up day by day — counts the same buyer on several days. */
+  dailySums: { existingBuyers: number | null; potentialBuyers: number | null };
   notes: Bilingual[];
 }
 
@@ -428,7 +430,7 @@ export function customerTrend(dataset: CanonicalDataset, filter: DatasetFilter, 
     vi: 'Báo cáo tổng hợp không có mã người mua nên chưa phân nhóm RFM, cohort hay giá trị vòng đời được — cần file xuất đơn hàng.',
     en: 'No buyer IDs in summary reports: RFM / cohorts need an order export.',
   };
-  if (rows.length === 0) return { available: false, grain, points: [], periodTotal: null, notes: [{ vi: 'Báo cáo không có số người mua mới / hiện tại theo ngày.', en: 'No new/existing buyer counts.' }, noRfm] };
+  if (rows.length === 0) return { available: false, grain, points: [], periodTotal: null, dailySums: { existingBuyers: null, potentialBuyers: null }, notes: [{ vi: 'Báo cáo không có số người mua mới / hiện tại theo ngày.', en: 'No new/existing buyer counts.' }, noRfm] };
   const buckets = new Map<string, CustomerTrendPoint>();
   const add = (a: number | null, b: number | undefined) => (b === undefined ? a : (a ?? 0) + b);
   for (const d of rows as DailyMetric[]) {
@@ -455,10 +457,15 @@ export function customerTrend(dataset: CanonicalDataset, filter: DatasetFilter, 
         newShare: one.newBuyers !== undefined && one.existingBuyers !== undefined ? safeDivide(one.newBuyers, one.newBuyers + one.existingBuyers) : null,
       }
     : null;
+  const sumOf = (pick: (d: DailyMetric) => number | undefined) => (rows.some((d) => pick(d) !== undefined) ? rows.reduce((s, d) => s + (pick(d) ?? 0), 0) : null);
+  const dailySums = { existingBuyers: sumOf((d) => d.existingBuyers), potentialBuyers: sumOf((d) => d.potentialBuyers) };
   const notes: Bilingual[] = [];
-  if (grain === 'week') notes.push({ vi: 'Số theo tuần là cộng số người mua từng ngày — một người mua nhiều ngày trong tuần được đếm nhiều lần.', en: 'Weekly values are sums of daily distinct counts.' });
+  if (grain === 'week') {
+    const vs = periodTotal?.existingBuyers !== null && periodTotal?.existingBuyers !== undefined && dailySums.existingBuyers !== null ? ` (khách cũ cộng theo ngày ${dailySums.existingBuyers} so với dòng tổng cả kỳ ${periodTotal.existingBuyers})` : '';
+    notes.push({ vi: `Số theo tuần là cộng số người mua từng ngày — một người mua nhiều ngày trong tuần được đếm nhiều lần${vs}.`, en: 'Weekly values are sums of daily distinct counts.' });
+  }
   if (!periodTotal) notes.push({ vi: 'Chọn trọn kỳ báo cáo để xem số người mua khác nhau, người mua tiềm năng và tỉ lệ quay lại của cả kỳ.', en: 'Select the whole report period for distinct totals.' });
   notes.push({ vi: 'Người mua hiện tại = khách đã từng mua trước đó (theo định nghĩa của Shopee).', en: 'Existing buyers = bought before (Shopee definition).' });
   notes.push(noRfm);
-  return { available: true, grain, points, periodTotal, notes };
+  return { available: true, grain, points, periodTotal, dailySums, notes };
 }

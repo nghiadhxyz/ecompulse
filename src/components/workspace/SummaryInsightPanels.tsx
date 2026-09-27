@@ -317,8 +317,10 @@ export const CustomerTrendPanel: React.FC = () => {
   const t = useMemo(() => customerTrend(dataset, { range, platforms }, grain), [dataset, range, platforms, grain]);
   if (!dataset.dailyMetrics.some((d) => d.newBuyers !== undefined || d.existingBuyers !== undefined)) return null;
   const pt = t.periodTotal;
+  // Weekly bars add up daily distinct counts: say so on every series.
+  const summed = grain === 'week' ? (vi ? ' (cộng theo ngày)' : ' (sum of days)') : '';
   return (
-    <Section title={vi ? 'Khách mới và khách cũ (mức tổng)' : 'New vs existing buyers (totals)'} subtitle={formatRangeVi(range)} right={<GrainPicker grain={grain} onChange={setGrain} vi={vi} />}>
+    <Section title={vi ? 'Khách mới và khách cũ (đơn đặt)' : 'New vs existing buyers (placed orders)'} subtitle={formatRangeVi(range)} right={<GrainPicker grain={grain} onChange={setGrain} vi={vi} />}>
       {!t.available ? (
         <NotEnoughData lang={lang} reason={tr(lang, t.notes[0])} />
       ) : (
@@ -336,11 +338,19 @@ export const CustomerTrendPanel: React.FC = () => {
                 { l: vi ? 'Người mua (khác nhau)' : 'Buyers (distinct)', v: fmtCount(pt.buyers, lang) },
                 { l: vi ? 'Người mua mới' : 'New buyers', v: `${fmtCount(pt.newBuyers, lang)} (${fmtRate(pt.newShare, lang, 0)})` },
                 { l: vi ? 'Người mua hiện tại' : 'Existing buyers', v: fmtCount(pt.existingBuyers, lang) },
-                { l: vi ? 'Người mua tiềm năng' : 'Potential buyers', v: fmtCount(pt.potentialBuyers, lang) },
-                { l: vi ? 'Tỉ lệ quay lại' : 'Repeat rate', v: fmtRate(pt.repeatRate, lang) },
+                {
+                  l: vi ? 'Người mua tiềm năng' : 'Potential buyers',
+                  v: fmtCount(pt.potentialBuyers, lang),
+                  tip: vi ? 'Theo Shopee: người đã xem / thêm giỏ sản phẩm của shop nhưng chưa mua trong kỳ. Số khác nhau cả kỳ, không cộng từ các ngày.' : 'Shopee: visitors who viewed or added to cart but did not buy. Distinct for the period.',
+                },
+                {
+                  l: vi ? 'Tỉ lệ quay lại' : 'Repeat rate',
+                  v: fmtRate(pt.repeatRate, lang),
+                  tip: vi ? 'Số của Shopee ở dòng tổng cả kỳ. Công thức không công khai (khách cũ ÷ người mua ra số khác), nên không tự tính và không tính được cho một phần kỳ.' : "Shopee's own period figure; its formula is not published, so it is not recomputed.",
+                },
               ].map((x) => (
-                <div key={x.l} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <div className="text-[11px] text-slate-400">{x.l}</div>
+                <div key={x.l} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2" title={'tip' in x ? x.tip : undefined}>
+                  <div className="text-[11px] text-slate-400">{x.l}{'tip' in x && <span className="ml-1 text-slate-500" aria-hidden>ⓘ</span>}</div>
                   <div className="text-base font-bold text-white">{x.v}</div>
                 </div>
               ))}
@@ -352,8 +362,8 @@ export const CustomerTrendPanel: React.FC = () => {
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
                 <XAxis dataKey="label" tick={axisTick} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
                 <YAxis tick={axisTick} width={32} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [fmtCount(v, lang), n === 'newBuyers' ? (vi ? 'Mới' : 'New') : vi ? 'Hiện tại' : 'Existing']} />
-                <Legend formatter={(n: string) => (n === 'newBuyers' ? (vi ? 'Người mua mới' : 'New') : vi ? 'Người mua hiện tại' : 'Existing')} wrapperStyle={{ fontSize: 11 }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [fmtCount(v, lang), `${n === 'newBuyers' ? (vi ? 'Mới' : 'New') : vi ? 'Hiện tại' : 'Existing'}${summed}`]} />
+                <Legend formatter={(n: string) => `${n === 'newBuyers' ? (vi ? 'Người mua mới' : 'New') : vi ? 'Người mua hiện tại' : 'Existing'}${summed}`} wrapperStyle={{ fontSize: 11 }} />
                 <Bar isAnimationActive={false} dataKey="newBuyers" stackId="b" fill={BAR} maxBarSize={20} />
                 <Bar isAnimationActive={false} dataKey="existingBuyers" stackId="b" fill={SECOND} radius={[4, 4, 0, 0]} maxBarSize={20} />
               </BarChart>

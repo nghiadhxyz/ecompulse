@@ -183,6 +183,7 @@ export function summaryAlerts(dataset: CanonicalDataset, day: string, platforms:
   alerts.push(...adsAlerts(dataset, day, platforms));
   alerts.push(...channelAlerts(dataset, day, platforms, base.avg7));
   alerts.push(...dataQualityAlerts(dataset, day, platforms));
+  alerts.push(...customerOpportunityAlerts(dataset, day, platforms));
   return alerts;
 }
 
@@ -283,6 +284,40 @@ function channelAlerts(dataset: CanonicalDataset, day: string, platforms: Platfo
         evidence: [{ label: { vi: `Doanh số ${name.vi}`, en: `${name.en} sales` }, unit: 'vnd' as const, current: c.cur, currentLabel: label, baseline: c.avg, baselineLabel: AVG7_LABEL }],
       };
     });
+}
+
+// ------------------------------------------------------------------ customers
+
+/** At least this share of new buyers, with a low repeat rate, is an opportunity to bring buyers back. */
+export const NEW_BUYER_SHARE_OPPORTUNITY = 0.75;
+export const LOW_REPEAT_RATE = 0.2;
+
+function customerOpportunityAlerts(dataset: CanonicalDataset, day: string, platforms?: Platform[]): SmartAlert[] {
+  // Whole-period figures only: buyer counts are distinct, and the repeat rate is Shopee's own.
+  const period = (dataset.periodTotals ?? []).find((p) => p.stage === 'placed' && p.start <= day && p.end >= day && (!platforms?.length || platforms.includes(p.platform)));
+  if (!period || period.newBuyers === undefined || period.existingBuyers === undefined) return [];
+  const buyers = period.newBuyers + period.existingBuyers;
+  if (buyers < MIN_RATE_ORDERS) return [];
+  const newShare = period.newBuyers / buyers;
+  if (newShare < NEW_BUYER_SHARE_OPPORTUNITY || (period.repeatRate !== undefined && period.repeatRate >= LOW_REPEAT_RATE)) return [];
+  const periodText = `${fmtDay(period.start)}–${fmtDay(period.end)}`;
+  const repeat = period.repeatRate !== undefined ? `, tỉ lệ quay lại ${fmtRate(period.repeatRate)}` : '';
+  return [
+    {
+      id: `repeat_buyers-${period.start}-${period.end}`,
+      type: 'repeat_buyers_opportunity',
+      severity: 'opportunity',
+      title: { vi: `${Math.round(newShare * 100)}% người mua là khách mới (kỳ ${periodText})`, en: `${Math.round(newShare * 100)}% of buyers are new (${periodText})` },
+      message: {
+        vi: `${period.newBuyers} khách mới, ${period.existingBuyers} khách cũ (đơn đặt)${repeat}. Tỷ lệ quay lại thấp với hàng tiêu dùng mua lặp lại — còn dư địa giữ chân khách.`,
+        en: `${period.newBuyers} new, ${period.existingBuyers} existing buyers (placed orders). Few buyers come back for a repeat-purchase product.`,
+      },
+      check: { vi: 'Xem có voucher/tin nhắn mời mua lại cho khách đã mua chưa; so với tỉ lệ quay lại của kỳ trước.', en: 'Check follow-up vouchers or messages to past buyers; compare with the previous period.' },
+      evidence: [
+        { label: { vi: 'Khách mới', en: 'New buyers' }, unit: 'ratio', current: newShare, currentLabel: { vi: `Kỳ ${periodText}`, en: periodText } },
+      ],
+    },
+  ];
 }
 
 // ------------------------------------------------------------------ data quality

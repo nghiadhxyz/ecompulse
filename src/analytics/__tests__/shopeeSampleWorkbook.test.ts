@@ -27,7 +27,7 @@ import { fmtPerViewer, fmtShare } from '../format';
 import { anomalyScan } from '../anomalyScan';
 import { calendarPerformance } from '../campaignEngine';
 import { advancedStats } from '../statsEngine';
-import { stageFunnel } from '../summaryInsights';
+import { customerTrend, stageFunnel } from '../summaryInsights';
 import { orderHealth, stageCancellations } from '../orderHealthEngine';
 import { dataNotices } from '../dataNotices';
 import { sampleLevel } from '../sampleSize';
@@ -383,5 +383,18 @@ describe('Part 2 — order health', () => {
     expect(sc.byStage.map((s) => s.cancelled)).toEqual([102, 48, 9]);
     // Daily table: cancelled sales per day.
     expect(orderHealth(ds, { range }).byDate.some((d) => (d.cancelledGmv ?? 0) > 0)).toBe(true);
+  });
+});
+
+describe('Part 3 — customers', () => {
+  it.skipIf(!existsSync(NEW_WORKBOOK))('weekly sums are labelled; 82% new buyers is an opportunity alert', async () => {
+    const ds = await summaryWorkspace(NEW_WORKBOOK);
+    const range = datasetDateBounds(ds)!;
+    const t = customerTrend(ds, { range }, 'week');
+    expect([t.dailySums.existingBuyers, t.periodTotal!.existingBuyers]).toEqual([107, 81]);
+    expect(t.notes[0].vi).toContain('khách cũ cộng theo ngày 107 so với dòng tổng cả kỳ 81');
+    const alert = buildDailyBrief(ds, '2026-08-21').alerts.find((a) => a.type === 'repeat_buyers_opportunity')!;
+    expect(alert.severity).toBe('opportunity');
+    expect(alert.title.vi).toContain('82% người mua là khách mới');
   });
 });

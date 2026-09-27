@@ -47,7 +47,8 @@ export type AlertType =
   | 'source_change'
   | 'data_negative_subsidy'
   | 'data_period_mismatch'
-  | 'data_cvr_mismatch';
+  | 'data_cvr_mismatch'
+  | 'repeat_buyers_opportunity';
 
 export interface SmartAlert {
   id: string;
