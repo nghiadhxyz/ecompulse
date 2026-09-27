@@ -3,6 +3,8 @@
 Scope: the **Seller** and **Analyst** workspaces. The landing page, the classic dashboard and
 Internal Finance keep their dark look. The workspace is **light by default**; dark is an option
 (moon / sun button in the top bar, remembered per browser in `localStorage["ecompulse-theme"]`).
+The onboarding modals (workspace mode selector, Dolphin tour) use the tokens only, so they
+resolve to the dark set on the landing page (`:root`) and follow the toggle inside the workspace.
 
 Presentation only: no logic, formula, figure or calculation test changes.
 

@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { fmtMoney, PLATFORM_LABELS, resolveUnitCogs, type Platform } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
-import { Section } from '../../seller/ui';
+import { GhostButton, Section } from '../../seller/ui';
+import { SectionCard } from '../../ui/primitives';
+import { TABLE } from '../../ui/data';
 import { Th } from '../ui';
 
 /** Product catalog mapping: which SKUs have category, niche and COGS, and where they sell. */
@@ -39,27 +41,29 @@ export const DataMapping: React.FC = () => {
   return (
     <div className="space-y-4">
       <Section title={vi ? 'Nguồn dữ liệu' : 'Sources'}>
-        <ul className="text-xs text-slate-300 space-y-1">
+        <ul className="divide-y divide-line rounded-control border border-line text-sm text-muted">
           {dataset.sources.map((s, i) => (
-            <li key={i}>
-              <b className="text-white">{s.fileName}</b> · {s.reportType} · {s.platform !== 'other' ? PLATFORM_LABELS[s.platform] : vi ? 'nhiều sàn' : 'multi'}
+            <li key={i} className="px-3 py-2">
+              <b className="font-medium text-fg">{s.fileName}</b> · {s.reportType} · {s.platform !== 'other' ? PLATFORM_LABELS[s.platform] : vi ? 'nhiều sàn' : 'multi'}
               {s.rowCount !== undefined && ` · ${s.rowCount.toLocaleString('vi-VN')} ${vi ? 'dòng' : 'rows'}`}
             </li>
           ))}
         </ul>
       </Section>
-      <Section
+      <SectionCard
         title={vi ? 'Danh mục sản phẩm' : 'Product catalog'}
-        subtitle={
+        notesLabel={vi ? 'Ghi chú' : 'Notes'}
+        notes={[vi ? 'Ngành hàng lấy từ cột "Ngành hàng" trong file (mẫu EcomPulse) hoặc danh mục sản phẩm. File xuất đơn của sàn thường không có cột này.' : 'Categories come from the file or the product catalog.']}
+        description={
           vi
             ? `${rows.length} SKU · có ngành hàng ${pct(rows.filter((r) => r.category).length)}% · có nhóm hàng ${pct(rows.filter((r) => r.subcategory).length)}% · có giá vốn ${pct(rows.filter((r) => r.cogs !== undefined).length)}%`
             : `${rows.length} SKUs`
         }
-        right={<button onClick={() => goTo('settings')} className="text-xs text-sky-300">{vi ? 'Nhập giá vốn' : 'Enter COGS'}</button>}
+        tools={<GhostButton onClick={() => goTo('settings')}>{vi ? 'Nhập giá vốn' : 'Enter COGS'}</GhostButton>}
       >
-        <div className="overflow-x-auto rounded-xl border border-white/10 max-h-[520px] overflow-y-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-[#0f1530] text-slate-400 sticky top-0">
+        <div className={`${TABLE.frame} max-h-[520px] overflow-y-auto`}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
                 <Th left>SKU</Th>
                 <Th left>{vi ? 'Tên' : 'Name'}</Th>
@@ -72,23 +76,20 @@ export const DataMapping: React.FC = () => {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.sku} className="border-t border-white/5 text-slate-200">
-                  <td className="px-2.5 py-1.5 font-mono text-[11px]">{r.sku}</td>
-                  <td className="px-2.5 py-1.5 max-w-[240px] truncate">{r.name}</td>
-                  <td className="px-2.5 py-1.5">{r.category ?? <span className="text-[#fab219]">{vi ? 'chưa có' : 'missing'}</span>}</td>
-                  <td className="px-2.5 py-1.5">{r.subcategory ?? <span className="text-slate-500">—</span>}</td>
-                  <td className="px-2.5 py-1.5 text-right">{r.cogs === undefined ? <span className="text-[#fab219]">{vi ? 'chưa có' : 'missing'}</span> : fmtMoney(r.cogs, lang)}</td>
-                  <td className="px-2.5 py-1.5 text-right">{r.units.toLocaleString('vi-VN')}</td>
-                  <td className="px-2.5 py-1.5">{r.platforms.map((p) => PLATFORM_LABELS[p]).join(', ')}</td>
+                <tr key={r.sku} className={`${TABLE.tr} text-fg`}>
+                  <td className={`${TABLE.td} font-mono text-small`}>{r.sku}</td>
+                  <td className={`${TABLE.td} max-w-[280px] truncate`} title={r.name}>{r.name}</td>
+                  <td className={TABLE.td}>{r.category ?? <span className="font-medium text-warn">{vi ? 'chưa có' : 'missing'}</span>}</td>
+                  <td className={TABLE.td}>{r.subcategory ?? <span className="text-muted">—</span>}</td>
+                  <td className={`${TABLE.td} text-right`}>{r.cogs === undefined ? <span className="font-medium text-warn">{vi ? 'chưa có' : 'missing'}</span> : fmtMoney(r.cogs, lang)}</td>
+                  <td className={`${TABLE.td} text-right`}>{r.units.toLocaleString('vi-VN')}</td>
+                  <td className={TABLE.td}>{r.platforms.map((p) => PLATFORM_LABELS[p]).join(', ')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-slate-500 mt-2">
-          {vi ? 'Ngành hàng lấy từ cột "Ngành hàng" trong file (mẫu EcomPulse) hoặc danh mục sản phẩm. File xuất đơn của sàn thường không có cột này.' : 'Categories come from the file or the product catalog.'}
-        </p>
-      </Section>
+      </SectionCard>
     </div>
   );
 };
