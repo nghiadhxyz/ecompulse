@@ -4,16 +4,19 @@ import { adsIntelligence, moneyTolerance, fmtCount, fmtDay, fmtMoney, fmtMoneyCo
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { ChartTotalNote, MismatchBox } from '../../workspace/MismatchBox';
+import { Badge, CardGrid, SectionCard, type Tone } from '../../ui/primitives';
+import { TABLE } from '../../ui/data';
+import { axisProps, CHART, gridProps, tooltipProps } from '../../../theme/chart';
 import { ShareBar, Th } from '../ui';
 
-const BAR = '#3987e5';
-const EFF: Record<AdEfficiency, { vi: string; en: string; cls: string }> = {
-  profitable: { vi: 'Trên hòa vốn', en: 'Above break-even', cls: 'border-[#0ca30c]/40 bg-[#0ca30c]/10 text-[#4ade80]' },
-  below_break_even: { vi: 'Dưới hòa vốn', en: 'Below break-even', cls: 'border-[#d03b3b]/40 bg-[#d03b3b]/10 text-[#f08080]' },
-  likely_loss: { vi: 'Gần như chắc chắn lỗ', en: 'Almost surely losing', cls: 'border-[#d03b3b]/40 bg-[#d03b3b]/10 text-[#f08080]' },
-  unknown: { vi: 'Chưa đánh giá được', en: 'Unknown', cls: 'border-white/15 bg-white/[0.04] text-slate-400' },
+/** Above break-even = good; below / likely loss = bad (orange, never red); unknown = grey. */
+const EFF: Record<AdEfficiency, { vi: string; en: string; tone: Tone }> = {
+  profitable: { vi: 'Trên hòa vốn', en: 'Above break-even', tone: 'up' },
+  below_break_even: { vi: 'Dưới hòa vốn', en: 'Below break-even', tone: 'down' },
+  likely_loss: { vi: 'Gần như chắc chắn lỗ', en: 'Almost surely losing', tone: 'down' },
+  unknown: { vi: 'Chưa đánh giá được', en: 'Unknown', tone: 'neutral' },
 };
-const tooltipStyle = { background: '#0b1024', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, fontSize: 12 };
+const profitClass = (v: number | null) => (v === null ? '' : v < 0 ? 'text-down' : 'text-up');
 
 export const AdsIntelligenceView: React.FC = () => {
   const { lang, dataset, baseFilter, range, openEvidence, goTo } = useWorkspace();
@@ -55,43 +58,55 @@ export const AdsIntelligenceView: React.FC = () => {
   }
   const t = ai.totals;
   // Margin from the shop-wide estimates in Settings (0.9), not from COGS.
-  const est = t.marginIsEstimate ? ` · ${vi ? 'ước tính theo số bạn nhập' : 'estimate from your inputs'}` : '';
-  const tiles = [
+  const est = t.marginIsEstimate ? (vi ? 'Ước tính theo số bạn nhập' : 'Estimate from your inputs') : undefined;
+  const tiles: { l: string; v: string; bad?: boolean; sub?: string; missing?: boolean }[] = [
     { l: vi ? 'Chi phí Ads' : 'Spend', v: fmtMoneyCompact(t.spend, lang) },
     { l: vi ? 'Doanh thu quy đổi' : 'Attributed revenue', v: fmtMoneyCompact(t.attributedRevenue, lang) },
     { l: vi ? 'ROAS (đơn đặt)' : 'ROAS (placed)', v: fmtMultiple(t.roas, lang) },
-    { l: vi ? 'ROAS (đơn đã thanh toán)' : 'ROAS (paid)', v: t.paidRoas === null ? (vi ? 'Chọn trọn kỳ báo cáo' : 'Select the whole period') : fmtMultiple(t.paidRoas, lang) },
-    { l: `${vi ? 'ROAS hòa vốn (shop)' : 'Break-even ROAS'}${est}`, v: fmtMultiple(t.breakEvenRoas, lang) },
-    { l: `${vi ? 'Lời sau Ads (ước tính)' : 'Profit after ads'}${est}`, v: t.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(t.estimatedProfitAfterAds, lang), bad: (t.estimatedProfitAfterAds ?? 0) < 0 },
+    { l: vi ? 'ROAS (đơn đã thanh toán)' : 'ROAS (paid)', v: t.paidRoas === null ? (vi ? 'Chọn trọn kỳ báo cáo' : 'Select the whole period') : fmtMultiple(t.paidRoas, lang), missing: t.paidRoas === null },
+    { l: vi ? 'ROAS hòa vốn (shop)' : 'Break-even ROAS', v: fmtMultiple(t.breakEvenRoas, lang), sub: est },
+    { l: vi ? 'Lời sau Ads (ước tính)' : 'Profit after ads', v: t.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(t.estimatedProfitAfterAds, lang), bad: (t.estimatedProfitAfterAds ?? 0) < 0, sub: est, missing: t.estimatedProfitAfterAds === null },
     { l: vi ? 'Ngân sách dưới hòa vốn' : 'Spend below break-even', v: ai.campaigns.some((c) => c.breakEvenRoas !== null) ? `${fmtMoneyCompact(ai.spendBelowBreakEven, lang)} (${fmtRate(t.spend ? ai.spendBelowBreakEven / t.spend : null, lang, 0)})` : '—', bad: ai.spendBelowBreakEven > 0 },
   ];
 
   return (
     <div className="space-y-4">
-      <p className="text-[11px] text-slate-400">
+      <p className="text-small text-muted">
         {vi
           ? 'Nguồn: tổng các dòng quảng cáo trong sheet "Nguồn truy cập cho Đơn hàng…" (không dùng dòng "Doanh thu từ quảng cáo Shopee" ở đầu sheet). ROAS đơn đặt gồm cả đơn sau đó bị hủy; ROAS đơn đã thanh toán = doanh thu Ads của đơn đã thanh toán ÷ chi phí.'
           : 'Source: sum of the ad rows in the traffic-source sheet. Placed ROAS includes orders cancelled later; paid ROAS uses paid-order ad revenue.'}
       </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-7">
         {tiles.map((x) => (
-          <div key={x.l} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-            <div className="text-[11px] text-slate-400">{x.l}</div>
-            <div className={`text-lg font-black ${x.bad ? 'text-[#f08080]' : 'text-white'}`}>{x.v}</div>
+          <div key={x.l} className="flex min-h-28 min-w-0 flex-col rounded-card border border-line bg-surface px-4 py-3.5 shadow-card">
+            <div className="text-small text-muted">{x.l}</div>
+            <div className={`mt-1 ${x.missing ? 'text-sm font-semibold text-muted' : `text-xl font-bold tabular ${x.bad ? 'text-down' : 'text-fg'}`}`}>{x.v}</div>
+            {x.sub && <div className="mt-auto truncate text-small text-muted" title={x.sub}>{x.sub}</div>}
           </div>
         ))}
       </div>
       <MismatchBox items={ai.mismatches} lang={lang} note={vi ? 'Bảng dùng dòng tổng cả kỳ; biểu đồ dùng số từng ngày.' : 'The table uses the period rows; the charts use the days.'} />
       {ai.notes.map((n, i) => (
-        <p key={i} className="text-xs text-[#fab219]">{tr(lang, n)}</p>
+        <p key={i} className="rounded-control bg-warn-soft px-3 py-2 text-small text-warn">
+          {tr(lang, n)}
+        </p>
       ))}
 
-      <Section title={vi ? 'Chiến dịch' : 'Campaigns'} subtitle={`${formatRangeVi(range)} · ${vi ? 'ROAS chỉ có ý nghĩa khi so với ROAS hòa vốn của sản phẩm được quảng cáo' : 'ROAS only matters against break-even ROAS'}`}>
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-xs">
-            <thead className="bg-white/[0.04] text-slate-400">
+      <SectionCard
+        title={vi ? 'Chiến dịch' : 'Campaigns'}
+        description={`${formatRangeVi(range)} · ${vi ? 'ROAS chỉ có ý nghĩa khi so với ROAS hòa vốn của sản phẩm được quảng cáo' : 'ROAS only matters against break-even ROAS'}`}
+        notesLabel={vi ? 'Ghi chú' : 'Notes'}
+        notes={[
+          vi
+            ? `Lời sau Ads = doanh thu quy đổi × biên lợi nhuận trước Ads${t.marginIsEstimate ? ' (biên gộp − phí sàn bạn nhập ở Cài đặt, ước tính theo số bạn nhập)' : ' của SKU'} − chi phí. Doanh thu quy đổi do sàn báo cáo, có thể trùng với đơn tự nhiên. * = thiếu một số chi phí.`
+            : 'Profit after ads = attributed revenue × margin before ads − spend. Attribution is the platform’s own.',
+        ]}
+      >
+        <div className={TABLE.frame}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
-                <Th left>{vi ? 'Chiến dịch' : 'Campaign'}</Th>
+                <Th left className="sticky left-0 z-20 bg-surface-2">{vi ? 'Chiến dịch' : 'Campaign'}</Th>
                 <Th left>{vi ? 'Đánh giá' : 'Status'}</Th>
                 <Th>{vi ? 'Chi phí' : 'Spend'}</Th>
                 <Th>{vi ? 'Tỷ trọng NS' : 'Budget share'}</Th>
@@ -104,32 +119,40 @@ export const AdsIntelligenceView: React.FC = () => {
                 <Th>CPC</Th>
                 <Th>CVR</Th>
                 <Th>CPA</Th>
-                <th className="px-2.5 py-2" />
+                <th className={TABLE.th} />
               </tr>
             </thead>
             <tbody>
               {ai.campaigns.map((c) => (
-                <tr key={c.key} className="border-t border-white/5 text-slate-200">
-                  <td className="px-2.5 py-2 max-w-[220px]">
-                    <div className="font-semibold text-white truncate">{c.name}</div>
-                    <div className="text-[11px] text-slate-500">{PLATFORM_LABELS[c.platform]}{c.sku ? ` · ${c.sku}` : ''}</div>
+                <tr key={c.key} className={`${TABLE.tr} text-fg`}>
+                  <td className="sticky left-0 z-10 max-w-[220px] bg-surface px-3 py-1.5" title={c.name}>
+                    <div className="truncate font-medium text-fg">{c.name}</div>
+                    <div className="text-small text-muted">
+                      {PLATFORM_LABELS[c.platform]}
+                      {c.sku ? ` · ${c.sku}` : ''}
+                    </div>
                   </td>
-                  <td className="px-2.5 py-2"><span className={`px-2 py-0.5 rounded-full border text-[11px] font-bold whitespace-nowrap ${EFF[c.efficiency].cls}`}>{vi ? EFF[c.efficiency].vi : EFF[c.efficiency].en}</span></td>
-                  <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(c.spend, lang)}</td>
-                  <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtRate(c.spendShare, lang, 0)}<ShareBar share={c.spendShare} /></td>
-                  <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(c.attributedRevenue, lang)}</td>
-                  <td className="px-2.5 py-2 text-right whitespace-nowrap font-semibold">{fmtMultiple(c.roas, lang)}</td>
-                  <td className="px-2.5 py-2 text-right whitespace-nowrap text-slate-400">{fmtMultiple(c.breakEvenRoas, lang)}</td>
-                  <td className={`px-2.5 py-2 text-right whitespace-nowrap ${(c.estimatedProfitAfterAds ?? 0) < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`} title={c.profitNote?.[lang]}>
-                    {c.estimatedProfitAfterAds === null ? <span className="text-slate-500">—</span> : fmtMoneyCompact(c.estimatedProfitAfterAds, lang)}
-                    {c.marginIsPartial && <span className="text-[#fab219]">*</span>}
+                  <td className={TABLE.td}>
+                    <Badge tone={EFF[c.efficiency].tone}>{vi ? EFF[c.efficiency].vi : EFF[c.efficiency].en}</Badge>
                   </td>
-                  <td className="px-2.5 py-2 text-right">{fmtCount(c.impressions, lang)}</td>
-                  <td className="px-2.5 py-2 text-right">{fmtRate(c.ctr, lang, 2)}</td>
-                  <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(c.cpc, lang)}</td>
-                  <td className="px-2.5 py-2 text-right">{fmtRate(c.cvr, lang, 2)}</td>
-                  <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(c.cpa, lang)}</td>
-                  <td className="px-2.5 py-2 text-right">
+                  <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(c.spend, lang)}</td>
+                  <td className={`${TABLE.td} text-right`}>
+                    {fmtRate(c.spendShare, lang, 0)}
+                    <ShareBar share={c.spendShare} />
+                  </td>
+                  <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(c.attributedRevenue, lang)}</td>
+                  <td className={`${TABLE.td} text-right font-semibold`}>{fmtMultiple(c.roas, lang)}</td>
+                  <td className={`${TABLE.td} text-right text-muted`}>{fmtMultiple(c.breakEvenRoas, lang)}</td>
+                  <td className={`${TABLE.td} text-right font-medium ${profitClass(c.estimatedProfitAfterAds)}`} title={c.profitNote?.[lang]}>
+                    {c.estimatedProfitAfterAds === null ? <span className="text-muted">—</span> : fmtMoneyCompact(c.estimatedProfitAfterAds, lang)}
+                    {c.marginIsPartial && <span className="text-warn">*</span>}
+                  </td>
+                  <td className={`${TABLE.td} text-right`}>{fmtCount(c.impressions, lang)}</td>
+                  <td className={`${TABLE.td} text-right`}>{fmtRate(c.ctr, lang, 2)}</td>
+                  <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(c.cpc, lang)}</td>
+                  <td className={`${TABLE.td} text-right`}>{fmtRate(c.cvr, lang, 2)}</td>
+                  <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(c.cpa, lang)}</td>
+                  <td className={`${TABLE.td} text-right`}>
                     <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: c.name, filter: { range: baseFilter.range, platforms: baseFilter.platforms, campaignId: c.key.split('|')[1] } })} />
                   </td>
                 </tr>
@@ -137,54 +160,49 @@ export const AdsIntelligenceView: React.FC = () => {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-slate-500 mt-2">
-          {vi
-            ? `Lời sau Ads = doanh thu quy đổi × biên lợi nhuận trước Ads${t.marginIsEstimate ? ' (biên gộp − phí sàn bạn nhập ở Cài đặt, ước tính theo số bạn nhập)' : ' của SKU'} − chi phí. Doanh thu quy đổi do sàn báo cáo, có thể trùng với đơn tự nhiên. * = thiếu một số chi phí.`
-            : 'Profit after ads = attributed revenue × margin before ads − spend. Attribution is the platform’s own.'}
-        </p>
-      </Section>
+      </SectionCard>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Section title={vi ? 'Chi phí Ads theo ngày' : 'Daily ad spend'}>
+      <CardGrid>
+        <SectionCard span={6} title={vi ? 'Chi phí Ads theo ngày' : 'Daily ad spend'}>
           <div className="h-48" role="img" aria-label={vi ? 'Chi phí quảng cáo theo ngày' : 'Daily ad spend'}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ai.daily.map((d) => ({ label: fmtDay(d.date), spend: d.spend }))} barCategoryGap={2}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
-                <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} tick={{ fill: '#94a3b8', fontSize: 10 }} width={56} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [fmtMoney(v, lang), vi ? 'Chi phí' : 'Spend']} />
-                <Bar isAnimationActive={false} dataKey="spend" fill={BAR} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="label" tick={axisProps.tick} tickLine={false} minTickGap={16} axisLine={{ stroke: CHART.grid }} />
+                <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} tick={axisProps.tick} width={64} tickLine={false} axisLine={false} />
+                <Tooltip {...tooltipProps} cursor={{ fill: 'var(--hover)' }} formatter={(v: number) => [fmtMoney(v, lang), vi ? 'Chi phí' : 'Spend']} />
+                <Bar isAnimationActive={false} dataKey="spend" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <ChartTotalNote chartTotal={ai.daily.reduce((s, d) => s + d.spend, 0)} kpi={t.spend} lang={lang} tolerance={moneyTolerance(t.spend ?? 0)} />
-        </Section>
-        <Section title={vi ? 'ROAS theo ngày' : 'Daily ROAS'} subtitle={vi ? `Đường nét đứt: ROAS hòa vốn của shop (${fmtMultiple(t.breakEvenRoas, lang)})` : 'Dashed: shop break-even ROAS'}>
+        </SectionCard>
+        <SectionCard span={6} title={vi ? 'ROAS theo ngày' : 'Daily ROAS'} description={vi ? `Đường nét đứt: ROAS hòa vốn của shop (${fmtMultiple(t.breakEvenRoas, lang)})` : 'Dashed: shop break-even ROAS'}>
           <div className="h-48" role="img" aria-label={vi ? 'ROAS theo ngày' : 'Daily ROAS'}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={ai.daily.map((d) => ({ label: fmtDay(d.date), roas: d.roas, be: t.breakEvenRoas, outlier: d.roasOutlier }))}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} minTickGap={16} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
-                <YAxis tickFormatter={(v: number) => `${v}x`} tick={{ fill: '#94a3b8', fontSize: 10 }} width={36} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [fmtMultiple(v, lang), n === 'be' ? (vi ? 'Hòa vốn' : 'Break-even') : 'ROAS']} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="label" tick={axisProps.tick} tickLine={false} minTickGap={16} axisLine={{ stroke: CHART.grid }} />
+                <YAxis tickFormatter={(v: number) => `${v}x`} tick={axisProps.tick} width={40} tickLine={false} axisLine={false} />
+                <Tooltip {...tooltipProps} formatter={(v: number, n: string) => [fmtMultiple(v, lang), n === 'be' ? (vi ? 'Hòa vốn' : 'Break-even') : 'ROAS']} />
                 <Line
                   isAnimationActive={false}
                   type="monotone"
                   dataKey="roas"
-                  stroke={BAR}
+                  stroke={CHART.primary}
                   strokeWidth={2}
                   connectNulls
                   dot={(p: { cx?: number; cy?: number; index?: number; payload?: { outlier?: boolean } }) =>
-                    p.payload?.outlier ? <circle key={p.index} cx={p.cx} cy={p.cy} r={4} fill="#f08080" stroke="#0b1024" strokeWidth={1} /> : <g key={p.index} />
+                    p.payload?.outlier ? <circle key={p.index} cx={p.cx} cy={p.cy} r={4} fill={CHART.anomaly} stroke="var(--surface)" strokeWidth={1.5} /> : <g key={p.index} />
                   }
                 />
-                <Line isAnimationActive={false} type="monotone" dataKey="be" stroke="#8b93a3" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                <Line isAnimationActive={false} type="monotone" dataKey="be" stroke={CHART.muted} strokeWidth={1.5} strokeDasharray={CHART.compareDash} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
           {ai.daily.some((d) => d.roasOutlier) && (
-            <p className="text-[11px] text-[#f08080] mt-1.5">
-              {vi ? 'ROAS bất thường (chấm đỏ): ' : 'Unusual ROAS (red dots): '}
+            <p className="mt-2 text-small text-muted">
+              <span className="font-medium text-down">{vi ? 'ROAS bất thường (chấm cam): ' : 'Unusual ROAS (orange dots): '}</span>
               {ai.daily
                 .filter((d) => d.roasOutlier)
                 .map((d) => `${fmtDay(d.date)} ${fmtMultiple(d.roas, lang)}`)
@@ -192,13 +210,13 @@ export const AdsIntelligenceView: React.FC = () => {
               {vi ? ' — kiểm tra đơn lớn hoặc số liệu ngày này trước khi dùng để kết luận.' : ' — check large orders or the data before drawing conclusions.'}
             </p>
           )}
-        </Section>
-      </div>
+        </SectionCard>
+      </CardGrid>
 
-      <Section title={vi ? 'Theo sàn' : 'By platform'}>
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-xs">
-            <thead className="bg-white/[0.04] text-slate-400">
+      <SectionCard title={vi ? 'Theo sàn' : 'By platform'}>
+        <div className={TABLE.frame}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
                 <Th left>{vi ? 'Sàn' : 'Platform'}</Th>
                 <Th>{vi ? 'Chi phí' : 'Spend'}</Th>
@@ -209,18 +227,18 @@ export const AdsIntelligenceView: React.FC = () => {
             </thead>
             <tbody>
               {ai.byPlatform.map((p) => (
-                <tr key={p.platform} className="border-t border-white/5 text-slate-200">
-                  <td className="px-2.5 py-2 font-semibold text-white">{PLATFORM_LABELS[p.platform]}</td>
-                  <td className="px-2.5 py-2 text-right">{fmtMoneyCompact(p.spend, lang)}</td>
-                  <td className="px-2.5 py-2 text-right">{fmtMoneyCompact(p.revenue, lang)}</td>
-                  <td className="px-2.5 py-2 text-right">{fmtMultiple(p.roas, lang)}</td>
-                  <td className={`px-2.5 py-2 text-right ${(p.profitAfterAds ?? 0) < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`}>{p.profitAfterAds === null ? '—' : fmtMoneyCompact(p.profitAfterAds, lang)}</td>
+                <tr key={p.platform} className={`${TABLE.tr} text-fg`}>
+                  <td className={`${TABLE.td} font-medium`}>{PLATFORM_LABELS[p.platform]}</td>
+                  <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(p.spend, lang)}</td>
+                  <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(p.revenue, lang)}</td>
+                  <td className={`${TABLE.td} text-right`}>{fmtMultiple(p.roas, lang)}</td>
+                  <td className={`${TABLE.td} text-right font-medium ${profitClass(p.profitAfterAds)}`}>{p.profitAfterAds === null ? '—' : fmtMoneyCompact(p.profitAfterAds, lang)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </Section>
+      </SectionCard>
     </div>
   );
 };

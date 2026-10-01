@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   calendarPerformance,
@@ -20,9 +21,12 @@ import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
 import { SampleTag, SmallRateCell } from '../../workspace/SampleSize';
 import { REFERENCE_MAX_SAMPLES } from '../../../analytics';
+import { Button, CardGrid, SectionCard } from '../../ui/primitives';
+import { TABLE } from '../../ui/data';
+import { axisProps, CHART, gridProps, tooltipProps } from '../../../theme/chart';
 import { ChangeCell, Th } from '../ui';
 
-const BAR = '#3987e5';
+const field = 'min-h-10 rounded-control border border-line bg-surface px-2.5 text-sm text-fg';
 
 export const CampaignCalendar: React.FC = () => {
   const { lang, dataset, baseFilter, range, openEvidence, settings, updateSettings } = useWorkspace();
@@ -51,18 +55,18 @@ export const CampaignCalendar: React.FC = () => {
   // Profit per day needs COGS: without it the column is hidden (one note below the table).
   const hasProfit = perf.byDayType.some((b) => b.profitPerDay !== null);
   const bucketRow = (x: BucketStats) => (
-    <tr key={x.key} className="border-t border-white/5 text-slate-200">
-      <td className="px-2.5 py-2 font-semibold text-white">
+    <tr key={x.key} className={`${TABLE.tr} text-fg`}>
+      <td className={`${TABLE.td} font-medium`}>
         {tr(lang, x.label)}
         <SampleTag n={x.days} lang={lang} />
       </td>
-      <td className="px-2.5 py-2 text-right">{x.days}</td>
-      <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.gmvPerDay, lang)}</td>
-      <td className="px-2.5 py-2 text-right">{fmtCount(x.ordersPerDay === null ? null : Math.round(x.ordersPerDay), lang)}</td>
-      <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.aov, lang)}</td>
+      <td className={`${TABLE.td} text-right`}>{x.days}</td>
+      <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(x.gmvPerDay, lang)}</td>
+      <td className={`${TABLE.td} text-right`}>{fmtCount(x.ordersPerDay === null ? null : Math.round(x.ordersPerDay), lang)}</td>
+      <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(x.aov, lang)}</td>
       <SmallRateCell rate={x.cancelRate} orders={x.ordersPerDay === null ? 0 : x.ordersPerDay * x.days} lang={lang} />
-      {hasProfit && <td className="px-2.5 py-2 text-right whitespace-nowrap">{fmtMoneyCompact(x.profitPerDay, lang)}</td>}
-      <td className="px-2.5 py-2 text-right whitespace-nowrap">{x.upliftVsWeekday === null ? '—' : x.key === 'weekday' ? (vi ? 'mốc' : 'base') : fmtChange(x.upliftVsWeekday, lang)}</td>
+      {hasProfit && <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(x.profitPerDay, lang)}</td>}
+      <td className={`${TABLE.td} text-right`}>{x.upliftVsWeekday === null ? '—' : x.key === 'weekday' ? <span className="text-muted">{vi ? 'mốc' : 'base'}</span> : fmtChange(x.upliftVsWeekday, lang)}</td>
     </tr>
   );
 
@@ -85,7 +89,9 @@ export const CampaignCalendar: React.FC = () => {
     <div className="space-y-4">
       <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       {perf.warnings.map((w, i) => (
-        <p key={i} className="text-xs text-[#fab219] rounded-xl border border-[#fab219]/30 bg-[#fab219]/[0.06] px-3 py-2">{tr(lang, w)}</p>
+        <p key={i} className="rounded-control bg-warn-soft px-3 py-2 text-small text-warn">
+          {tr(lang, w)}
+        </p>
       ))}
 
       {(perf.suggestedSaleDays.length > 0 || confirmedDays.length > 0 || updateSettings) && (
@@ -95,30 +101,31 @@ export const CampaignCalendar: React.FC = () => {
         >
           {perf.suggestedSaleDays.length > 0 && (
             <>
-              <div className="text-xs font-bold text-slate-300 mb-1">{vi ? 'Ngày nghi là sale — cần bạn xác nhận' : 'Possible sale days — please confirm'}</div>
-              <ul className="space-y-1 mb-3">
+              <h3 className="mb-1 text-sm font-semibold text-fg">{vi ? 'Ngày nghi là sale — cần bạn xác nhận' : 'Possible sale days — please confirm'}</h3>
+              <ul className="mb-4 divide-y divide-line">
                 {perf.suggestedSaleDays.map((s) => (
-                  <li key={s.date} className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-                    <b className="text-white w-14">{fmtDay(s.date)}</b>
-                    <span className="text-slate-400">{s.reasons.map((r) => tr(lang, r)).join(' · ')}{s.autoDoubleDay ? (vi ? ' · đang được tự nhận là ngày đôi' : ' · auto double day') : ''}</span>
-                    {updateSettings && (
-                      <button onClick={() => setConfirmed([...confirmedDays, s.date])} className="px-2 py-0.5 rounded-md border border-sky-400/40 text-sky-200 font-semibold">
-                        {vi ? 'Xác nhận là ngày sale' : 'Confirm sale day'}
-                      </button>
-                    )}
+                  <li key={s.date} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm">
+                    <b className="w-14 font-semibold tabular text-fg">{fmtDay(s.date)}</b>
+                    <span className="min-w-0 flex-1 text-small text-muted">
+                      {s.reasons.map((r) => tr(lang, r)).join(' · ')}
+                      {s.autoDoubleDay ? (vi ? ' · đang được tự nhận là ngày đôi' : ' · auto double day') : ''}
+                    </span>
+                    {updateSettings && <Button onClick={() => setConfirmed([...confirmedDays, s.date])}>{vi ? 'Xác nhận là ngày sale' : 'Confirm sale day'}</Button>}
                   </li>
                 ))}
               </ul>
             </>
           )}
           {confirmedDays.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-300 mb-2">
+            <div className="mb-3 flex flex-wrap items-center gap-1.5 text-sm text-muted">
               {vi ? 'Đã xác nhận:' : 'Confirmed:'}
               {confirmedDays.map((d) => (
-                <span key={d} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/15">
+                <span key={d} className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface-2 py-0.5 pl-2.5 pr-1 text-small tabular text-fg">
                   {fmtDay(d)}
                   {updateSettings && (
-                    <button onClick={() => setConfirmed(confirmedDays.filter((x) => x !== d))} aria-label={vi ? `Bỏ ${fmtDay(d)}` : `Remove ${fmtDay(d)}`} className="text-slate-500 hover:text-white">×</button>
+                    <button type="button" onClick={() => setConfirmed(confirmedDays.filter((x) => x !== d))} aria-label={vi ? `Bỏ ${fmtDay(d)}` : `Remove ${fmtDay(d)}`} className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-fg">
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
                   )}
                 </span>
               ))}
@@ -126,28 +133,30 @@ export const CampaignCalendar: React.FC = () => {
           )}
           {updateSettings && (
             <form
-              className="flex items-center gap-2 text-xs text-slate-300"
+              className="flex flex-wrap items-center gap-2 text-sm text-muted"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (/^\d{4}-\d{2}-\d{2}$/.test(manualDay)) setConfirmed([...confirmedDays, manualDay]);
                 setManualDay('');
               }}
             >
-              {vi ? 'Nhập ngày sale thủ công:' : 'Add a sale day:'}
-              <input type="date" value={manualDay} onChange={(e) => setManualDay(e.target.value)} className="bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-slate-100 [color-scheme:dark]" />
-              <button type="submit" className="px-2 py-1 rounded-md border border-white/15 font-semibold">{vi ? 'Thêm' : 'Add'}</button>
+              <label htmlFor="manual-sale-day">{vi ? 'Nhập ngày sale thủ công:' : 'Add a sale day:'}</label>
+              <input id="manual-sale-day" type="date" value={manualDay} onChange={(e) => setManualDay(e.target.value)} className={field} />
+              <Button type="submit">{vi ? 'Thêm' : 'Add'}</Button>
             </form>
           )}
         </Section>
       )}
 
-      <Section
+      <SectionCard
         title={vi ? 'Hiệu quả theo loại ngày' : 'Performance by day type'}
-        subtitle={vi ? `${formatRangeVi(range)} · ${perf.analyzedDays} ngày · cột "Ngày" là cỡ mẫu · mức tăng so với ngày thường cả kỳ` : `${formatRangeVi(range)} · ${perf.analyzedDays} days · uplift vs weekdays of the whole period`}
+        description={vi ? `${formatRangeVi(range)} · ${perf.analyzedDays} ngày · cột "Ngày" là cỡ mẫu · mức tăng so với ngày thường cả kỳ` : `${formatRangeVi(range)} · ${perf.analyzedDays} days · uplift vs weekdays of the whole period`}
+        notesLabel={vi ? 'Ghi chú' : 'Notes'}
+        notes={[!hasProfit ? (vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận theo ngày.' : 'No COGS yet, so no profit per day.') : null]}
       >
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full text-xs">
-            <thead className="bg-white/[0.04] text-slate-400">
+        <div className={TABLE.frame}>
+          <table className={TABLE.table}>
+            <thead className={TABLE.thead}>
               <tr>
                 <Th left>{vi ? 'Loại ngày' : 'Day type'}</Th>
                 <Th title={vi ? 'Số ngày trong mẫu' : 'Sample size'}>{vi ? 'Ngày' : 'Days'}</Th>
@@ -161,24 +170,23 @@ export const CampaignCalendar: React.FC = () => {
             </thead>
             <tbody>
               {perf.byDayType.map(bucketRow)}
-              <tr className="border-t border-white/15 bg-white/[0.03]">
-                <td className="px-2.5 py-2 font-bold text-white" colSpan={hasProfit ? 8 : 7}>
-                  {vi ? 'Ngày sale so với ngày thường: ' : 'Sale vs normal days: '}
-                  <span className="text-sky-300">{fmtMoneyCompact(perf.saleVsNormal.sale.gmvPerDay, lang)}</span> {vi ? 'so với' : 'vs'}{' '}
-                  <span className="text-slate-300">{fmtMoneyCompact(perf.saleVsNormal.normal.gmvPerDay, lang)}</span> / {vi ? 'ngày' : 'day'} ({fmtChange(perf.saleVsNormal.uplift, lang)}) ·{' '}
-                  {vi ? 'hủy' : 'cancel'} {fmtRate(perf.saleVsNormal.sale.cancelRate, lang)} {vi ? 'so với' : 'vs'} {fmtRate(perf.saleVsNormal.normal.cancelRate, lang)}
+              <tr className="border-t border-line bg-surface-2">
+                <td className="px-3 py-2.5 text-sm text-fg" colSpan={hasProfit ? 8 : 7}>
+                  <span className="font-semibold">{vi ? 'Ngày sale so với ngày thường: ' : 'Sale vs normal days: '}</span>
+                  <b className="font-semibold text-primary">{fmtMoneyCompact(perf.saleVsNormal.sale.gmvPerDay, lang)}</b> {vi ? 'so với' : 'vs'} <b className="font-semibold">{fmtMoneyCompact(perf.saleVsNormal.normal.gmvPerDay, lang)}</b> / {vi ? 'ngày' : 'day'} ({fmtChange(perf.saleVsNormal.uplift, lang)}) · {vi ? 'hủy' : 'cancel'}{' '}
+                  {fmtRate(perf.saleVsNormal.sale.cancelRate, lang)} {vi ? 'so với' : 'vs'} {fmtRate(perf.saleVsNormal.normal.cancelRate, lang)}
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        {!hasProfit && <p className="text-[11px] text-slate-500 mt-1.5">{vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận theo ngày.' : 'No COGS yet, so no profit per day.'}</p>}
-      </Section>
+      </SectionCard>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Section
+      <CardGrid>
+        <SectionCard
+          span={6}
           title={vi ? 'Theo thứ trong tuần' : 'By day of week'}
-          subtitle={
+          description={
             vi
               ? `Chỉ ngày không sale${perf.byWeekday.some((w) => w.days > 0 && w.days <= REFERENCE_MAX_SAMPLES) ? ` · mỗi thứ chỉ có ${Math.min(...perf.byWeekday.filter((w) => w.days > 0).map((w) => w.days))}–${Math.max(...perf.byWeekday.map((w) => w.days))} ngày: tham khảo` : ''}`
               : 'Non-sale days only'
@@ -187,69 +195,84 @@ export const CampaignCalendar: React.FC = () => {
           <div className="h-52" role="img" aria-label={vi ? 'GMV trung bình mỗi ngày theo thứ' : 'Average GMV per weekday'}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={perf.byWeekday.map((w) => ({ label: tr(lang, w.label), gmv: w.gmvPerDay, days: w.days }))}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} />
-                <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} tick={{ fill: '#94a3b8', fontSize: 11 }} width={60} tickLine={false} axisLine={false} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="label" tick={axisProps.tick} tickLine={false} axisLine={{ stroke: CHART.grid }} />
+                <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} tick={axisProps.tick} width={64} tickLine={false} axisLine={false} />
                 <Tooltip
-                  contentStyle={{ background: '#0b1024', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, fontSize: 12 }}
+                  {...tooltipProps}
+                  cursor={{ fill: 'var(--hover)' }}
                   formatter={(v: number, _n: string, p: { payload?: { days?: number } }) => [`${fmtMoney(v, lang)} (${p.payload?.days ?? 0} ${vi ? 'ngày mẫu' : 'days'})`, vi ? 'GMV/ngày' : 'GMV/day']}
                 />
-                <Bar isAnimationActive={false} dataKey="gmv" fill={BAR} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                <Bar isAnimationActive={false} dataKey="gmv" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={36} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Section>
+        </SectionCard>
         {perf.showByDayOfMonth ? (
-        <Section title={vi ? 'Theo ngày trong tháng' : 'By day of month'} subtitle={vi ? '● = có ngày sale trong mẫu' : '● = includes sale days'}>
-          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs max-h-52 overflow-y-auto pr-1">
-            {perf.byDayOfMonth.map((d) => {
-              const max = Math.max(...perf.byDayOfMonth.map((x) => x.gmvPerDay ?? 0)) || 1;
-              return (
-                <li key={d.key} className="flex items-center gap-1.5 text-slate-300">
-                  <span className="w-6 text-right">{d.key}</span>
-                  <span className="flex-1 h-1.5 rounded-full bg-white/[0.06]"><span className="block h-1.5 rounded-full bg-[#3987e5]" style={{ width: `${((d.gmvPerDay ?? 0) / max) * 100}%` }} /></span>
-                  <span className="w-16 text-right whitespace-nowrap">{fmtMoneyCompact(d.gmvPerDay, lang)}</span>
-                  <span className={`w-2 ${d.saleDays ? 'text-[#fab219]' : 'text-transparent'}`} aria-label={d.saleDays ? (vi ? 'có ngày sale' : 'sale day') : undefined}>●</span>
-                </li>
-              );
-            })}
-          </ul>
-        </Section>
+          <SectionCard
+            span={6}
+            title={vi ? 'Theo ngày trong tháng' : 'By day of month'}
+            description={
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: CHART.saleDay }} aria-hidden /> {vi ? '= có ngày sale trong mẫu' : '= includes sale days'}
+              </span>
+            }
+          >
+            <ul className="grid max-h-52 grid-cols-2 gap-x-4 gap-y-1 overflow-y-auto pr-1 text-small text-muted sm:grid-cols-3">
+              {perf.byDayOfMonth.map((d) => {
+                const max = Math.max(...perf.byDayOfMonth.map((x) => x.gmvPerDay ?? 0)) || 1;
+                return (
+                  <li key={d.key} className="flex items-center gap-1.5">
+                    <span className="w-6 text-right tabular">{d.key}</span>
+                    <span className="h-1.5 flex-1 rounded-full bg-surface-2">
+                      <span className="block h-1.5 rounded-full bg-primary" style={{ width: `${((d.gmvPerDay ?? 0) / max) * 100}%` }} />
+                    </span>
+                    <span className="w-16 whitespace-nowrap text-right tabular text-fg">{fmtMoneyCompact(d.gmvPerDay, lang)}</span>
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.saleDays ? CHART.saleDay : 'transparent' }} aria-label={d.saleDays ? (vi ? 'có ngày sale' : 'sale day') : undefined} />
+                  </li>
+                );
+              })}
+            </ul>
+          </SectionCard>
         ) : (
-          <Section title={vi ? 'Theo ngày trong tháng' : 'By day of month'}>
-            <p className="text-sm text-slate-400">{vi ? 'Không đủ dữ liệu: cần từ 2 tháng trở lên để mỗi ngày trong tháng có ít nhất 2 mẫu.' : 'Not enough data: needs 2+ months.'}</p>
-          </Section>
+          <SectionCard span={6} title={vi ? 'Theo ngày trong tháng' : 'By day of month'}>
+            <NotEnoughData lang={lang} reason={vi ? 'Cần từ 2 tháng trở lên để mỗi ngày trong tháng có ít nhất 2 mẫu.' : 'Needs 2+ months.'} />
+          </SectionCard>
         )}
-      </div>
+      </CardGrid>
 
-      <Section
+      <SectionCard
         title={vi ? 'So sánh chiến dịch' : 'Campaign comparison'}
-        subtitle={vi ? 'Mức tăng so với 14 ngày trước chiến dịch (chỉ ngày thường, đã loại ngày sale đã xác nhận)' : 'Uplift vs the normal days in the 14 days before the campaign'}
+        description={vi ? 'Mức tăng so với 14 ngày trước chiến dịch (chỉ ngày thường, đã loại ngày sale đã xác nhận)' : 'Uplift vs the normal days in the 14 days before the campaign'}
+        notesLabel={vi ? 'Ghi chú' : 'Notes'}
+        notes={cmp ? [vi ? 'So sánh 2 chiến dịch chỉ là 2 quan sát — chênh lệch có thể đến từ sản phẩm, ngân sách hoặc thời điểm, không phải từ bản thân chiến dịch.' : 'Two campaigns are two observations — differences may come from products, budget or timing.'] : []}
       >
         {all.length < 2 ? (
           <NotEnoughData lang={lang} reason={vi ? 'Cần ít nhất 2 chiến dịch/ngày sale trong dữ liệu.' : 'At least 2 campaigns are needed.'} />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2 mb-3 text-xs text-slate-300">
+            <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-muted">
               {[
                 { label: vi ? 'Kỳ gốc (A)' : 'Reference (A)', value: a?.campaignId, set: setAId },
                 { label: vi ? 'So với (B)' : 'Compare (B)', value: b?.campaignId, set: setBId },
               ].map((s) => (
-                <label key={s.label} className="flex items-center gap-1.5">
+                <label key={s.label} className="flex items-center gap-2">
                   {s.label}
-                  <select value={s.value} onChange={(e) => s.set(e.target.value)} className="bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-slate-100 [color-scheme:dark]">
+                  <select value={s.value} onChange={(e) => s.set(e.target.value)} className={field}>
                     {all.map((c) => (
-                      <option key={c.campaignId} value={c.campaignId}>{c.name} · {formatRangeVi(c.range)}</option>
+                      <option key={c.campaignId} value={c.campaignId}>
+                        {c.name} · {formatRangeVi(c.range)}
+                      </option>
                     ))}
                   </select>
                 </label>
               ))}
             </div>
             {cmp && (
-              <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
-                <div className="overflow-x-auto rounded-xl border border-white/10">
-                  <table className="w-full text-xs">
-                    <thead className="bg-white/[0.04] text-slate-400">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
+                <div className={TABLE.frame}>
+                  <table className={TABLE.table}>
+                    <thead className={TABLE.thead}>
                       <tr>
                         <Th left>{vi ? 'Chỉ số' : 'Metric'}</Th>
                         <Th>A · {cmp.a.entry.name}</Th>
@@ -259,36 +282,41 @@ export const CampaignCalendar: React.FC = () => {
                     </thead>
                     <tbody>
                       {metricRows.map((m) => (
-                        <tr key={m.label} className="border-t border-white/5 text-slate-200">
-                          <td className="px-2.5 py-2">{m.label}</td>
-                          <td className="px-2.5 py-2 text-right whitespace-nowrap">{m.get(cmp.a)}</td>
-                          <td className="px-2.5 py-2 text-right whitespace-nowrap font-semibold text-white">{m.get(cmp.b)}</td>
-                          <td className="px-2.5 py-2 text-right whitespace-nowrap">{m.change ? <ChangeCell c={m.change} rate={m.rate} goodWhenUp={m.goodWhenUp} lang={lang} /> : '—'}</td>
+                        <tr key={m.label} className={`${TABLE.tr} text-fg`}>
+                          <td className="px-3 py-1.5">{m.label}</td>
+                          <td className={`${TABLE.td} text-right`}>{m.get(cmp.a)}</td>
+                          <td className={`${TABLE.td} text-right font-semibold`}>{m.get(cmp.b)}</td>
+                          <td className={`${TABLE.td} text-right`}>{m.change ? <ChangeCell c={m.change} rate={m.rate} goodWhenUp={m.goodWhenUp} lang={lang} /> : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <div className="space-y-3 text-xs">
+                <div className="space-y-3 text-small">
                   {[cmp.a, cmp.b].map((r, i) => (
-                    <div key={i} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                    <div key={i} className="rounded-control border border-line bg-surface-2 p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <b className="text-white">{i === 0 ? 'A' : 'B'} · {r.entry.name}</b>
+                        <b className="text-sm font-semibold text-fg">
+                          {i === 0 ? 'A' : 'B'} · {r.entry.name}
+                        </b>
                         <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: r.entry.name, filter: { range: r.entry.range, platforms: baseFilter.platforms } })} />
                       </div>
-                      <div className="text-slate-400 mt-1">{vi ? 'Top SKU:' : 'Top SKUs:'} {r.topSkus.slice(0, 3).map((s) => `${s.label} (${fmtMoneyCompact(s.current.gmv, lang)})`).join(', ')}</div>
+                      <div className="mt-1 text-muted">
+                        {vi ? 'Top SKU:' : 'Top SKUs:'} {r.topSkus.slice(0, 3).map((s) => `${s.label} (${fmtMoneyCompact(s.current.gmv, lang)})`).join(', ')}
+                      </div>
                       {r.cancelReasons.length > 0 && (
-                        <div className="text-slate-400 mt-1">{vi ? 'Lý do hủy nhiều nhất:' : 'Top cancel reasons:'} {r.cancelReasons.map((c) => `${c.reason} (${fmtRate(c.share, lang, 0)})`).join(', ')}</div>
+                        <div className="mt-1 text-muted">
+                          {vi ? 'Lý do hủy nhiều nhất:' : 'Top cancel reasons:'} {r.cancelReasons.map((c) => `${c.reason} (${fmtRate(c.share, lang, 0)})`).join(', ')}
+                        </div>
                       )}
                     </div>
                   ))}
-                  <p className="text-[11px] text-slate-500">{vi ? 'So sánh 2 chiến dịch chỉ là 2 quan sát — chênh lệch có thể đến từ sản phẩm, ngân sách hoặc thời điểm, không phải từ bản thân chiến dịch.' : 'Two campaigns are two observations — differences may come from products, budget or timing.'}</p>
                 </div>
               </div>
             )}
           </>
         )}
-      </Section>
+      </SectionCard>
     </div>
   );
 };

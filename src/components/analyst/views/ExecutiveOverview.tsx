@@ -4,48 +4,35 @@ import {
   breakdown,
   compareRanges,
   dailySeries,
-  fmtChange,
   fmtMoney,
   fmtMoneyCompact,
-  fmtPp,
   formatRangeVi,
   moneyTolerance,
   type KpiKey,
-  type MetricComparison,
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
-import { KpiCard, NotEnoughData, Section, tr } from '../../seller/ui';
+import { NotEnoughData, tr } from '../../seller/ui';
+import { CardGrid, SectionCard } from '../../ui/primitives';
+import { AlertStack, DeltaBadge, KpiGrid, type KpiItem, type StackItem } from '../../ui/data';
+import { axisProps, CHART, gridProps, legendProps, tooltipProps, xAxisProps } from '../../../theme/chart';
 import { SourceDriversPanel, SubsidyPanel } from '../../workspace/SummaryInsightPanels';
 import { ChartTotalNote } from '../../workspace/MismatchBox';
-import { BreakdownTable } from '../ui';
+import { BreakdownTable, ChangeCell } from '../ui';
 
-const CURRENT_COLOR = '#3987e5';
-const PREVIOUS_COLOR = '#8b93a3';
-
-const KPIS: { key: KpiKey; vi: string; en: string; goodWhenUp?: boolean }[] = [
-  { key: 'gmv', vi: 'GMV', en: 'GMV' },
-  { key: 'netRevenue', vi: 'Doanh thu thuần', en: 'Net revenue' },
-  { key: 'profit', vi: 'Lợi nhuận đóng góp', en: 'Contribution profit' },
-  { key: 'margin', vi: 'Margin', en: 'Margin' },
-  { key: 'orders', vi: 'Đơn đặt', en: 'Orders' },
+const KPIS: { key: KpiKey; vi: string; en: string; goodWhenUp?: boolean; defVi?: string }[] = [
+  { key: 'gmv', vi: 'GMV', en: 'GMV', defVi: 'Tổng giá trị đơn đặt trong kỳ, gồm cả đơn sau đó bị hủy (như báo cáo Shopee).' },
+  { key: 'netRevenue', vi: 'Doanh thu thuần', en: 'Net revenue', defVi: 'GMV − doanh số hủy − tiền hoàn, cùng mức đơn.' },
+  { key: 'profit', vi: 'Lợi nhuận đóng góp', en: 'Contribution profit', defVi: 'Doanh thu thuần − giá vốn − phí sàn − Ads − chi phí khác đã biết.' },
+  { key: 'margin', vi: 'Margin', en: 'Margin', defVi: 'Lợi nhuận đóng góp ÷ doanh thu thuần.' },
+  { key: 'orders', vi: 'Đơn đặt', en: 'Orders', defVi: 'Số đơn đặt trong kỳ, mọi trạng thái.' },
   { key: 'units', vi: 'Sản phẩm bán', en: 'Units' },
-  { key: 'aov', vi: 'AOV', en: 'AOV' },
-  { key: 'cvr', vi: 'CVR', en: 'CVR' },
-  { key: 'cancelRate', vi: 'Tỷ lệ hủy', en: 'Cancel rate', goodWhenUp: false },
-  { key: 'refundRate', vi: 'Tỷ lệ trả/hoàn', en: 'Refund rate', goodWhenUp: false },
-  { key: 'visits', vi: 'Lượt truy cập', en: 'Visits' },
-  { key: 'buyers', vi: 'Người mua', en: 'Buyers' },
+  { key: 'aov', vi: 'AOV', en: 'AOV', defVi: 'GMV ÷ số đơn (cùng mức đơn).' },
+  { key: 'cvr', vi: 'CVR', en: 'CVR', defVi: 'Số đơn ÷ lượt nhấp sản phẩm.' },
+  { key: 'cancelRate', vi: 'Tỷ lệ hủy', en: 'Cancel rate', goodWhenUp: false, defVi: 'Đơn hủy ÷ số đơn.' },
+  { key: 'refundRate', vi: 'Tỷ lệ trả/hoàn', en: 'Refund rate', goodWhenUp: false, defVi: 'Đơn trả hàng/hoàn tiền ÷ số đơn.' },
+  { key: 'visits', vi: 'Lượt truy cập', en: 'Visits', defVi: 'Số khách truy cập khác nhau trong kỳ.' },
+  { key: 'buyers', vi: 'Người mua', en: 'Buyers', defVi: 'Số người mua khác nhau, gồm cả người có đơn hủy.' },
 ];
-
-function changeSentence(label: string, c: MetricComparison, lang: 'vi' | 'en'): string | null {
-  if (c.direction === 'unknown') return null;
-  if (c.unit === 'ratio') {
-    if (c.percentagePointDelta === null || c.percentagePointDelta === undefined) return null;
-    return `${label} ${fmtPp(c.percentagePointDelta, lang)}`;
-  }
-  if (c.percentageDelta === null) return null;
-  return `${label} ${fmtChange(c.percentageDelta, lang)}`;
-}
 
 export const ExecutiveOverview: React.FC = () => {
   const { lang, dataset, baseFilter, range, previousRange, goTo } = useWorkspace();
@@ -60,7 +47,6 @@ export const ExecutiveOverview: React.FC = () => {
   // No data in the comparison period: no Δ anywhere, and say so instead of "chưa đủ mẫu".
   const noComparison = cmp.previous.coverage === 'none';
   const compareLabel = noComparison ? (vi ? 'Không có kỳ so sánh' : 'No comparison period') : vi ? `so với ${formatRangeVi(previousRange)}` : `vs ${formatRangeVi(previousRange)}`;
-  const changed = KPIS.map((k) => changeSentence(vi ? k.vi : k.en, cmp.metrics[k.key], lang)).filter(Boolean) as string[];
 
   const chart = Array.from({ length: Math.max(cur.length, prev.length) }, (_, i) => ({
     idx: i + 1,
@@ -71,69 +57,84 @@ export const ExecutiveOverview: React.FC = () => {
 
   const negatives = [...byPlatform.rows, ...byCategory.rows].filter((r) => (r.change.gmv.absoluteDelta ?? 0) < 0).sort((a, b) => (a.change.gmv.absoluteDelta ?? 0) - (b.change.gmv.absoluteDelta ?? 0));
 
+  const alerts: StackItem[] = [];
+  if (noComparison) alerts.push({ id: 'no-cmp', tone: 'info', title: vi ? 'Không có kỳ so sánh' : 'No comparison period', detail: vi ? `${formatRangeVi(previousRange)} nằm ngoài dữ liệu.` : `${formatRangeVi(previousRange)} is outside the data.` });
+  if (cmp.previous.coverage === 'partial') alerts.push({ id: 'partial-cmp', tone: 'warn', title: vi ? 'Kỳ so sánh chỉ có một phần dữ liệu' : 'Comparison period partly covered', detail: vi ? `${formatRangeVi(previousRange)} — so sánh có thể không đại diện.` : formatRangeVi(previousRange) });
+
+  const kpiItems: KpiItem[] = KPIS.map((k) => ({
+    key: k.key,
+    label: vi ? k.vi : k.en,
+    metric: cmp.current.metrics[k.key],
+    cmp: noComparison ? undefined : cmp.metrics[k.key],
+    goodWhenUp: k.goodWhenUp,
+    definition: vi ? k.defVi : undefined,
+    missingAction: k.key === 'profit' || k.key === 'margin' ? { label: vi ? 'Nhập giá vốn' : 'Enter COGS', onClick: () => goTo('settings') } : undefined,
+  }));
+  const changedKpis = KPIS.filter((k) => !noComparison && cmp.metrics[k.key].direction !== 'unknown' && cmp.current.metrics[k.key].value !== null);
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5">
-        {KPIS.map((k) => (
-          <KpiCard key={k.key} lang={lang} label={vi ? k.vi : k.en} metric={cmp.current.metrics[k.key]} cmp={noComparison ? undefined : cmp.metrics[k.key]} compareLabel={compareLabel} goodWhenUp={k.goodWhenUp} />
-        ))}
-      </div>
-      {noComparison && <p className="text-xs text-slate-400">{vi ? `Không có kỳ so sánh: ${formatRangeVi(previousRange)} nằm ngoài dữ liệu.` : `No comparison period: ${formatRangeVi(previousRange)} is outside the data.`}</p>}
-      {cmp.previous.coverage === 'partial' && (
-        <p className="text-xs text-[#fab219]">
-          {vi
-            ? `Kỳ so sánh ${formatRangeVi(previousRange)} chỉ có một phần dữ liệu — so sánh có thể không đại diện.`
-            : `Comparison period ${formatRangeVi(previousRange)} is only partly covered.`}
-        </p>
-      )}
+      <AlertStack items={alerts} lang={lang} label={(n) => (vi ? `${n} lưu ý về kỳ so sánh` : `${n} notes on the comparison`)} />
+      <KpiGrid items={kpiItems} lang={lang} compareLabel={compareLabel} />
 
-      <Section title={vi ? '1 · Điều gì đã thay đổi?' : '1 · What changed?'} subtitle={noComparison ? `${formatRangeVi(range)} · ${compareLabel}` : `${formatRangeVi(range)} ${compareLabel}`}>
-        {changed.length === 0 ? (
-          <p className="text-sm text-slate-400">{vi ? 'Không có kỳ so sánh.' : 'No comparison period.'}</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {changed.map((s) => (
-              <span key={s} className="text-xs px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-slate-100">{s}</span>
-            ))}
-          </div>
-        )}
-        {chart.length > 1 && (
-          <ChartTotalNote chartTotal={cur.reduce((s, p) => s + (p.gmv ?? 0), 0)} kpi={cmp.current.metrics.gmv.value} lang={lang} tolerance={moneyTolerance(cmp.current.metrics.gmv.value ?? 0)} />
-        )}
-        {chart.length > 1 && gmvBasis && (
-          <p className="text-[11px] text-slate-400 mt-4">{vi ? `Biểu đồ: GMV theo ngày, ${gmvBasis.vi.toLowerCase()}.` : `Chart: daily GMV, ${gmvBasis.en.toLowerCase()}.`}</p>
-        )}
-        {chart.length > 1 && (
-          <div className="h-60 mt-4" role="img" aria-label={vi ? 'GMV theo ngày: kỳ này và kỳ so sánh' : 'Daily GMV: current vs comparison'}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} minTickGap={16} />
-                <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} tick={{ fill: '#94a3b8', fontSize: 11 }} tickLine={false} axisLine={false} width={64} />
-                <Tooltip
-                  contentStyle={{ background: '#0b1024', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, fontSize: 12 }}
-                  labelStyle={{ color: '#e2e8f0', fontWeight: 700 }}
-                  itemStyle={{ color: '#cbd5e1' }}
-                  formatter={(v: number, name: string) => [fmtMoney(v, lang), name]}
-                />
-                <Legend wrapperStyle={{ fontSize: 12, color: '#cbd5e1' }} />
-                <Line isAnimationActive={false} type="monotone" dataKey="current" name={vi ? `Kỳ này (${formatRangeVi(range)})` : `Current (${formatRangeVi(range)})`} stroke={CURRENT_COLOR} strokeWidth={2} dot={false} connectNulls />
-                <Line isAnimationActive={false} type="monotone" dataKey="previous" name={vi ? `Kỳ so sánh (${formatRangeVi(previousRange)})` : `Comparison (${formatRangeVi(previousRange)})`} stroke={PREVIOUS_COLOR} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </Section>
+      <CardGrid>
+        <SectionCard
+          span={12}
+          title={vi ? '1 · Điều gì đã thay đổi?' : '1 · What changed?'}
+          description={noComparison ? `${formatRangeVi(range)} · ${compareLabel}` : `${formatRangeVi(range)} ${compareLabel}`}
+          notes={[chart.length > 1 && gmvBasis ? (vi ? `Biểu đồ: GMV theo ngày, ${gmvBasis.vi.toLowerCase()}.` : `Chart: daily GMV, ${gmvBasis.en.toLowerCase()}.`) : null]}
+        >
+          {changedKpis.length === 0 ? (
+            <p className="text-sm text-muted">{vi ? 'Không có kỳ so sánh.' : 'No comparison period.'}</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {changedKpis.map((k) => (
+                <span key={k.key} className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 py-1 text-sm text-fg">
+                  {vi ? k.vi : k.en}
+                  <DeltaBadge cmp={cmp.metrics[k.key]} lang={lang} goodWhenUp={k.goodWhenUp} />
+                </span>
+              ))}
+            </div>
+          )}
+          {chart.length > 1 && (
+            <ChartTotalNote chartTotal={cur.reduce((s, p) => s + (p.gmv ?? 0), 0)} kpi={cmp.current.metrics.gmv.value} lang={lang} tolerance={moneyTolerance(cmp.current.metrics.gmv.value ?? 0)} />
+          )}
+          {chart.length > 1 && (
+            <div className="mt-4 h-64" role="img" aria-label={vi ? 'GMV theo ngày: kỳ này và kỳ so sánh' : 'Daily GMV: current vs comparison'}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="label" {...xAxisProps} />
+                  <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} {...axisProps} width={64} />
+                  <Tooltip {...tooltipProps} formatter={(v: number, name: string) => [fmtMoney(v, lang), name]} />
+                  <Legend {...legendProps} />
+                  <Line isAnimationActive={false} type="monotone" dataKey="current" name={vi ? `Kỳ này (${formatRangeVi(range)})` : `Current (${formatRangeVi(range)})`} stroke={CHART.primary} strokeWidth={2} dot={false} connectNulls />
+                  <Line
+                    isAnimationActive={false}
+                    type="monotone"
+                    dataKey="previous"
+                    name={vi ? `Kỳ so sánh (${formatRangeVi(previousRange)})` : `Comparison (${formatRangeVi(previousRange)})`}
+                    stroke={CHART.primary}
+                    strokeOpacity={CHART.compareOpacity}
+                    strokeWidth={2}
+                    strokeDasharray={CHART.compareDash}
+                    dot={false}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
 
-      <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
-        <Section title={vi ? '2 · Thay đổi nằm ở sàn nào?' : '2 · Where — by platform'} subtitle={vi ? 'Đóng góp Δ = phần của thay đổi GMV toàn shop do sàn đó tạo ra' : 'Contribution = share of the total GMV change'}>
+        <SectionCard span={6} title={vi ? '2 · Thay đổi nằm ở sàn nào?' : '2 · Where — by platform'} description={vi ? 'Đóng góp Δ = phần của thay đổi GMV toàn shop do sàn đó tạo ra' : 'Contribution = share of the total GMV change'}>
           {byPlatform.unavailable ? (
             <NotEnoughData lang={lang} reason={tr(lang, byPlatform.unavailable)} />
           ) : (
             <BreakdownTable rows={byPlatform.rows} lang={lang} firstHeader={vi ? 'Sàn' : 'Platform'} columns={['gmv', 'gmvChange', 'contribution', 'profit', 'margin', 'cancel']} />
           )}
-        </Section>
-        <Section title={vi ? '3 · Ngành hàng nào đóng góp?' : '3 · What contributed — by category'} subtitle={vi ? 'Bấm để đi sâu Ngành → Nhóm → SKU' : 'Click to drill into niche → SKU'}>
+        </SectionCard>
+        <SectionCard span={6} title={vi ? '3 · Ngành hàng nào đóng góp?' : '3 · What contributed — by category'} description={vi ? 'Bấm để đi sâu Ngành → Nhóm → SKU' : 'Click to drill into niche → SKU'}>
           {byCategory.unavailable ? (
             <NotEnoughData lang={lang} reason={tr(lang, byCategory.unavailable)} />
           ) : (
@@ -145,24 +146,35 @@ export const ExecutiveOverview: React.FC = () => {
               onRowClick={(r) => goTo('category', { categories: [r.key] })}
             />
           )}
-        </Section>
-      </div>
+        </SectionCard>
 
-      {negatives.length > 0 && (
-        <Section title={vi ? '4 · Nên điều tra gì?' : '4 · What to investigate'}>
-          <ul className="space-y-1.5 text-sm text-slate-200">
-            {negatives.slice(0, 4).map((r) => (
-              <li key={r.key}>
-                • <b>{r.label}</b>: GMV {fmtChange(r.change.gmv.percentageDelta, lang)} ({fmtMoneyCompact(r.change.gmv.absoluteDelta, lang)})
-                {r.gmvContribution !== null && (vi ? `, chiếm ${Math.round(Math.abs(r.gmvContribution) * 100)}% độ lớn thay đổi toàn shop` : `, ${Math.round(Math.abs(r.gmvContribution) * 100)}% of the total change`)}.
-              </li>
-            ))}
-          </ul>
-          <p className="text-[11px] text-slate-500 mt-2">{vi ? 'Đây là phân rã đóng góp, không phải nguyên nhân. Đi sâu theo ngành/SKU để tìm yếu tố đi cùng.' : 'This is a contribution breakdown, not a cause.'}</p>
-        </Section>
-      )}
-      <SourceDriversPanel before={previousRange} after={range} title={vi ? 'Doanh số thay đổi do kênh / nguồn nào (so với kỳ so sánh)' : 'Which channel / source moved sales (vs comparison period)'} />
-      <SubsidyPanel />
+        {negatives.length > 0 && (
+          <SectionCard
+            span={12}
+            title={vi ? '4 · Nên điều tra gì?' : '4 · What to investigate'}
+            notes={[vi ? 'Đây là phân rã đóng góp, không phải nguyên nhân. Đi sâu theo ngành/SKU để tìm yếu tố đi cùng.' : 'This is a contribution breakdown, not a cause.']}
+          >
+            <ul className="space-y-2 text-sm text-fg">
+              {negatives.slice(0, 4).map((r) => (
+                <li key={r.key} className="flex flex-wrap items-center gap-1.5">
+                  <b className="font-semibold">{r.label}</b>
+                  <ChangeCell c={r.change.gmv} lang={lang} />
+                  <span className="text-muted">
+                    {fmtMoneyCompact(r.change.gmv.absoluteDelta, lang)}
+                    {r.gmvContribution !== null && (vi ? ` · chiếm ${Math.round(Math.abs(r.gmvContribution) * 100)}% độ lớn thay đổi toàn shop` : ` · ${Math.round(Math.abs(r.gmvContribution) * 100)}% of the total change`)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        )}
+        <div className="col-span-12">
+          <SourceDriversPanel before={previousRange} after={range} title={vi ? 'Doanh số thay đổi do kênh / nguồn nào (so với kỳ so sánh)' : 'Which channel / source moved sales (vs comparison period)'} />
+        </div>
+        <div className="col-span-12">
+          <SubsidyPanel />
+        </div>
+      </CardGrid>
     </div>
   );
 };

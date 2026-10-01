@@ -10,6 +10,9 @@ import { NotEnoughData, Section, tr } from '../seller/ui';
 import { MismatchBox } from './MismatchBox';
 import { NoticeBadge } from './DataNotices';
 import { ShareBar, Th } from '../analyst/ui';
+import { TABLE } from '../ui/data';
+import { Badge } from '../ui/primitives';
+import { CHANNEL_COLOR } from '../../theme/chart';
 
 export const SUMMARY_STAGES: { key: SummaryStage; vi: string; en: string }[] = [
   { key: 'placed', vi: 'Đơn đã đặt', en: 'Placed' },
@@ -20,26 +23,39 @@ export const SUMMARY_STAGES: { key: SummaryStage; vi: string; en: string }[] = [
 export const StagePicker: React.FC<{ stage: SummaryStage; onChange: (s: SummaryStage) => void; vi: boolean }> = ({ stage, onChange, vi }) => (
   <div className="flex gap-1" role="group" aria-label={vi ? 'Loại đơn' : 'Order stage'}>
     {SUMMARY_STAGES.map((s) => (
-      <button key={s.key} onClick={() => onChange(s.key)} aria-pressed={stage === s.key} className={`px-2 py-1 rounded-lg text-xs font-semibold border ${stage === s.key ? 'bg-white/15 border-white/30 text-white' : 'border-white/10 text-slate-400'}`}>
+      <button key={s.key} onClick={() => onChange(s.key)} aria-pressed={stage === s.key} className={`px-2 py-1 rounded-lg text-xs font-semibold border ${stage === s.key ? 'bg-primary-soft border-primary/30 text-primary' : 'border-line text-muted'}`}>
         {vi ? s.vi : s.en}
       </button>
     ))}
   </div>
 );
 
-export const SummaryNotes: React.FC<{ notes: { vi: string; en: string }[]; lang: 'vi' | 'en' }> = ({ notes, lang }) => (
-  <ul className="mt-2 space-y-0.5">
-    {notes.map((n, i) => (
-      <li key={i} className="text-[11px] text-slate-500">
-        • {tr(lang, n)}
-      </li>
-    ))}
-  </ul>
-);
+/** Long notes go in a collapsible "Ghi chú" footer, never in the body of a card. */
+export const SummaryNotes: React.FC<{ notes: { vi: string; en: string }[]; lang: 'vi' | 'en' }> = ({ notes, lang }) => {
+  const [open, setOpen] = useState(false);
+  if (notes.length === 0) return null;
+  return (
+    <div className="mt-3 border-t border-line pt-1">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="inline-flex min-h-10 items-center gap-1 text-small text-muted hover:text-fg">
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+        {lang === 'vi' ? 'Ghi chú' : 'Notes'} ({notes.length})
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-1">
+          {notes.map((n, i) => (
+            <li key={i} className="text-small text-muted">
+              • {tr(lang, n)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 /** A rate that cannot exceed 100%: above it, "—" with the reason. */
 const RateCell: React.FC<{ v: number | null; lang: 'vi' | 'en'; digits?: number; small?: boolean }> = ({ v, lang, digits = 1, small }) => (
-  <td className={`px-2.5 ${small ? 'py-1' : 'py-1.5'} text-right`} title={isOverFull(v) ? tr(lang, OVER_FULL_NOTE) : undefined}>
+  <td className={`${TABLE.td} text-right`} title={isOverFull(v) ? tr(lang, OVER_FULL_NOTE) : undefined}>
     {fmtShare(v, lang, digits)}
   </td>
 );
@@ -52,7 +68,7 @@ const UniqueCell: React.FC<{ channel: SummaryChannel; v: number | null; lang: 'v
   channel === 'product_card' ? (
     <RateCell v={v} lang={lang} small={small} />
   ) : (
-    <td className={`px-2.5 ${small ? 'py-1' : 'py-1.5'} text-right whitespace-nowrap`}>{fmtPerViewer(v, lang)}</td>
+    <td className={`${TABLE.td} text-right`}>{fmtPerViewer(v, lang)}</td>
   );
 
 export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) => {
@@ -72,14 +88,14 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
       : 'Part of the period: sums of daily unique counts';
 
   return (
-    <Section title={title ?? (vi ? 'Doanh thu đến từ đâu' : 'Where revenue comes from')} subtitle={vi ? `Theo kênh và nguồn truy cập · ${formatRangeVi(range)}` : `By channel and traffic source · ${formatRangeVi(range)}`} right={<span className="text-[11px] text-slate-400">{STAGE_BASIS[stage][lang]}</span>}>
+    <Section title={title ?? (vi ? 'Doanh thu đến từ đâu' : 'Where revenue comes from')} subtitle={vi ? `Theo kênh và nguồn truy cập · ${formatRangeVi(range)}` : `By channel and traffic source · ${formatRangeVi(range)}`} right={<Badge>{STAGE_BASIS[stage][lang]}</Badge>}>
       {!mix.available ? (
         <NotEnoughData lang={lang} reason={tr(lang, mix.notes[0] ?? { vi: 'Không có số liệu theo kênh trong khoảng này.', en: 'No channel data in this range.' })} />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
-            <table className="w-full text-xs">
-              <thead className="bg-white/[0.04] text-slate-400">
+          <div className={TABLE.frame}>
+            <table className={TABLE.table}>
+              <thead className={TABLE.thead}>
                 <tr>
                   <Th left>{vi ? 'Kênh / nguồn' : 'Channel / source'}</Th>
                   <Th>{vi ? 'Doanh số' : 'Sales'}</Th>
@@ -95,29 +111,30 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
                   const expanded = open === c.channel;
                   return (
                     <React.Fragment key={c.channel}>
-                      <tr className="border-t border-white/5 text-slate-100 cursor-pointer hover:bg-white/[0.03]" onClick={() => setOpen(expanded ? null : c.channel)} aria-expanded={expanded}>
-                        <td className="px-2.5 py-1.5 font-semibold whitespace-nowrap">
-                          {c.sources.length > 0 ? expanded ? <ChevronDown className="inline w-3.5 h-3.5 mr-1" aria-hidden /> : <ChevronRight className="inline w-3.5 h-3.5 mr-1" aria-hidden /> : <span className="inline-block w-[18px]" />}
+                      <tr className={`${TABLE.tr} cursor-pointer text-fg`} onClick={() => setOpen(expanded ? null : c.channel)} aria-expanded={expanded}>
+                        <td className={`${TABLE.td} font-medium`}>
+                          {c.sources.length > 0 ? expanded ? <ChevronDown className="mr-1 inline h-4 w-4 text-muted" aria-hidden /> : <ChevronRight className="mr-1 inline h-4 w-4 text-muted" aria-hidden /> : <span className="inline-block w-5" />}
+                          <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: CHANNEL_COLOR[c.channel].fill }} aria-hidden />
                           {tr(lang, SUMMARY_CHANNEL_LABELS[c.channel])}
                           {notices.filter((n) => n.ref.channel === c.channel && n.kind === 'unique_clicks_over_viewers').map((n) => (
                             <NoticeBadge key={n.id} level={n.level} lang={lang} detail={n.detail[lang]} />
                           ))}
                         </td>
-                        <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(c.gmv, lang)}</td>
-                        <td className="px-2.5 py-1.5 whitespace-nowrap"><div className="flex items-center justify-end gap-2">{fmtPortion(c.share, lang)}<ShareBar share={c.share} /></div></td>
-                        <td className="px-2.5 py-1.5 text-right">{fmtOrders(c.orders, lang)}</td>
-                        <td className="px-2.5 py-1.5 text-right">{fmtCount(c.clicks, lang)}</td>
+                        <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(c.gmv, lang)}</td>
+                        <td className={TABLE.td}><div className="flex items-center justify-end">{fmtPortion(c.share, lang)}<ShareBar share={c.share} channel={c.channel} /></div></td>
+                        <td className={`${TABLE.td} text-right`}>{fmtOrders(c.orders, lang)}</td>
+                        <td className={`${TABLE.td} text-right`}>{fmtCount(c.clicks, lang)}</td>
                         <RateCell v={c.clicks && c.orders !== null ? c.orders / c.clicks : null} lang={lang} digits={2} />
                         <UniqueCell channel={c.channel} v={c.uniqueCtr} lang={lang} />
                       </tr>
                       {expanded &&
                         c.sources.map((s) => (
-                          <tr key={s.key} className="border-t border-white/5 text-slate-300 bg-white/[0.015]">
-                            <td className="px-2.5 py-1 pl-9 whitespace-nowrap">{s.key}</td>
-                            <td className="px-2.5 py-1 text-right whitespace-nowrap">{fmtMoneyCompact(s.gmv, lang)}</td>
-                            <td className="px-2.5 py-1 text-right text-slate-400 whitespace-nowrap">{fmtPortion(s.share, lang)} {vi ? 'của kênh' : 'of channel'}</td>
-                            <td className="px-2.5 py-1 text-right">{fmtOrders(s.orders, lang)}</td>
-                            <td className="px-2.5 py-1 text-right">{fmtCount(s.clicks, lang)}</td>
+                          <tr key={s.key} className={`${TABLE.tr} bg-surface-2 text-fg`}>
+                            <td className={`${TABLE.td} pl-14`}>{s.key}</td>
+                            <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(s.gmv, lang)}</td>
+                            <td className={`${TABLE.td} text-right text-muted`}>{fmtPortion(s.share, lang)} {vi ? 'của kênh' : 'of channel'}</td>
+                            <td className={`${TABLE.td} text-right`}>{fmtOrders(s.orders, lang)}</td>
+                            <td className={`${TABLE.td} text-right`}>{fmtCount(s.clicks, lang)}</td>
                             <RateCell v={s.clicks && s.orders !== null ? s.orders / s.clicks : null} lang={lang} digits={2} small />
                             <UniqueCell channel={c.channel} v={s.uniqueCtr} lang={lang} small />
                           </tr>
@@ -125,18 +142,18 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
                     </React.Fragment>
                   );
                 })}
-                <tr className="border-t border-white/10 font-bold text-white">
-                  <td className="px-2.5 py-1.5">{vi ? 'Tổng 4 kênh' : 'Total (4 channels)'}</td>
-                  <td className="px-2.5 py-1.5 text-right">{fmtMoneyCompact(mix.total, lang)}</td>
+                <tr className="h-11 h-11 border-t border-line hover:bg-hover bg-surface-2 font-semibold text-fg">
+                  <td className={TABLE.td}>{vi ? 'Tổng 4 kênh' : 'Total (4 channels)'}</td>
+                  <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(mix.total, lang)}</td>
                   <td colSpan={5} />
                 </tr>
               </tbody>
             </table>
           </div>
           {mix.adsGmv !== null && (
-            <div className="mt-2 rounded-xl border border-dashed border-white/15 px-3 py-2 text-xs text-slate-300">
-              <span className="font-semibold text-white">{vi ? 'Lớp Quảng cáo Shopee (không phải kênh riêng, tổng các dòng quảng cáo): ' : 'Shopee Ads layer (not a separate channel, sum of the ad rows): '}</span>
-              <b className="text-white">{fmtMoneyCompact(mix.adsGmv, lang)}</b> — <b className="text-white" title={isOverFull(mix.adsAssistedShare) ? tr(lang, OVER_FULL_NOTE) : undefined}>{fmtShare(mix.adsAssistedShare, lang)}</b> {vi ? 'doanh số có ads hỗ trợ' : 'of sales ads-assisted'} ({vi ? 'đã nằm trong 4 kênh trên' : 'already inside the 4 channels'}). {vi ? 'Xem chi phí và ROAS ở mục Quảng cáo.' : 'See spend and ROAS in Ads.'}
+            <div className="mt-3 rounded-control border-2 border-dashed px-3 py-2 text-sm text-fg" style={{ borderColor: CHANNEL_COLOR.ads.line }}>
+              <span className="font-semibold text-fg">{vi ? 'Lớp Quảng cáo Shopee (không phải kênh riêng, tổng các dòng quảng cáo): ' : 'Shopee Ads layer (not a separate channel, sum of the ad rows): '}</span>
+              <b className="text-fg">{fmtMoneyCompact(mix.adsGmv, lang)}</b> — <b className="text-fg" title={isOverFull(mix.adsAssistedShare) ? tr(lang, OVER_FULL_NOTE) : undefined}>{fmtShare(mix.adsAssistedShare, lang)}</b> {vi ? 'doanh số có ads hỗ trợ' : 'of sales ads-assisted'} ({vi ? 'đã nằm trong 4 kênh trên' : 'already inside the 4 channels'}). {vi ? 'Xem chi phí và ROAS ở mục Quảng cáo.' : 'See spend and ROAS in Ads.'}
             </div>
           )}
           <MismatchBox items={mix.mismatches} lang={lang} />
@@ -161,7 +178,7 @@ export const SummaryProductsPanel: React.FC = () => {
   }));
   const flag = (sku: string, what: string) => {
     const m = current ? flagged.get(`${current.channel}|${sku}|${what}`) : undefined;
-    return m ? <span className="text-[#f08080] font-bold ml-0.5" title={describeMismatch(m)[lang]}>⚠</span> : null;
+    return m ? <span className="text-down font-bold ml-0.5" title={describeMismatch(m)[lang]}>⚠</span> : null;
   };
 
   return (
@@ -172,7 +189,7 @@ export const SummaryProductsPanel: React.FC = () => {
         sp.byChannel.length > 1 ? (
           <div className="flex flex-wrap gap-1" role="group" aria-label={vi ? 'Kênh' : 'Channel'}>
             {sp.byChannel.map((c) => (
-              <button key={c.channel} onClick={() => setChannel(c.channel)} aria-pressed={current?.channel === c.channel} className={`px-2 py-1 rounded-lg text-xs font-semibold border ${current?.channel === c.channel ? 'bg-white/15 border-white/30 text-white' : 'border-white/10 text-slate-400'}`}>
+              <button key={c.channel} onClick={() => setChannel(c.channel)} aria-pressed={current?.channel === c.channel} className={`px-2 py-1 rounded-lg text-xs font-semibold border ${current?.channel === c.channel ? 'bg-primary-soft border-primary/30 text-primary' : 'border-line text-muted'}`}>
                 {tr(lang, SUMMARY_CHANNEL_LABELS[c.channel]).split(' (')[0]}
               </button>
             ))}
@@ -184,12 +201,12 @@ export const SummaryProductsPanel: React.FC = () => {
         <NotEnoughData lang={lang} reason={tr(lang, sp.notes[0] ?? { vi: 'Không đủ dữ liệu.', en: 'Not enough data.' })} />
       ) : (
         <>
-          <p className="text-xs text-slate-400 mb-2">
+          <p className="text-xs text-muted mb-2">
             {vi ? `Top ${current.rows.length} · ${tr(lang, SUMMARY_CHANNEL_LABELS[current.channel])} · chiếm ${fmtRate(current.coverage, lang, 0)} doanh số kênh` : `Top ${current.rows.length} · ${fmtRate(current.coverage, lang, 0)} of channel sales`}
           </p>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
-            <table className="w-full text-xs">
-              <thead className="bg-white/[0.04] text-slate-400">
+          <div className={TABLE.frame}>
+            <table className={TABLE.table}>
+              <thead className={TABLE.thead}>
                 <tr>
                   <Th left>#</Th>
                   <Th left>{vi ? 'Sản phẩm' : 'Product'}</Th>
@@ -205,28 +222,28 @@ export const SummaryProductsPanel: React.FC = () => {
               </thead>
               <tbody>
                 {current.rows.map((r, i) => (
-                  <tr key={r.sku} className="border-t border-white/5 text-slate-200">
-                    <td className="px-2.5 py-1.5 text-slate-500">{i + 1}</td>
-                    <td className="px-2.5 py-1.5 max-w-[320px]">
+                  <tr key={r.sku} className="h-11 border-t border-line hover:bg-hover text-fg">
+                    <td className="px-3 text-muted">{i + 1}</td>
+                    <td className="px-3 max-w-[320px]">
                       <div className="truncate" title={r.name}>{r.name}</div>
-                      <div className="text-[10px] text-slate-500">{r.sku}</div>
+                      <div className="text-[10px] text-muted">{r.sku}</div>
                     </td>
-                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtMoneyCompact(r.gmv, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
+                    <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.gmv, lang)}</td>
+                    <td className="px-3 text-right whitespace-nowrap">
                       {r.paidGmv === null ? (
-                        <span className="text-slate-500" title={vi ? 'Sản phẩm này không nằm trong Top 5 của sheet đơn đã thanh toán, nên file không có số.' : 'Not in the paid-orders Top 5, so the file has no figure.'}>
+                        <span className="text-muted" title={vi ? 'Sản phẩm này không nằm trong Top 5 của sheet đơn đã thanh toán, nên file không có số.' : 'Not in the paid-orders Top 5, so the file has no figure.'}>
                           {vi ? 'Ngoài top 5' : 'Not in top 5'}
                         </span>
                       ) : (
                         fmtMoneyCompact(r.paidGmv, lang)
                       )}
                     </td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtOrders(r.orders, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtCount(r.units, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtCount(r.buyers, lang)}</td>
-                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtShare(r.ctr, lang, 2)}{flag(r.sku, 'CTR')}</td>
-                    <td className="px-2.5 py-1.5 text-right whitespace-nowrap">{fmtShare(r.cvr, lang, 2)}{flag(r.sku, 'CVR')}</td>
-                    <td className="px-2.5 py-1.5 text-right">{fmtShare(r.uniqueCtr, lang, 1)}</td>
+                    <td className="px-3 text-right">{fmtOrders(r.orders, lang)}</td>
+                    <td className="px-3 text-right">{fmtCount(r.units, lang)}</td>
+                    <td className="px-3 text-right">{fmtCount(r.buyers, lang)}</td>
+                    <td className="px-3 text-right whitespace-nowrap">{fmtShare(r.ctr, lang, 2)}{flag(r.sku, 'CTR')}</td>
+                    <td className="px-3 text-right whitespace-nowrap">{fmtShare(r.cvr, lang, 2)}{flag(r.sku, 'CVR')}</td>
+                    <td className="px-3 text-right">{fmtShare(r.uniqueCtr, lang, 1)}</td>
                   </tr>
                 ))}
               </tbody>

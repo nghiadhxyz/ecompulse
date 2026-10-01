@@ -3,6 +3,8 @@ import { FileSpreadsheet, FileText, Printer, CalendarPlus } from 'lucide-react';
 import { buildReport, campaignCalendar, cellText, fmtDay, REPORT_TYPES, type ReportType } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { GhostButton, NotEnoughData, Section } from '../../seller/ui';
+import { SectionCard } from '../../ui/primitives';
+import { TABLE } from '../../ui/data';
 import { Th } from '../ui';
 import { usePlanning } from '../../workspace/usePlanning';
 import { downloadCsv, downloadIcs, downloadXlsx, printReport } from '../../../utils/reportExport';
@@ -37,9 +39,18 @@ export const ReportCenterView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <Section title="Report Center" subtitle={vi ? 'Báo cáo tạo trên máy từ cùng engine với các màn hình — xuất CSV, Excel, PDF.' : 'Reports built locally from the same engine as the screens.'}>
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="text-xs text-slate-400">
+      <SectionCard
+        title="Report Center"
+        description={vi ? 'Báo cáo tạo trên máy từ cùng engine với các màn hình — xuất CSV, Excel, PDF.' : 'Reports built locally from the same engine as the screens.'}
+        notesLabel={vi ? 'Ghi chú' : 'Notes'}
+        notes={[
+          vi
+            ? 'Google Sheets: mở sheets.google.com → Tệp → Nhập → tải file Excel/CSV. PDF: chọn "Lưu dưới dạng PDF" trong hộp thoại in. Không file nào được tải lên máy chủ.'
+            : 'Google Sheets: File → Import the Excel/CSV. PDF: choose "Save as PDF" in the print dialog. Nothing is uploaded.',
+        ]}
+      >
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-small font-medium text-muted">
             {vi ? 'Loại báo cáo' : 'Report'}
             <select aria-label={vi ? "Loại báo cáo" : "Report"} value={type} onChange={(e) => setType(e.target.value as ReportType)} className={`mt-1 block ${inputCls}`}>
               {REPORT_TYPES.map((r) => (
@@ -48,19 +59,19 @@ export const ReportCenterView: React.FC = () => {
             </select>
           </label>
           {(type === 'daily' || type === 'weekly') && (
-            <label className="text-xs text-slate-400">
+            <label className="text-small font-medium text-muted">
               {type === 'daily' ? (vi ? 'Ngày' : 'Day') : vi ? 'Tuần kết thúc ngày' : 'Week ending'}
               <input type="date" value={day} max={asOf} onChange={(e) => e.target.value && setDay(e.target.value)} className={`mt-1 block ${inputCls}`} />
             </label>
           )}
           {(type === 'monthly' || type === 'planning') && (
-            <label className="text-xs text-slate-400">
+            <label className="text-small font-medium text-muted">
               {vi ? 'Tháng' : 'Month'}
               <input type="month" aria-label={vi ? "Tháng" : "Month"} value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className={`mt-1 block ${inputCls}`} />
             </label>
           )}
           {type === 'campaign' && (
-            <label className="text-xs text-slate-400">
+            <label className="text-small font-medium text-muted">
               {vi ? 'Chiến dịch' : 'Campaign'}
               <select value={campaignId || campaigns[0]?.campaignId || ''} onChange={(e) => setCampaignId(e.target.value)} className={`mt-1 block ${inputCls}`}>
                 {campaigns.map((c) => (
@@ -69,11 +80,11 @@ export const ReportCenterView: React.FC = () => {
               </select>
             </label>
           )}
-          {type === 'live' && <p className="text-xs text-slate-400 pb-2">{vi ? 'Dùng khoảng thời gian đang chọn ở thanh lọc.' : 'Uses the selected period.'}</p>}
+          {type === 'live' && <p className="pb-2 text-sm text-muted">{vi ? 'Dùng khoảng thời gian đang chọn ở thanh lọc.' : 'Uses the selected period.'}</p>}
         </div>
 
         {report && (
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="mt-4 flex flex-wrap gap-2">
             <GhostButton onClick={() => downloadXlsx(report)}><FileSpreadsheet className="w-4 h-4" aria-hidden /> Excel</GhostButton>
             <GhostButton onClick={() => downloadCsv(report)}><FileText className="w-4 h-4" aria-hidden /> CSV</GhostButton>
             <GhostButton onClick={() => setPopupBlocked(!printReport(report))}><Printer className="w-4 h-4" aria-hidden /> PDF ({vi ? 'in' : 'print'})</GhostButton>
@@ -82,13 +93,8 @@ export const ReportCenterView: React.FC = () => {
             )}
           </div>
         )}
-        {popupBlocked && <p className="text-xs text-[#fab219] mt-2">{vi ? 'Trình duyệt chặn cửa sổ in — hãy cho phép popup cho trang này.' : 'Pop-up blocked — allow pop-ups for this page.'}</p>}
-        <p className="text-[11px] text-slate-500 mt-2">
-          {vi
-            ? 'Google Sheets: mở sheets.google.com → Tệp → Nhập → tải file Excel/CSV. PDF: chọn "Lưu dưới dạng PDF" trong hộp thoại in. Không file nào được tải lên máy chủ.'
-            : 'Google Sheets: File → Import the Excel/CSV. PDF: choose "Save as PDF" in the print dialog. Nothing is uploaded.'}
-        </p>
-      </Section>
+        {popupBlocked && <p className="mt-3 inline-flex rounded-control bg-warn-soft px-2.5 py-1 text-small text-warn">{vi ? 'Trình duyệt chặn cửa sổ in — hãy cho phép popup cho trang này.' : 'Pop-up blocked — allow pop-ups for this page.'}</p>}
+      </SectionCard>
 
       {!report ? (
         <NotEnoughData
@@ -103,28 +109,35 @@ export const ReportCenterView: React.FC = () => {
         />
       ) : (
         <Section title={report.title} subtitle={`${report.period} · ${report.generatedFrom}`}>
-          <ul className="list-disc pl-4 space-y-0.5 text-sm text-slate-200">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-fg">
             {report.summary.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
           </ul>
-          <div className="space-y-4 mt-4">
+          <div className="mt-5 space-y-5">
             {report.tables.map((tb) => (
               <div key={tb.title}>
-                <h3 className="text-xs font-bold text-slate-300 mb-1.5">{tb.title}</h3>
+                <h3 className="mb-2 text-sm font-semibold text-fg">{tb.title}</h3>
                 {tb.rows.length === 0 ? (
-                  <p className="text-xs text-slate-500">{vi ? 'Không có dòng nào.' : 'No rows.'}</p>
+                  <p className="text-sm text-muted">{vi ? 'Không có dòng nào.' : 'No rows.'}</p>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-white/10 max-h-96">
-                    <table className="w-full text-xs">
-                      <thead className="bg-white/[0.04] text-slate-400 sticky top-0">
-                        <tr>{tb.columns.map((c, i) => <Th key={i} left={i === 0}>{c}</Th>)}</tr>
+                  <div className={`${TABLE.frame} max-h-96 overflow-y-auto`}>
+                    <table className={TABLE.table}>
+                      <thead className={TABLE.thead}>
+                        <tr>
+                          {tb.columns.map((c, i) => (
+                            // Text columns are left-aligned like their cells; numbers stay right.
+                            <Th key={i} left={i === 0 || (tb.rows[0]?.[i] !== undefined && 't' in tb.rows[0][i])}>
+                              {c}
+                            </Th>
+                          ))}
+                        </tr>
                       </thead>
                       <tbody>
                         {tb.rows.map((row, ri) => (
-                          <tr key={ri} className="border-t border-white/5 text-slate-200">
+                          <tr key={ri} className={`${TABLE.tr} text-fg`}>
                             {row.map((c, ci) => (
-                              <td key={ci} className={`px-2.5 py-1.5 whitespace-nowrap ${'t' in c ? '' : 'text-right'}`}>{cellText(c, lang)}</td>
+                              <td key={ci} className={'t' in c ? 'min-w-[120px] px-3 py-1.5 leading-snug' : `${TABLE.td} text-right`}>{cellText(c, lang)}</td>
                             ))}
                           </tr>
                         ))}
@@ -132,7 +145,11 @@ export const ReportCenterView: React.FC = () => {
                     </table>
                   </div>
                 )}
-                {tb.notes?.map((x, i) => <p key={i} className="text-[11px] text-slate-500 mt-1">{x}</p>)}
+                {tb.notes?.map((x, i) => (
+                  <p key={i} className="mt-1 text-small text-muted">
+                    {x}
+                  </p>
+                ))}
               </div>
             ))}
           </div>

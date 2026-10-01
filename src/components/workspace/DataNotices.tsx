@@ -1,14 +1,13 @@
 /** "Lưu ý" (grey) and "Không hợp lệ" (red) markers for odd records — analytics/dataNotices.ts. */
 import React from 'react';
 import { NOTICE_LABELS, NOTICE_TOOLTIP, type DataNotice, type Lang, type NoticeLevel } from '../../analytics';
+import { Badge } from '../ui/primitives';
 
+/** Grey "Lưu ý" (Shopee's own inconsistencies) or red "Không hợp lệ" (impossible values). */
 export const NoticeBadge: React.FC<{ level: NoticeLevel; lang: Lang; detail?: string }> = ({ level, lang, detail }) => (
-  <span
-    className={`ml-1.5 inline-block text-[10px] font-bold px-1 py-px rounded border whitespace-nowrap ${level === 'invalid' ? 'border-[#d03b3b]/50 text-[#f08080] bg-[#d03b3b]/10' : 'border-white/15 text-slate-400 bg-white/[0.04]'}`}
-    title={[detail, level === 'notice' ? NOTICE_TOOLTIP[lang] : undefined].filter(Boolean).join('\n')}
-  >
+  <Badge tone={level === 'invalid' ? 'mismatch' : 'note'} className="ml-1.5" title={[detail, level === 'notice' ? NOTICE_TOOLTIP[lang] : undefined].filter(Boolean).join('\n')}>
     {NOTICE_LABELS[level][lang]}
-  </span>
+  </Badge>
 );
 
 export const DataNoticesList: React.FC<{ notices: DataNotice[]; lang: Lang }> = ({ notices, lang }) => {
@@ -17,9 +16,9 @@ export const DataNoticesList: React.FC<{ notices: DataNotice[]; lang: Lang }> = 
   return (
     <ul className="space-y-1">
       {sorted.map((n) => (
-        <li key={n.id} className={`text-[11px] leading-snug ${n.level === 'invalid' ? 'text-[#f08080]' : 'text-slate-400'}`}>
+        <li key={n.id} className={`text-small leading-snug ${n.level === 'invalid' ? 'text-mismatch' : 'text-muted'}`}>
           <NoticeBadge level={n.level} lang={lang} />{' '}
-          <b className={n.level === 'invalid' ? 'text-[#f08080]' : 'text-slate-300'}>{n.title[lang]}</b> — {n.detail[lang]}
+          <b className={n.level === 'invalid' ? 'text-mismatch' : 'text-fg'}>{n.title[lang]}</b> — {n.detail[lang]}
         </li>
       ))}
     </ul>

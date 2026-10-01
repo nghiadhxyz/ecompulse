@@ -2,7 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { Store, LineChart, Save } from 'lucide-react';
 import { assessDataQuality, fmtMoney, PLATFORM_LABELS, toNumber, type CanonicalDataset, type CostSettings, type Lang, type Platform } from '../../../analytics';
 import type { WorkspaceMode } from '../../../utils/workspacePreferences';
-import { HelpTip, PrimaryButton, Section } from '../ui';
+import { HelpTip, NotEnoughData, PrimaryButton, Section } from '../ui';
+import { Chip } from '../../ui/primitives';
+import { TABLE } from '../../ui/data';
+
+/** Form field inside tables and settings rows. */
+const FIELD = 'min-h-10 rounded-control border border-line bg-surface px-2.5 text-sm text-fg placeholder:text-muted';
 import { AiPrivacySettings } from '../../workspace/AiPrivacySettings';
 
 interface SettingsViewProps {
@@ -108,72 +113,75 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
             : `Unit cost per product. Without COGS, profit cannot be computed — nothing is assumed. ${missingCount > 0 ? `${missingCount} SKUs missing.` : ''}`
         }
         right={
-          <label className="text-xs text-slate-300 flex items-center gap-1.5">
-            <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
+          <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-sm text-muted">
+            <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} className="h-4 w-4 accent-primary" />
             {vi ? 'Chỉ SKU thiếu giá vốn' : 'Only missing'}
           </label>
         }
       >
         {!dataset ? (
-          <p className="text-sm text-slate-400">{vi ? 'Nhập dữ liệu trước để thấy danh sách SKU.' : 'Import data to see SKUs.'}</p>
+          <NotEnoughData lang={lang} title={vi ? 'Chưa có dữ liệu' : 'No data yet'} reason={vi ? 'Nhập dữ liệu trước để thấy danh sách SKU.' : 'Import data to see SKUs.'} />
         ) : (
           <>
-            <p className="text-[11px] text-slate-500 mb-2">
+            <p className="mb-3 text-small text-muted">
               {vi
                 ? 'Mẹo: nhập nhanh bằng file Excel có cột "SKU" cùng "Giá vốn", "Ngành hàng", "Nhóm hàng" ở trang Dữ liệu. Ngành hàng cần cho phân tích Category Intelligence.'
                 : 'Tip: import an Excel file with "SKU" plus "COGS", "Category", "Niche" columns on the Data page.'}
             </p>
             <datalist id="category-options">{categoryOptions.map((c) => <option key={c} value={c} />)}</datalist>
             <datalist id="niche-options">{nicheOptions.map((c) => <option key={c} value={c} />)}</datalist>
-            <div className="overflow-x-auto rounded-xl border border-white/10 max-h-[420px] overflow-y-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-[#0f1530] text-slate-400 sticky top-0">
+            <div className={`${TABLE.frame} max-h-[480px] overflow-y-auto`}>
+              <table className={TABLE.table}>
+                <thead className={TABLE.thead}>
                   <tr>
-                    <th className="text-left font-semibold px-2.5 py-2">{vi ? 'Sản phẩm' : 'Product'}</th>
-                    <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Đã bán' : 'Sold'}</th>
-                    <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Giá vốn từ file' : 'From file'}</th>
-                    <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Giá vốn bạn nhập' : 'Your COGS'}</th>
-                    <th className="text-left font-semibold px-2.5 py-2">{vi ? 'Ngành hàng' : 'Category'}</th>
-                    <th className="text-left font-semibold px-2.5 py-2">{vi ? 'Nhóm hàng' : 'Niche'}</th>
+                    <th scope="col" className={`${TABLE.th} text-left`}>{vi ? 'Sản phẩm' : 'Product'}</th>
+                    <th scope="col" className={`${TABLE.th} text-right`}>{vi ? 'Đã bán' : 'Sold'}</th>
+                    <th scope="col" className={`${TABLE.th} text-right`}>{vi ? 'Giá vốn từ file' : 'From file'}</th>
+                    <th scope="col" className={`${TABLE.th} text-right`}>{vi ? 'Giá vốn bạn nhập' : 'Your COGS'}</th>
+                    <th scope="col" className={`${TABLE.th} text-left`}>{vi ? 'Ngành hàng' : 'Category'}</th>
+                    <th scope="col" className={`${TABLE.th} text-left`}>{vi ? 'Nhóm hàng' : 'Niche'}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {shown.map((r) => (
-                    <tr key={r.sku} className={`border-t border-white/5 ${r.missing ? 'bg-[#fab219]/[0.05]' : ''}`}>
-                      <td className="px-2.5 py-1.5 max-w-[260px]">
-                        <div className="text-slate-100 truncate">{r.name}</div>
-                        <div className="text-[11px] text-slate-500">{r.sku}{r.missing && <span className="text-[#fab219]"> · {vi ? 'thiếu giá vốn' : 'missing'}</span>}</div>
+                    <tr key={r.sku} className={`border-t border-line ${r.missing ? 'bg-warn-soft' : ''}`}>
+                      <td className="max-w-[260px] px-3 py-1.5" title={r.name}>
+                        <div className="truncate font-medium text-fg">{r.name}</div>
+                        <div className="text-small text-muted">
+                          {r.sku}
+                          {r.missing && <span className="font-medium text-warn"> · {vi ? 'thiếu giá vốn' : 'missing'}</span>}
+                        </div>
                       </td>
-                      <td className="px-2.5 py-1.5 text-right text-slate-300">{r.units.toLocaleString('vi-VN')}</td>
-                      <td className="px-2.5 py-1.5 text-right text-slate-400">{r.fileCogs === undefined ? '—' : fmtMoney(r.fileCogs, lang)}</td>
-                      <td className="px-2.5 py-1.5 text-right">
+                      <td className={`${TABLE.td} text-right text-fg`}>{r.units.toLocaleString('vi-VN')}</td>
+                      <td className={`${TABLE.td} text-right text-muted`}>{r.fileCogs === undefined ? '—' : fmtMoney(r.fileCogs, lang)}</td>
+                      <td className="px-3 py-1.5 text-right">
                         <input
                           inputMode="decimal"
                           value={drafts[r.sku] ?? (r.userCogs !== undefined ? String(r.userCogs) : '')}
                           onChange={(e) => setDrafts((d) => ({ ...d, [r.sku]: e.target.value }))}
                           placeholder={r.fileCogs !== undefined ? (vi ? 'dùng giá từ file' : 'use file value') : vi ? 'nhập giá vốn' : 'enter COGS'}
                           aria-label={`${vi ? 'Giá vốn' : 'COGS'} ${r.sku}`}
-                          className="w-32 text-right bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
+                          className={`w-32 text-right tabular ${FIELD}`}
                         />
                       </td>
-                      <td className="px-2.5 py-1.5">
+                      <td className="px-3 py-1.5">
                         <input
                           list="category-options"
                           value={catDrafts[r.sku] ?? r.category ?? ''}
                           onChange={(e) => setCatDrafts((d) => ({ ...d, [r.sku]: e.target.value }))}
                           placeholder={vi ? 'vd: Mẹ & Bé' : 'e.g. Beauty'}
                           aria-label={`${vi ? 'Ngành hàng' : 'Category'} ${r.sku}`}
-                          className="w-36 bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
+                          className={`w-48 ${FIELD}`}
                         />
                       </td>
-                      <td className="px-2.5 py-1.5">
+                      <td className="px-3 py-1.5">
                         <input
                           list="niche-options"
                           value={subDrafts[r.sku] ?? r.subcategory ?? ''}
                           onChange={(e) => setSubDrafts((d) => ({ ...d, [r.sku]: e.target.value }))}
                           placeholder={vi ? 'vd: Tã bỉm' : 'e.g. Diapers'}
                           aria-label={`${vi ? 'Nhóm hàng' : 'Niche'} ${r.sku}`}
-                          className="w-36 bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
+                          className={`w-48 ${FIELD}`}
                         />
                       </td>
                     </tr>
@@ -181,11 +189,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center gap-2 mt-3">
+            <div className="mt-4 flex items-center gap-3">
               <PrimaryButton disabled={!dirty || invalidDraft} onClick={saveCogs}>
-                <Save className="w-4 h-4" /> {vi ? 'Lưu thay đổi' : 'Save changes'}
+                <Save className="h-4 w-4" aria-hidden /> {vi ? 'Lưu thay đổi' : 'Save changes'}
               </PrimaryButton>
-              {invalidDraft && <span className="text-xs text-[#f08080]">{vi ? 'Có giá trị không hợp lệ.' : 'Invalid value.'}</span>}
+              {invalidDraft && <span className="rounded-control bg-mismatch-soft px-2.5 py-1 text-small font-medium text-mismatch">{vi ? 'Có giá trị không hợp lệ.' : 'Invalid value.'}</span>}
             </div>
           </>
         )}
@@ -196,31 +204,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
         subtitle={vi ? 'Chỉ dùng khi file không có số phí thật. Lợi nhuận sẽ ghi rõ là "ước tính theo tỷ lệ bạn nhập".' : 'Used only when files have no actual fees; results are labelled as estimates.'}
       >
         <div className="overflow-x-auto">
-          <table className="text-xs">
-            <thead className="text-slate-400">
+          <table className="text-sm">
+            <thead className="text-small text-muted">
               <tr>
-                <th className="text-left font-semibold pr-4 py-1.5">{vi ? 'Sàn' : 'Platform'}</th>
-                <th className="text-left font-semibold pr-4 py-1.5">
+                <th scope="col" className="py-1.5 pr-6 text-left font-semibold">{vi ? 'Sàn' : 'Platform'}</th>
+                <th scope="col" className="py-1.5 pr-6 text-left font-semibold">
                   {vi ? 'Phí sàn (% doanh thu thuần)' : 'Platform fee (% of net revenue)'} <HelpTip text={vi ? 'Phí cố định + phí dịch vụ' : 'Fixed + service fee'} />
                 </th>
-                <th className="text-left font-semibold py-1.5">{vi ? 'Phí thanh toán (%)' : 'Payment fee (%)'}</th>
+                <th scope="col" className="py-1.5 text-left font-semibold">{vi ? 'Phí thanh toán (%)' : 'Payment fee (%)'}</th>
               </tr>
             </thead>
             <tbody>
               {FEE_PLATFORMS.map((p) => (
                 <tr key={p}>
-                  <td className="pr-4 py-1.5 text-slate-200">{PLATFORM_LABELS[p]}</td>
+                  <td className="py-1.5 pr-6 font-medium text-fg">{PLATFORM_LABELS[p]}</td>
                   {(['platformFeeRate', 'paymentFeeRate'] as const).map((field) => (
-                    <td key={field} className="pr-4 py-1.5">
+                    <td key={field} className="py-1.5 pr-6">
                       <input
                         inputMode="decimal"
                         defaultValue={settings[field]?.[p] !== undefined ? String(+(settings[field]![p]! * 100).toFixed(3)) : ''}
                         onBlur={(e) => setRate(field, p, e.target.value)}
                         placeholder={vi ? 'chưa nhập' : 'not set'}
                         aria-label={`${field} ${p}`}
-                        className="w-24 bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
+                        className={`w-28 text-right tabular ${FIELD}`}
                       />
-                      <span className="text-slate-500 ml-1">%</span>
+                      <span className="ml-1.5 text-muted">%</span>
                     </td>
                   ))}
                 </tr>
@@ -228,19 +236,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
             </tbody>
           </table>
         </div>
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-          <div className="text-sm font-bold text-white">{vi ? 'Ước tính cho cả shop (khi chưa có giá vốn)' : 'Shop-wide estimates (without COGS)'}</div>
-          <p className="text-[11px] text-slate-500 mb-2">
+        <div className="mt-5 rounded-control border border-line bg-surface-2 p-4">
+          <div className="text-sm font-semibold text-fg">{vi ? 'Ước tính cho cả shop (khi chưa có giá vốn)' : 'Shop-wide estimates (without COGS)'}</div>
+          <p className="mb-3 text-small text-muted">
             {vi
               ? 'Dùng cho ROAS hòa vốn, lợi nhuận sau Ads và What-If khi chỉ có báo cáo tổng hợp. Kết quả luôn ghi "ước tính theo số bạn nhập".'
               : 'Used for break-even ROAS, profit after Ads and What-If with summary reports. Results are labelled as estimates.'}
           </p>
-          <div className="flex flex-wrap gap-4 text-xs">
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
             {([
               { field: 'estimatedGrossMargin' as const, vi: 'Biên lợi nhuận gộp ước tính (%)', en: 'Estimated gross margin (%)', tip: vi ? '(Giá bán − giá vốn) / giá bán, trung bình cả shop' : '(Price − COGS) / price, shop average' },
               { field: 'estimatedFeeRate' as const, vi: 'Phí sàn (%)', en: 'Platform fees (%)', tip: vi ? 'Tổng phí sàn, phí thanh toán, phí dịch vụ trên doanh số' : 'All platform, payment and service fees on sales' },
             ]).map((f) => (
-              <label key={f.field} className="flex items-center gap-1.5 text-slate-300">
+              <label key={f.field} className="flex items-center gap-1.5 text-fg">
                 {vi ? f.vi : f.en} <HelpTip text={f.tip} />
                 <input
                   inputMode="decimal"
@@ -248,26 +256,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
                   onBlur={(e) => setEstimate(f.field, e.target.value)}
                   placeholder={vi ? 'chưa nhập' : 'not set'}
                   aria-label={vi ? f.vi : f.en}
-                  className="w-20 bg-white/[0.05] border border-white/15 rounded-md px-2 py-1 text-slate-100 placeholder:text-slate-600"
+                  className={`w-28 text-right tabular ${FIELD}`}
                 />
-                <span className="text-slate-500">%</span>
+                <span className="text-muted">%</span>
               </label>
             ))}
           </div>
         </div>
-        <div className="mt-4 space-y-2">
-          <label className="flex items-start gap-2 text-sm text-slate-200">
-            <input type="checkbox" className="mt-1" checked={!!settings.noAdsDeclared} onChange={(e) => onChange({ ...settings, noAdsDeclared: e.target.checked })} />
+        <div className="mt-5 space-y-3">
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm text-fg">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={!!settings.noAdsDeclared} onChange={(e) => onChange({ ...settings, noAdsDeclared: e.target.checked })} />
             <span>
               {vi ? 'Shop không chạy quảng cáo trả phí' : 'The shop runs no paid ads'}
-              <span className="block text-[11px] text-slate-500">{vi ? 'Khi chưa nhập báo cáo Ads, chi phí Ads được tính = 0 thay vì "chưa có dữ liệu".' : 'Ads cost counts as 0 instead of "missing" when no ads report is imported.'}</span>
+              <span className="block text-small text-muted">{vi ? 'Khi chưa nhập báo cáo Ads, chi phí Ads được tính = 0 thay vì "chưa có dữ liệu".' : 'Ads cost counts as 0 instead of "missing" when no ads report is imported.'}</span>
             </span>
           </label>
-          <label className="flex items-start gap-2 text-sm text-slate-200">
-            <input type="checkbox" className="mt-1" checked={!!settings.noSellerShippingDeclared} onChange={(e) => onChange({ ...settings, noSellerShippingDeclared: e.target.checked })} />
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm text-fg">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={!!settings.noSellerShippingDeclared} onChange={(e) => onChange({ ...settings, noSellerShippingDeclared: e.target.checked })} />
             <span>
               {vi ? 'Shop không chịu phí vận chuyển' : 'The shop pays no shipping'}
-              <span className="block text-[11px] text-slate-500">{vi ? 'Người mua hoặc sàn trả toàn bộ phí ship.' : 'Buyer or platform pays all shipping.'}</span>
+              <span className="block text-small text-muted">{vi ? 'Người mua hoặc sàn trả toàn bộ phí ship.' : 'Buyer or platform pays all shipping.'}</span>
             </span>
           </label>
         </div>
@@ -276,30 +284,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
       <AiPrivacySettings lang={lang} />
 
       <Section title={vi ? 'Chế độ làm việc & ngôn ngữ' : 'Workspace mode & language'} subtitle={vi ? 'Đổi chế độ không làm mất dữ liệu.' : 'Switching mode keeps your data.'}>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-1">
           {([
             { m: 'seller' as const, icon: Store, vi: 'Chủ shop / Người bán', en: 'Shop owner' },
             { m: 'analyst' as const, icon: LineChart, vi: 'Planner / Data Analyst', en: 'Planner / Analyst' },
           ]).map((o) => (
-            <button
-              key={o.m}
-              onClick={() => onChangeMode(o.m)}
-              aria-pressed={workspaceMode === o.m}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold ${workspaceMode === o.m ? 'bg-sky-600 border-sky-500 text-white' : 'border-white/15 text-slate-300 hover:bg-white/[0.06]'}`}
-            >
-              <o.icon className="w-4 h-4" /> {vi ? o.vi : o.en}
-            </button>
+            <Chip key={o.m} selected={workspaceMode === o.m} onClick={() => onChangeMode(o.m)}>
+              <o.icon className="h-4 w-4" aria-hidden /> {vi ? o.vi : o.en}
+            </Chip>
           ))}
-          <span className="w-px bg-white/10 mx-1" aria-hidden />
+          <span className="mx-2 h-6 w-px bg-line" aria-hidden />
           {(['vi', 'en'] as const).map((l) => (
-            <button
-              key={l}
-              onClick={() => onChangeLanguage(l)}
-              aria-pressed={lang === l}
-              className={`px-3 py-2 rounded-xl border text-sm font-semibold ${lang === l ? 'bg-white/15 border-white/30 text-white' : 'border-white/15 text-slate-300'}`}
-            >
+            <Chip key={l} selected={lang === l} onClick={() => onChangeLanguage(l)}>
               {l === 'vi' ? 'Tiếng Việt' : 'English'}
-            </button>
+            </Chip>
           ))}
         </div>
       </Section>

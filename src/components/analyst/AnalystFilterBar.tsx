@@ -1,6 +1,6 @@
-import React from 'react';
-import { CalendarDays, GitCompare } from 'lucide-react';
-import { OrderStagePicker } from '../workspace/OrderStagePicker';
+import React, { useEffect, useRef, useState } from 'react';
+import { CalendarDays, ChevronDown, GitCompare } from 'lucide-react';
+import { Tabs } from '../ui/primitives';
 import type { SummaryStage } from '../../analytics';
 import { formatRangeVi, PLATFORM_LABELS, type ComparisonMode, type DateRange, type Lang, type PeriodPreset, type Platform } from '../../analytics';
 
@@ -49,103 +49,134 @@ interface Props {
   onStage?: (s: SummaryStage) => void;
 }
 
-const dateInput = 'bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-xs text-slate-100 [color-scheme:dark]';
+/** Why a filter does not apply to the current page (dimmed + tooltip). */
+export interface FilterDisabled {
+  compare?: string;
+  platforms?: string;
+  categories?: string;
+  stage?: string;
+}
 
-export const AnalystFilterBar: React.FC<Props> = (p) => {
-  const vi = p.lang === 'vi';
-  const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+const field = 'min-h-10 rounded-control border border-line bg-surface px-2.5 text-sm text-fg';
+
+/** Multi-select as a small popover of checkboxes, so the bar stays on one row. */
+const MultiSelect: React.FC<{ label: string; all: string; options: { key: string; label: string }[]; value: string[]; onChange: (v: string[]) => void; disabled?: string; clearLabel: string }> = ({ label, all, options, value, onChange, disabled, clearLabel }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  const text = value.length === 0 ? all : value.length === 1 ? options.find((o) => o.key === value[0])?.label ?? value[0] : `${value.length}`;
   return (
-    <div className="glass-panel rounded-2xl p-3 space-y-2.5">
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={vi ? 'Khoảng thời gian' : 'Date range'}>
-        <CalendarDays className="w-4 h-4 text-slate-400" aria-hidden />
-        {PRESETS.map((x) => (
-          <button
-            key={x.key}
-            onClick={() => p.onPreset(x.key)}
-            aria-pressed={p.preset === x.key}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${p.preset === x.key ? 'bg-sky-600 border-sky-500 text-white' : 'border-white/10 text-slate-300 hover:bg-white/[0.06]'}`}
-          >
-            {vi ? x.vi : x.en}
-          </button>
-        ))}
-        {p.preset === 'custom' && (
-          <span className="flex items-center gap-1 text-xs text-slate-400">
-            <input type="date" className={dateInput} value={p.custom.start} min={p.bounds.start} max={p.bounds.end} onChange={(e) => e.target.value && p.onCustom({ ...p.custom, start: e.target.value })} aria-label={vi ? 'Từ ngày' : 'From'} />
-            –
-            <input type="date" className={dateInput} value={p.custom.end} min={p.bounds.start} max={p.bounds.end} onChange={(e) => e.target.value && p.onCustom({ ...p.custom, end: e.target.value })} aria-label={vi ? 'Đến ngày' : 'To'} />
-          </span>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        <GitCompare className="w-4 h-4 text-slate-400" aria-hidden />
-        <label className="sr-only" htmlFor="compare-mode">{vi ? 'So sánh với' : 'Compare with'}</label>
-        <select
-          id="compare-mode"
-          value={p.compare}
-          onChange={(e) => p.onCompare(e.target.value as AnalystCompare)}
-          className="bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-xs text-slate-100 [color-scheme:dark]"
-        >
-          {COMPARES.map((c) => (
-            <option key={c.key} value={c.key}>{vi ? c.vi : c.en}</option>
+    <div ref={ref} className="relative" title={disabled}>
+      <button type="button" disabled={!!disabled} onClick={() => setOpen(!open)} aria-expanded={open} className={`${field} inline-flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50`}>
+        <span className="text-muted">{label}:</span>
+        <span className={value.length ? 'font-semibold text-primary' : ''}>{text}</span>
+        <ChevronDown className="h-4 w-4 text-muted" aria-hidden />
+      </button>
+      {open && (
+        <div role="group" aria-label={label} className="absolute left-0 top-11 z-40 min-w-56 rounded-control border border-line bg-surface p-1.5 shadow-card">
+          {options.map((o) => (
+            <label key={o.key} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-control px-2 text-sm text-fg hover:bg-hover">
+              <input type="checkbox" className="h-4 w-4 accent-primary" checked={value.includes(o.key)} onChange={() => onChange(value.includes(o.key) ? value.filter((x) => x !== o.key) : [...value, o.key])} />
+              {o.label}
+            </label>
           ))}
-        </select>
-        {p.compare === 'custom' && (
-          <span className="flex items-center gap-1 text-xs text-slate-400">
-            <input type="date" className={dateInput} value={p.customCompare.start} max={p.bounds.end} onChange={(e) => e.target.value && p.onCustomCompare({ ...p.customCompare, start: e.target.value })} aria-label={vi ? 'Kỳ so sánh từ' : 'Compare from'} />
-            –
-            <input type="date" className={dateInput} value={p.customCompare.end} max={p.bounds.end} onChange={(e) => e.target.value && p.onCustomCompare({ ...p.customCompare, end: e.target.value })} aria-label={vi ? 'Kỳ so sánh đến' : 'Compare to'} />
-          </span>
-        )}
-        <span className="text-[11px] text-slate-400 ml-auto">
-          <b className="text-slate-100">{formatRangeVi(p.range)}</b> {vi ? 'so với' : 'vs'} <b className="text-slate-300">{formatRangeVi(p.previousRange)}</b>
-        </span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label={vi ? 'Sàn' : 'Platforms'}>
-          <span className="text-[11px] text-slate-500 mr-1">{vi ? 'Sàn' : 'Platform'}</span>
-          {(['shopee', 'tiktok', 'lazada'] as Platform[]).map((pl) => {
-            const disabled = !p.availablePlatforms.includes(pl);
-            const on = p.platforms.includes(pl);
-            return (
-              <button
-                key={pl}
-                disabled={disabled}
-                aria-pressed={on}
-                onClick={() => p.onPlatforms(toggle(p.platforms, pl))}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${on ? 'bg-white/15 border-white/30 text-white' : 'border-white/10 text-slate-400'} disabled:opacity-30`}
-              >
-                {PLATFORM_LABELS[pl]}
-              </button>
-            );
-          })}
-          {p.platforms.length > 0 && (
-            <button onClick={() => p.onPlatforms([])} className="text-[11px] text-sky-300 ml-1">{vi ? 'Tất cả' : 'All'}</button>
+          {value.length > 0 && (
+            <button type="button" onClick={() => onChange([])} className="mt-1 min-h-10 w-full rounded-control px-2 text-left text-sm font-semibold text-primary hover:bg-primary-soft">
+              {clearLabel}
+            </button>
           )}
         </div>
-        {p.stage && p.onStage && <OrderStagePicker stage={p.stage} onChange={p.onStage} lang={p.lang} compact />}
-        {p.availableCategories.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1" role="group" aria-label={vi ? 'Ngành hàng' : 'Categories'}>
-            <span className="text-[11px] text-slate-500 mr-1">{vi ? 'Ngành' : 'Category'}</span>
-            {p.availableCategories.map((c) => {
-              const on = p.categories.includes(c);
-              return (
-                <button
-                  key={c}
-                  aria-pressed={on}
-                  onClick={() => p.onCategories(toggle(p.categories, c))}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${on ? 'bg-white/15 border-white/30 text-white' : 'border-white/10 text-slate-400'}`}
-                >
-                  {c}
-                </button>
-              );
-            })}
-            {p.categories.length > 0 && (
-              <button onClick={() => p.onCategories([])} className="text-[11px] text-sky-300 ml-1">{vi ? 'Bỏ lọc' : 'Clear'}</button>
-            )}
-          </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Filter bar: sticky at the top of the content, white, one row when wide enough.
+ * Left: period · middle: comparison, platform, category, order stage · right: dates in view.
+ */
+export const AnalystFilterBar: React.FC<Props & { disabled?: FilterDisabled }> = (p) => {
+  const vi = p.lang === 'vi';
+  const d = p.disabled ?? {};
+  const dim = (reason?: string) => (reason ? 'opacity-50' : '');
+  return (
+    <div className="sticky top-16 z-20 -mx-1 rounded-card border border-line bg-surface px-3 py-2 shadow-card">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex items-center gap-1">
+          <CalendarDays className="h-4 w-4 text-muted" aria-hidden />
+          <Tabs
+            label={vi ? 'Khoảng thời gian' : 'Date range'}
+            value={p.preset}
+            onChange={p.onPreset}
+            options={PRESETS.map((x) => ({ key: x.key, label: vi ? x.vi : x.en }))}
+          />
+        </div>
+        {p.preset === 'custom' && (
+          <span className="flex items-center gap-1 text-sm text-muted">
+            <input type="date" className={field} value={p.custom.start} min={p.bounds.start} max={p.bounds.end} onChange={(e) => e.target.value && p.onCustom({ ...p.custom, start: e.target.value })} aria-label={vi ? 'Từ ngày' : 'From'} />
+            –
+            <input type="date" className={field} value={p.custom.end} min={p.bounds.start} max={p.bounds.end} onChange={(e) => e.target.value && p.onCustom({ ...p.custom, end: e.target.value })} aria-label={vi ? 'Đến ngày' : 'To'} />
+          </span>
         )}
+
+        <div className={`flex items-center gap-1 ${dim(d.compare)}`} title={d.compare}>
+          <GitCompare className="h-4 w-4 text-muted" aria-hidden />
+          <label className="sr-only" htmlFor="compare-mode">{vi ? 'So sánh với' : 'Compare with'}</label>
+          <select id="compare-mode" value={p.compare} disabled={!!d.compare} onChange={(e) => p.onCompare(e.target.value as AnalystCompare)} className={field}>
+            {COMPARES.map((c) => (
+              <option key={c.key} value={c.key}>{vi ? c.vi : c.en}</option>
+            ))}
+          </select>
+          {p.compare === 'custom' && (
+            <span className="flex items-center gap-1 text-sm text-muted">
+              <input type="date" className={field} value={p.customCompare.start} max={p.bounds.end} onChange={(e) => e.target.value && p.onCustomCompare({ ...p.customCompare, start: e.target.value })} aria-label={vi ? 'Kỳ so sánh từ' : 'Compare from'} />
+              –
+              <input type="date" className={field} value={p.customCompare.end} max={p.bounds.end} onChange={(e) => e.target.value && p.onCustomCompare({ ...p.customCompare, end: e.target.value })} aria-label={vi ? 'Kỳ so sánh đến' : 'Compare to'} />
+            </span>
+          )}
+        </div>
+
+        <MultiSelect
+          label={vi ? 'Sàn' : 'Platform'}
+          all={vi ? 'Tất cả' : 'All'}
+          options={p.availablePlatforms.map((pl) => ({ key: pl, label: PLATFORM_LABELS[pl] }))}
+          value={p.platforms}
+          onChange={(v) => p.onPlatforms(v as Platform[])}
+          disabled={d.platforms ?? (p.availablePlatforms.length < 2 ? (vi ? 'Dữ liệu chỉ có một sàn' : 'Only one platform in the data') : undefined)}
+          clearLabel={vi ? 'Tất cả sàn' : 'All platforms'}
+        />
+        <MultiSelect
+          label={vi ? 'Ngành' : 'Category'}
+          all={vi ? 'Tất cả' : 'All'}
+          options={p.availableCategories.map((c) => ({ key: c, label: c }))}
+          value={p.categories}
+          onChange={p.onCategories}
+          disabled={d.categories ?? (p.availableCategories.length === 0 ? (vi ? 'Cần file đơn hàng hoặc danh mục có ngành hàng' : 'Needs an order file or a catalog with categories') : undefined)}
+          clearLabel={vi ? 'Bỏ lọc ngành' : 'Clear'}
+        />
+        <div className={`flex items-center gap-1 ${dim(d.stage ?? (p.stage ? undefined : 'x'))}`} title={d.stage ?? (p.stage ? undefined : vi ? 'Chỉ áp dụng cho báo cáo tổng hợp của sàn (file đơn hàng luôn tính theo đơn đặt)' : 'Summary reports only')}>
+          <span className="text-small text-muted">{vi ? 'Mức đơn' : 'Orders'}</span>
+          <Tabs
+            label={vi ? 'Mức đơn' : 'Order stage'}
+            value={p.stage ?? 'placed'}
+            onChange={(s) => p.onStage?.(s)}
+            options={(['placed', 'paid'] as SummaryStage[]).map((s) => ({ key: s, label: s === 'placed' ? (vi ? 'Đặt' : 'Placed') : vi ? 'Thanh toán' : 'Paid', disabled: !p.stage || !!d.stage }))}
+          />
+        </div>
+
+        <span className="ml-auto text-small text-muted tabular">
+          <b className="font-semibold text-fg">{formatRangeVi(p.range)}</b> {vi ? 'so với' : 'vs'} <b className="font-semibold text-fg">{formatRangeVi(p.previousRange)}</b>
+        </span>
       </div>
     </div>
   );

@@ -14,6 +14,10 @@ import { subsidyDependence } from '../summaryInsights';
 import { breakdown } from '../breakdownEngine';
 import * as XLSX from 'xlsx';
 import { importShopeeSalesAnalysis } from '../importers/shopeeSalesAnalysis';
+import { detectReport, importOrderExport } from '../importers/orderExport';
+import { detectTableReport, importTableReport } from '../importers/reportImporters';
+import { customerIntelligence } from '../customerEngine';
+import { resolveUnitCogs } from '../profitEngine';
 import { mergeIntoWorkspace, withCostSettings } from '../workspace';
 import { buildDailyBrief } from '../dailyBrief';
 import { questionUnavailable } from '../dolphinEvidence';
@@ -558,5 +562,81 @@ describe('Part 11 — advanced statistics', () => {
     expect([wd(5), wd(4)]).toEqual([1.48, 0.55]);
     const noSale = advancedStats(ds, { range }, { start: '2026-06-24', end: '2026-07-23' }, { excludeSaleDays: true });
     expect(noSale.correlations.cells.find((x) => x.a === 'gmv' && x.b === 'ads')!.n).toBeLessThan(r('gmv', 'ads').c.n);
+  });
+});
+
+/** Order export and COGS catalog for the same shop (samples/, not committed). */
+const ORDER_FILE = resolve(__dirname, '../../../samples/Order.all.20260624_20260822.xlsx');
+const CATALOG_FILE = resolve(__dirname, '../../../samples/Danh_muc_SKU_gia_von.xlsx');
+
+function sheetsOf(path: string) {
+  const wb = XLSX.read(readFileSync(path), { dense: true });
+  return wb.SheetNames.map((name) => ({ name, rows: XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: true, defval: '' }) }));
+}
+function orderExport(path: string) {
+  const sheets = sheetsOf(path);
+  const det = detectReport({ fileName: basename(path), sheets });
+  if (det.kind !== 'orders') throw new Error('not an order export');
+  return importOrderExport({ fileName: basename(path), sheets }, det);
+}
+
+describe.skipIf(!existsSync(WORKBOOK) || !existsSync(ORDER_FILE) || !existsSync(CATALOG_FILE))('Summary report + order export + COGS catalog (same period)', () => {
+  const range = { start: '2026-07-24', end: '2026-08-22' };
+  const figures = (ds: CanonicalDataset) => {
+    const m = computeKpis(ds, { range }).metrics;
+    const sc = stageCancellations(ds, { range });
+    return {
+      gmv: m.gmv.value,
+      orders: m.orders.value,
+      aov: Math.round(m.aov.value!),
+      cancelled: m.cancelledOrders.value,
+      cancelledGmv: sc.cancelledGmv,
+      refunded: m.refundedOrders.value,
+      refundRate: Math.round(m.refundRate.value! * 10_000) / 100,
+      net: m.netRevenue.value,
+      buyers: m.buyers.value,
+      visits: m.visits.value,
+    };
+  };
+  const EXPECTED = { gmv: 67_348_702, orders: 519, aov: 129_766, cancelled: 102, cancelledGmv: 18_954_280, refunded: 7, refundRate: 1.35, net: 47_559_510, buyers: 453, visits: 7_362 };
+
+  it('the summary report alone gives the Shopee figures', async () => {
+    expect(figures(await summaryWorkspace(WORKBOOK))).toEqual(EXPECTED);
+  });
+
+  it('the order export alone: placed GMV includes cancellations, returns found, 453 buyers (81 returning)', () => {
+    const r = orderExport(ORDER_FILE);
+    const ds = r.dataset;
+    const { visits: _v, ...rest } = EXPECTED;
+    const { visits: _w, ...got } = figures(ds);
+    expect(got).toEqual(rest);
+    const ci = customerIntelligence(ds, { range });
+    expect([ci.inRange.customers, ci.inRange.newCustomers, ci.inRange.returningCustomers]).toEqual([453, 372, 81]);
+  });
+
+  it('merging the order export and the catalog changes none of those figures, and COGS is found', async () => {
+    const summary = await summaryWorkspace(WORKBOOK);
+    const both = mergeIntoWorkspace(summary, orderExport(ORDER_FILE).dataset);
+    expect(figures(both)).toEqual(EXPECTED);
+    const t = customerTrend(both, { range }).periodTotal!;
+    expect([t.buyers, t.existingBuyers, t.newBuyers]).toEqual([453, 81, 372]);
+
+    const catSheets = sheetsOf(CATALOG_FILE);
+    const table = detectTableReport({ fileName: 'Danh_muc_SKU_gia_von.xlsx', sheets: catSheets })!;
+    const catalog = importTableReport({ fileName: 'Danh_muc_SKU_gia_von.xlsx', sheets: catSheets }, table);
+    expect(catalog.dataset.products.every((p) => typeof p.unitCogs === 'number')).toBe(true);
+    const all = mergeIntoWorkspace(both, catalog.dataset);
+    expect(figures(all)).toEqual(EXPECTED);
+    const k = computeKpis(all, { range });
+    expect(k.profit!.missingCogsSkus).toEqual([]);
+    expect(k.metrics.profit.value).not.toBeNull();
+  });
+
+  it('COGS matches on the product ID when the SKU does not', () => {
+    const r = orderExport(ORDER_FILE);
+    const byId = r.dataset.products.find((p) => p.productId)!;
+    const ds = mergeIntoWorkspace(r.dataset, { ...emptyDataset('c', 'c'), products: [{ sku: 'OTHER-CODE', productId: byId.productId, unitCogs: 1234 }] });
+    const line = ds.orderLines.find((l) => l.sku === byId.sku)!;
+    expect(resolveUnitCogs(ds, line)).toBe(1234);
   });
 });

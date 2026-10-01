@@ -1,7 +1,13 @@
+/**
+ * Workspace UI helpers shared by the Seller and Analyst pages. Same names and props as
+ * before; the look comes from the redesign components (src/components/ui) and tokens.
+ */
 import React from 'react';
-import { AlertOctagon, AlertTriangle, Sparkles, Info, Database, ChevronRight, CircleHelp } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, Sparkles, Info, ChevronRight, CircleHelp } from 'lucide-react';
 import type { AlertSeverity, Bilingual, CostSource, Lang, MetricComparison, MetricResult } from '../../analytics';
-import { fmtByUnit, fmtPp, fmtRate } from '../../analytics';
+import { fmtByUnit } from '../../analytics';
+import { Badge, Button, EmptyState, SectionCard, TONE_CLASS, type Tone } from '../ui/primitives';
+import { DeltaBadge, KpiCard as KpiCardView } from '../ui/data';
 
 export type { Lang };
 
@@ -9,21 +15,23 @@ export function tr(lang: Lang, v: Bilingual | string): string {
   return typeof v === 'string' ? v : v[lang];
 }
 
-/** Status colors are reserved for state and always paired with an icon + label. */
-export const SEVERITY_STYLE: Record<AlertSeverity, { icon: typeof Info; label: Bilingual; text: string; ring: string; bg: string; dot: string }> = {
-  critical: { icon: AlertOctagon, label: { vi: 'Nghiêm trọng', en: 'Critical' }, text: 'text-[#f08080]', ring: 'border-[#d03b3b]/50', bg: 'bg-[#d03b3b]/10', dot: 'bg-[#d03b3b]' },
-  warning: { icon: AlertTriangle, label: { vi: 'Cần chú ý', en: 'Warning' }, text: 'text-[#fab219]', ring: 'border-[#fab219]/40', bg: 'bg-[#fab219]/10', dot: 'bg-[#fab219]' },
-  opportunity: { icon: Sparkles, label: { vi: 'Cơ hội', en: 'Opportunity' }, text: 'text-[#4ade80]', ring: 'border-[#0ca30c]/50', bg: 'bg-[#0ca30c]/10', dot: 'bg-[#0ca30c]' },
-  info: { icon: Info, label: { vi: 'Thông tin', en: 'Info' }, text: 'text-sky-300', ring: 'border-sky-400/30', bg: 'bg-sky-500/10', dot: 'bg-sky-400' },
+/** Status colours are reserved for state and always paired with an icon + label.
+ * Red is kept for data mismatches: a critical business alert is orange (down). */
+const SEVERITY_TONE: Record<AlertSeverity, Tone> = { critical: 'down', warning: 'warn', opportunity: 'up', info: 'info' };
+export const SEVERITY_STYLE: Record<AlertSeverity, { icon: typeof Info; label: Bilingual; text: string; ring: string; bg: string; dot: string; tone: Tone }> = {
+  critical: { icon: AlertOctagon, label: { vi: 'Nghiêm trọng', en: 'Critical' }, text: 'text-down', ring: 'border-down/30', bg: 'bg-down-soft', dot: 'bg-down', tone: SEVERITY_TONE.critical },
+  warning: { icon: AlertTriangle, label: { vi: 'Cần chú ý', en: 'Warning' }, text: 'text-warn', ring: 'border-warn/30', bg: 'bg-warn-soft', dot: 'bg-warn', tone: SEVERITY_TONE.warning },
+  opportunity: { icon: Sparkles, label: { vi: 'Cơ hội', en: 'Opportunity' }, text: 'text-up', ring: 'border-up/30', bg: 'bg-up-soft', dot: 'bg-up', tone: SEVERITY_TONE.opportunity },
+  info: { icon: Info, label: { vi: 'Thông tin', en: 'Info' }, text: 'text-info', ring: 'border-info/30', bg: 'bg-info-soft', dot: 'bg-info', tone: SEVERITY_TONE.info },
 };
 
 export const SeverityBadge: React.FC<{ severity: AlertSeverity; lang: Lang }> = ({ severity, lang }) => {
   const s = SEVERITY_STYLE[severity];
   const Icon = s.icon;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-bold whitespace-nowrap ${s.text} ${s.ring} ${s.bg}`}>
-      <Icon className="w-3 h-3" aria-hidden /> {tr(lang, s.label)}
-    </span>
+    <Badge tone={s.tone} icon={<Icon className="h-3 w-3" aria-hidden />}>
+      {tr(lang, s.label)}
+    </Badge>
   );
 };
 
@@ -40,11 +48,7 @@ const SOURCE_LABEL: Record<CostSource, Bilingual> = {
 
 export const SourceBadge: React.FC<{ source: CostSource; lang: Lang }> = ({ source, lang }) => {
   const warn = source === 'missing' || source === 'assumed' || source === 'unallocated';
-  return (
-    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border whitespace-nowrap ${warn ? 'text-[#fab219] border-[#fab219]/40 bg-[#fab219]/10' : 'text-slate-400 border-white/10 bg-white/[0.03]'}`}>
-      {tr(lang, SOURCE_LABEL[source])}
-    </span>
-  );
+  return <Badge tone={warn ? 'warn' : 'neutral'}>{tr(lang, SOURCE_LABEL[source])}</Badge>;
 };
 
 /** Renders a metric; missing values show "Không đủ dữ liệu", never 0. */
@@ -53,118 +57,41 @@ export function metricText(m: MetricResult, lang: Lang, compact = true): string 
   return fmtByUnit(m.value, m.unit, lang, compact);
 }
 
-/** Delta chip: relative % for amounts, percentage points for rates. */
-export const DeltaChip: React.FC<{ cmp: MetricComparison; lang: Lang; goodWhenUp?: boolean }> = ({ cmp, lang, goodWhenUp = true }) => {
-  if (cmp.direction === 'unknown' || cmp.absoluteDelta === null) {
-    return <span className="text-[11px] text-slate-500">{lang === 'vi' ? 'Chưa có kỳ trước để so sánh' : 'No previous period'}</span>;
-  }
-  const isRate = cmp.unit === 'ratio';
-  const up = cmp.direction === 'up';
-  const flat = cmp.direction === 'flat';
-  const good = flat ? null : up === goodWhenUp;
-  const color = good === null ? 'text-slate-400' : good ? 'text-[#4ade80]' : 'text-[#f08080]';
-  const arrow = flat ? '→' : up ? '↑' : '↓';
-  const main = isRate
-    ? fmtPp(cmp.percentagePointDelta ?? null, lang)
-    : cmp.percentageDelta === null
-      ? lang === 'vi' ? 'mới phát sinh' : 'new'
-      : `${arrow} ${fmtRate(Math.abs(cmp.percentageDelta), lang)}`;
-  const abs = isRate ? null : fmtByUnit(cmp.absoluteDelta, cmp.unit, lang);
-  return (
-    <span className={`text-[11px] font-semibold ${color}`}>
-      {main}
-      {abs && <span className="text-slate-400 font-normal"> ({cmp.absoluteDelta > 0 ? '+' : ''}{abs})</span>}
-    </span>
-  );
-};
+/** Change badge: ↑/↓ + % for amounts, pp for rates; green when good, orange when bad. */
+export const DeltaChip: React.FC<{ cmp: MetricComparison; lang: Lang; goodWhenUp?: boolean }> = (props) => <DeltaBadge {...props} />;
 
-export const KpiCard: React.FC<{
-  label: string;
-  metric: MetricResult;
-  cmp?: MetricComparison;
-  lang: Lang;
-  compareLabel?: string;
-  goodWhenUp?: boolean;
-  sub?: React.ReactNode;
-  emphasis?: boolean;
-}> = ({ label, metric, cmp, lang, compareLabel, goodWhenUp, sub, emphasis }) => {
-  const missing = metric.value === null;
-  return (
-    <div className={`rounded-2xl border p-3.5 sm:p-4 flex flex-col gap-1 min-w-0 ${emphasis ? 'border-sky-400/30 bg-sky-500/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
-      <div className="text-xs font-semibold text-slate-400 flex flex-wrap items-center gap-1" title={metric.status === 'ok' ? (metric.notes || []).map((n) => n[lang]).join('\n') || undefined : undefined}>
-        {metric.label ? metric.label[lang] : label}
-        {metric.basis && <span className="text-[10px] font-semibold text-slate-300 bg-white/[0.07] border border-white/10 rounded px-1 py-px whitespace-nowrap">{metric.basis[lang]}</span>}
-        {metric.status === 'partial' && (
-          <span className="text-[10px] font-bold text-[#fab219]" title={(metric.notes || []).map((n) => n[lang]).join('\n')}>
-            • {lang === 'vi' ? 'chưa đầy đủ' : 'partial'}
-          </span>
-        )}
-      </div>
-      <div className={`font-black tracking-tight truncate ${missing ? 'text-base text-slate-500' : 'text-xl sm:text-2xl text-white'}`}>{metricText(metric, lang)}</div>
-      {missing && metric.notes?.[0] && <div className="text-[11px] text-slate-500 leading-snug">{metric.notes[0][lang]}</div>}
-      {!missing && metric.warning && (
-        <div className={`text-[11px] leading-snug ${metric.mismatch ? 'text-[#f08080] font-semibold' : 'text-[#fab219]'}`} role={metric.mismatch ? 'alert' : undefined}>
-          ⚠ {metric.warning[lang]}
-        </div>
-      )}
-      {!missing && cmp && (
-        <div className="leading-snug">
-          <DeltaChip cmp={cmp} lang={lang} goodWhenUp={goodWhenUp} />
-          {compareLabel && cmp.direction !== 'unknown' && <span className="text-[11px] text-slate-500"> {compareLabel}</span>}
-        </div>
-      )}
-      {sub}
-    </div>
-  );
-};
+/** KPI card (fixed height, stage tag, data flag) — see ui/data.tsx. */
+export const KpiCard = KpiCardView;
 
+/** Card with title, one-line description and tools on the right. */
 export const Section: React.FC<{ title: string; subtitle?: string; right?: React.ReactNode; children: React.ReactNode; id?: string }> = ({ title, subtitle, right, children, id }) => (
-  <section className="glass-panel rounded-2xl p-4 sm:p-5" id={id} aria-label={title}>
-    <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
-      <div className="min-w-0">
-        <h2 className="text-base sm:text-lg font-black text-white">{title}</h2>
-        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
-      </div>
-      {right}
-    </div>
+  <SectionCard title={title} description={subtitle} tools={right} id={id}>
     {children}
-  </section>
+  </SectionCard>
 );
 
 export const NotEnoughData: React.FC<{ lang: Lang; reason: string; action?: React.ReactNode; title?: string }> = ({ lang, reason, action, title }) => (
-  <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-4 text-center">
-    <Database className="w-5 h-5 mx-auto text-slate-500" aria-hidden />
-    <div className="text-sm font-bold text-slate-300 mt-1.5">{title ?? (lang === 'vi' ? 'Không đủ dữ liệu' : 'Not enough data')}</div>
-    <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">{reason}</p>
-    {action && <div className="mt-3">{action}</div>}
-  </div>
+  <EmptyState title={title ?? (lang === 'vi' ? 'Không đủ dữ liệu' : 'Not enough data')} reason={reason} action={action} />
 );
 
 export const EvidenceButton: React.FC<{ lang: Lang; onClick: () => void; compact?: boolean }> = ({ lang, onClick, compact }) => (
   <button
+    type="button"
     onClick={onClick}
-    className={`inline-flex items-center gap-1 rounded-lg border border-sky-400/30 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 font-semibold whitespace-nowrap ${compact ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-1'}`}
+    className={`inline-flex min-h-10 items-center gap-1 rounded-control font-semibold whitespace-nowrap text-primary hover:bg-primary-soft ${compact ? 'px-2 text-small' : 'px-3 text-sm'}`}
   >
-    {lang === 'vi' ? 'Xem dữ liệu' : 'View data'} <ChevronRight className="w-3 h-3" aria-hidden />
+    {lang === 'vi' ? 'Xem dữ liệu' : 'View data'} <ChevronRight className="h-3.5 w-3.5" aria-hidden />
   </button>
 );
 
 export const HelpTip: React.FC<{ text: string }> = ({ text }) => (
-  <span title={text} className="inline-flex text-slate-500 hover:text-slate-300 cursor-help align-middle">
-    <CircleHelp className="w-3.5 h-3.5" aria-label={text} />
+  <span title={text} className="inline-flex cursor-help align-middle text-muted hover:text-fg">
+    <CircleHelp className="h-3.5 w-3.5" aria-label={text} />
   </span>
 );
 
-export const PrimaryButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className = '', ...props }) => (
-  <button
-    {...props}
-    className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-  />
-);
+export const PrimaryButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = (props) => <Button variant="primary" {...props} />;
 
-export const GhostButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className = '', ...props }) => (
-  <button
-    {...props}
-    className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border border-white/15 bg-white/[0.04] hover:bg-white/[0.1] text-slate-200 disabled:opacity-50 ${className}`}
-  />
-);
+export const GhostButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = (props) => <Button variant="secondary" {...props} />;
+
+export { TONE_CLASS };

@@ -62,25 +62,25 @@ describe('KPI engine — order grain', () => {
     expect(m.completedOrders.value).toBe(2);
   });
 
-  it('GMV excludes cancelled orders and counts multi-item orders fully', () => {
-    expect(m.gmv.value).toBe(700 * K);
+  it('GMV = placed orders, cancellations included (as the Shopee report), multi-item orders fully', () => {
+    expect(m.gmv.value).toBe(800 * K);
     expect(m.placedGmv.value).toBe(800 * K);
     expect(m.units.value).toBe(7);
   });
 
-  it('net revenue = GMV − seller discount − refund', () => {
-    expect(m.netRevenue.value).toBe(530 * K);
+  it('net revenue = GMV − cancelled sales − refunds', () => {
+    expect(m.netRevenue.value).toBe(600 * K);
   });
 
-  it('computes AOV and rates', () => {
-    expect(m.aov.value).toBeCloseTo((700 * K) / 3, 6);
+  it('computes AOV and rates on placed orders', () => {
+    expect(m.aov.value).toBeCloseTo((800 * K) / 4, 6);
     expect(m.cancelRate.value).toBeCloseTo(0.25, 10);
-    expect(m.refundRate.value).toBeCloseTo(1 / 3, 10);
+    expect(m.refundRate.value).toBeCloseTo(1 / 4, 10);
     expect(m.completionRate.value).toBeCloseTo(0.5, 10);
   });
 
-  it('counts distinct buyers when every valid order has a customer ID', () => {
-    expect(m.buyers.value).toBe(2); // c1 (O1, O3), c3 (O4); c2 only cancelled
+  it('counts distinct buyers of every placed order, cancelled ones included', () => {
+    expect(m.buyers.value).toBe(3); // c1 (O1, O3), c2 (cancelled O2), c3 (O4)
   });
 
   it('does not fabricate CVR without traffic data', () => {
@@ -146,15 +146,16 @@ describe('KPI engine — edge cases', () => {
     const k = computeKpis(baseFixture(), { range: { start: '2025-08-31', end: '2025-09-02' } });
     expect(k.coverage).toBe('partial');
     expect(k.metrics.gmv.status).toBe('partial');
-    expect(k.metrics.gmv.value).toBe(700 * K);
+    expect(k.metrics.gmv.value).toBe(800 * K);
   });
 
-  it('all-cancelled period has zero GMV and 100% cancel rate', () => {
+  it('all-cancelled period: placed GMV counts the order, net revenue is zero, 100% cancel rate', () => {
     const ds = dataset([order({ orderId: 'Z', orderDate: '2025-09-01', status: 'cancelled' })], [line({ orderId: 'Z', sku: 'A', quantity: 1, grossAmount: 100 })]);
     const m = computeKpis(ds, { range: { start: '2025-09-01', end: '2025-09-01' } }).metrics;
-    expect(m.gmv.value).toBe(0);
+    expect(m.gmv.value).toBe(100);
+    expect(m.netRevenue.value).toBe(0);
     expect(m.cancelRate.value).toBe(1);
-    expect(m.aov.value).toBeNull();
+    expect(m.aov.value).toBe(100);
   });
 });
 

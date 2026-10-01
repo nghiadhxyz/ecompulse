@@ -214,11 +214,11 @@ export function assessDataQuality(dataset: CanonicalDataset): DataQualityReport 
       code: 'estimated_fields',
       severity: 'info',
       message: {
-        vi: `File thiếu một số chỉ số, màn hình cũ đang hiển thị giá trị ước tính: ${dataset.estimatedFields.join(', ')}. Phân tích mới coi các chỉ số này là "không đủ dữ liệu".`,
-        en: `Some metrics are missing from the file; legacy screens show estimates: ${dataset.estimatedFields.join(', ')}. New analytics treat them as missing.`,
+        vi: `File thiếu một số chỉ số, màn hình cũ đang hiển thị giá trị ước tính: ${dataset.estimatedFields.map((f) => ESTIMATED_FIELD_LABELS[f]?.vi ?? f).join(', ')}. Phân tích mới coi các chỉ số này là "không đủ dữ liệu".`,
+        en: `Some metrics are missing from the file; legacy screens show estimates: ${dataset.estimatedFields.map((f) => ESTIMATED_FIELD_LABELS[f]?.en ?? f).join(', ')}. New analytics treat them as missing.`,
       },
       count: dataset.estimatedFields.length,
-      samples: dataset.estimatedFields,
+      samples: dataset.estimatedFields.map((f) => ESTIMATED_FIELD_LABELS[f]?.vi ?? f),
     });
   }
   for (const note of dataset.importNotes || []) {
@@ -319,3 +319,15 @@ export function assessDataQuality(dataset: CanonicalDataset): DataQualityReport 
     skusMissingCogs: Array.from(skusMissingCogs).sort(),
   };
 }
+
+/** Readable names for the legacy parser's estimated fields — never show internal keys. */
+const ESTIMATED_FIELD_LABELS: Record<string, { vi: string; en: string }> = {
+  totalUnits: { vi: 'Tổng số sản phẩm bán ra', en: 'Units sold' },
+  productUnits: { vi: 'Số sản phẩm theo từng mặt hàng', en: 'Units per product' },
+  confirmedOrders: { vi: 'Đơn đã xác nhận', en: 'Confirmed orders' },
+  confirmedRevenue: { vi: 'Doanh số đơn đã xác nhận', en: 'Confirmed-order sales' },
+  placedOrders: { vi: 'Đơn đã đặt', en: 'Placed orders' },
+  placedRevenue: { vi: 'Doanh số đơn đã đặt', en: 'Placed-order sales' },
+  actualRevenue: { vi: 'Doanh thu thực nhận', en: 'Actual revenue' },
+  channels: { vi: 'Doanh số theo kênh', en: 'Sales by channel' },
+};

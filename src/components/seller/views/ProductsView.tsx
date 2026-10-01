@@ -16,8 +16,13 @@ import {
 import { useSeller } from '../SellerContext';
 import { NotEnoughData, Section, GhostButton, tr } from '../ui';
 import { SummaryProductsPanel } from '../../workspace/SummaryPanels';
+import { Chip } from '../../ui/primitives';
+import { TABLE, Th } from '../../ui/data';
 
 const SHORTCUTS: (ProductShortcut | 'all')[] = ['all', 'bestSelling', 'topRevenue', 'topProfit', 'highMargin', 'growing', 'declining', 'losing', 'highCancel'];
+
+/** Growth: green when up, orange when down (the arrow comes with fmtChange). */
+const growthClass = (d: number | null) => ((d ?? 0) > 0 ? 'text-up' : (d ?? 0) < 0 ? 'text-down' : '');
 
 export const ProductsView: React.FC = () => {
   const { lang, dataset, range, previousRange, platforms, openEvidence, goTo } = useSeller();
@@ -31,9 +36,11 @@ export const ProductsView: React.FC = () => {
     return (
       <div className="space-y-4">
         <SummaryProductsPanel />
-        <p className="text-xs text-slate-400">
-          {vi ? 'Muốn xem lời/lỗ và bộ lọc theo từng sản phẩm, hãy nhập thêm file xuất đơn hàng (Đơn hàng → Xuất).' : 'Import an order export for per-product profit.'}{' '}
-          <button onClick={() => goTo('data')} className="underline text-sky-300">{vi ? 'Nhập file đơn hàng' : 'Import orders'}</button>
+        <p className="flex flex-wrap items-center gap-2 text-small text-muted">
+          {vi ? 'Muốn xem lời/lỗ và bộ lọc theo từng sản phẩm, hãy nhập thêm file xuất đơn hàng (Đơn hàng → Xuất).' : 'Import an order export for per-product profit.'}
+          <button type="button" onClick={() => goTo('data')} className="inline-flex min-h-10 items-center font-semibold text-primary hover:underline">
+            {vi ? 'Nhập file đơn hàng' : 'Import orders'}
+          </button>
         </p>
       </div>
     );
@@ -65,57 +72,48 @@ export const ProductsView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <Section
-        title={vi ? '“Sản phẩm tốt nhất” theo từng tiêu chí' : '“Best product” by criterion'}
-        subtitle={vi ? 'Mỗi tiêu chí có thể là một sản phẩm khác nhau' : 'Each criterion may be a different product'}
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+      <Section title={vi ? '“Sản phẩm tốt nhất” theo từng tiêu chí' : '“Best product” by criterion'} subtitle={vi ? 'Mỗi tiêu chí có thể là một sản phẩm khác nhau' : 'Each criterion may be a different product'}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {leaderItems.map((l) => (
             <button
               key={l.label}
+              type="button"
               disabled={!l.row}
               onClick={() => l.row && open(l.row)}
-              className="text-left rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] p-3 disabled:opacity-60"
+              className="rounded-control border border-line bg-surface-2 p-3 text-left hover:bg-hover disabled:cursor-default disabled:opacity-60"
             >
-              <div className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                <Trophy className="w-3 h-3" aria-hidden /> {l.label}
+              <div className="flex items-center gap-1 text-small font-medium text-muted">
+                <Trophy className="h-3.5 w-3.5" aria-hidden /> {l.label}
               </div>
-              <div className="text-sm font-bold text-white mt-1 line-clamp-2">{l.row ? l.row.name : vi ? 'Không đủ dữ liệu' : 'Not enough data'}</div>
-              {l.row && <div className="text-xs text-sky-300 mt-0.5">{l.value}</div>}
+              <div className="mt-1 line-clamp-2 text-sm font-semibold text-fg">{l.row ? l.row.name : vi ? 'Không đủ dữ liệu' : 'Not enough data'}</div>
+              {l.row && <div className="mt-0.5 text-small font-semibold tabular text-primary">{l.value}</div>}
             </button>
           ))}
         </div>
       </Section>
 
-      <Section
-        title={vi ? 'Hiệu quả sản phẩm' : 'Product performance'}
-        subtitle={`${formatRangeVi(range)} · ${vi ? 'tăng trưởng so với' : 'growth vs'} ${formatRangeVi(previousRange)}`}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
-          <div className="flex flex-wrap gap-1.5 flex-1" role="group" aria-label={vi ? 'Lọc nhanh' : 'Shortcuts'}>
+      <Section title={vi ? 'Hiệu quả sản phẩm' : 'Product performance'} subtitle={`${formatRangeVi(range)} · ${vi ? 'tăng trưởng so với' : 'growth vs'} ${formatRangeVi(previousRange)}`}>
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-1 flex-wrap gap-1" role="group" aria-label={vi ? 'Lọc nhanh' : 'Shortcuts'}>
             {SHORTCUTS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setShortcut(s)}
-                aria-pressed={shortcut === s}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${shortcut === s ? 'bg-sky-600 border-sky-500 text-white' : 'border-white/10 text-slate-300 hover:bg-white/[0.06]'}`}
-              >
+              <Chip key={s} selected={shortcut === s} onClick={() => setShortcut(s)}>
                 {s === 'all' ? (vi ? 'Tất cả' : 'All') : tr(lang, SHORTCUT_LABELS[s])}
-              </button>
+              </Chip>
             ))}
           </div>
-          <label className="relative block sm:w-56">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden />
+          <label className="relative block sm:w-60">
+            <span className="sr-only">{vi ? 'Tìm sản phẩm' : 'Search products'}</span>
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={vi ? 'Tìm SKU / tên sản phẩm' : 'Search SKU / name'}
-              className="w-full bg-white/[0.05] border border-white/10 rounded-lg pl-8 pr-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-500"
+              className="min-h-10 w-full rounded-control border border-line bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-muted"
             />
           </label>
         </div>
         {perf.unallocatedAdSpend > 0 && (
-          <p className="text-[11px] text-[#fab219] mb-2">
+          <p className="mb-3 inline-flex rounded-control bg-warn-soft px-2.5 py-1 text-small text-warn">
             {vi
               ? `${fmtMoneyCompact(perf.unallocatedAdSpend)} chi phí Ads không gắn SKU chưa được trừ vào lợi nhuận từng sản phẩm.`
               : `${fmtMoneyCompact(perf.unallocatedAdSpend, 'en')} of ad spend has no SKU and is not deducted per product.`}
@@ -123,36 +121,51 @@ export const ProductsView: React.FC = () => {
         )}
 
         {rows.length === 0 ? (
-          <p className="text-sm text-slate-400 py-4 text-center">{vi ? 'Không có sản phẩm nào khớp.' : 'No matching products.'}</p>
+          <p className="py-4 text-center text-sm text-muted">{vi ? 'Không có sản phẩm nào khớp.' : 'No matching products.'}</p>
         ) : (
           <>
             {/* Desktop table */}
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-white/10">
-              <table className="w-full text-xs">
-                <thead className="bg-white/[0.04] text-slate-400">
+            <div className={`hidden md:block ${TABLE.frame}`}>
+              <table className={TABLE.table}>
+                <thead className={TABLE.thead}>
                   <tr>
-                    {[vi ? 'Sản phẩm' : 'Product', vi ? 'SL bán' : 'Units', vi ? 'Đơn' : 'Orders', 'GMV', vi ? 'DT thuần' : 'Net rev.', vi ? 'Lợi nhuận' : 'Profit', 'Margin', vi ? 'Tỷ lệ hủy' : 'Cancel', vi ? 'Tăng trưởng' : 'Growth'].map((h, i) => (
-                      <th key={h} className={`font-semibold px-2.5 py-2 whitespace-nowrap ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
-                    ))}
+                    <Th left className="sticky left-0 z-20 bg-surface-2">{vi ? 'Sản phẩm' : 'Product'}</Th>
+                    <Th>{vi ? 'SL bán' : 'Units'}</Th>
+                    <Th>{vi ? 'Đơn' : 'Orders'}</Th>
+                    <Th>GMV</Th>
+                    <Th>{vi ? 'DT thuần' : 'Net rev.'}</Th>
+                    <Th>{vi ? 'Lợi nhuận' : 'Profit'}</Th>
+                    <Th>Margin</Th>
+                    <Th>{vi ? 'Tỷ lệ hủy' : 'Cancel'}</Th>
+                    <Th>{vi ? 'Tăng trưởng' : 'Growth'}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.sku} onClick={() => open(r)} className="border-t border-white/5 text-slate-200 hover:bg-white/[0.04] cursor-pointer">
-                      <td className="px-2.5 py-2 max-w-[260px]">
-                        <div className="font-semibold text-white truncate">{r.name}</div>
-                        <div className="text-[11px] text-slate-500">{r.sku}{r.comboId ? ' · Combo' : ''}</div>
+                    <tr key={r.sku} onClick={() => open(r)} className={`${TABLE.tr} cursor-pointer text-fg`}>
+                      <td className="sticky left-0 z-10 max-w-[260px] bg-surface px-3 py-1.5" title={r.name}>
+                        <div className="truncate font-medium text-fg">{r.name}</div>
+                        <div className="text-small text-muted">
+                          {r.sku}
+                          {r.comboId ? ' · Combo' : ''}
+                        </div>
                       </td>
-                      <td className="px-2.5 py-2 text-right">{fmtCount(r.units, lang)}</td>
-                      <td className="px-2.5 py-2 text-right">{fmtCount(r.orders, lang)}</td>
-                      <td className="px-2.5 py-2 text-right">{fmtMoneyCompact(r.gmv, lang)}</td>
-                      <td className="px-2.5 py-2 text-right">{fmtMoneyCompact(r.netRevenue, lang)}</td>
-                      <td className={`px-2.5 py-2 text-right font-semibold ${(r.profit.value ?? 0) < 0 ? 'text-[#f08080]' : ''}`}>
-                        {r.profit.value === null ? <span className="text-slate-500 font-normal" title={r.profit.notes?.[0]?.[lang]}>{vi ? 'Chưa có giá vốn' : 'No COGS'}</span> : fmtMoneyCompact(r.profit.value, lang)}
+                      <td className={`${TABLE.td} text-right`}>{fmtCount(r.units, lang)}</td>
+                      <td className={`${TABLE.td} text-right`}>{fmtCount(r.orders, lang)}</td>
+                      <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(r.gmv, lang)}</td>
+                      <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(r.netRevenue, lang)}</td>
+                      <td className={`${TABLE.td} text-right font-semibold ${(r.profit.value ?? 0) < 0 ? 'text-down' : ''}`}>
+                        {r.profit.value === null ? (
+                          <span className="font-normal text-muted" title={r.profit.notes?.[0]?.[lang]}>
+                            {vi ? 'Chưa có giá vốn' : 'No COGS'}
+                          </span>
+                        ) : (
+                          fmtMoneyCompact(r.profit.value, lang)
+                        )}
                       </td>
-                      <td className="px-2.5 py-2 text-right">{fmtRate(r.margin.value, lang)}</td>
-                      <td className="px-2.5 py-2 text-right">{fmtRate(r.cancelRate, lang)}</td>
-                      <td className={`px-2.5 py-2 text-right ${(r.growth.percentageDelta ?? 0) > 0 ? 'text-[#4ade80]' : (r.growth.percentageDelta ?? 0) < 0 ? 'text-[#f08080]' : ''}`}>
+                      <td className={`${TABLE.td} text-right`}>{fmtRate(r.margin.value, lang)}</td>
+                      <td className={`${TABLE.td} text-right`}>{fmtRate(r.cancelRate, lang)}</td>
+                      <td className={`${TABLE.td} text-right font-medium ${growthClass(r.growth.percentageDelta)}`}>
                         {r.growth.percentageDelta === null ? (r.growth.previous === 0 && r.gmv > 0 ? (vi ? 'Mới' : 'New') : '—') : fmtChange(r.growth.percentageDelta, lang)}
                       </td>
                     </tr>
@@ -161,19 +174,37 @@ export const ProductsView: React.FC = () => {
               </table>
             </div>
             {/* Mobile cards */}
-            <ul className="md:hidden space-y-2">
+            <ul className="space-y-2 md:hidden">
               {rows.map((r) => (
                 <li key={r.sku}>
-                  <button onClick={() => open(r)} className="w-full text-left rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                    <div className="font-semibold text-white text-sm">{r.name}</div>
-                    <div className="text-[11px] text-slate-500">{r.sku}</div>
-                    <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
-                      <div><div className="text-slate-500">GMV</div><div className="text-white font-bold">{fmtMoneyCompact(r.gmv, lang)}</div></div>
-                      <div><div className="text-slate-500">{vi ? 'Lợi nhuận' : 'Profit'}</div><div className={`font-bold ${(r.profit.value ?? 0) < 0 ? 'text-[#f08080]' : 'text-white'}`}>{r.profit.value === null ? '—' : fmtMoneyCompact(r.profit.value, lang)}</div></div>
-                      <div><div className="text-slate-500">{vi ? 'Tăng trưởng' : 'Growth'}</div><div className="text-white font-bold">{fmtChange(r.growth.percentageDelta, lang)}</div></div>
-                      <div><div className="text-slate-500">{vi ? 'SL bán' : 'Units'}</div><div className="text-white">{fmtCount(r.units, lang)}</div></div>
-                      <div><div className="text-slate-500">Margin</div><div className="text-white">{fmtRate(r.margin.value, lang)}</div></div>
-                      <div><div className="text-slate-500">{vi ? 'Hủy' : 'Cancel'}</div><div className="text-white">{fmtRate(r.cancelRate, lang)}</div></div>
+                  <button type="button" onClick={() => open(r)} className="w-full rounded-control border border-line bg-surface p-3 text-left hover:bg-hover">
+                    <div className="text-sm font-semibold text-fg">{r.name}</div>
+                    <div className="text-small text-muted">{r.sku}</div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-small tabular">
+                      <div>
+                        <div className="text-muted">GMV</div>
+                        <div className="font-semibold text-fg">{fmtMoneyCompact(r.gmv, lang)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted">{vi ? 'Lợi nhuận' : 'Profit'}</div>
+                        <div className={`font-semibold ${(r.profit.value ?? 0) < 0 ? 'text-down' : 'text-fg'}`}>{r.profit.value === null ? '—' : fmtMoneyCompact(r.profit.value, lang)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted">{vi ? 'Tăng trưởng' : 'Growth'}</div>
+                        <div className={`font-semibold ${growthClass(r.growth.percentageDelta) || 'text-fg'}`}>{fmtChange(r.growth.percentageDelta, lang)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted">{vi ? 'SL bán' : 'Units'}</div>
+                        <div className="text-fg">{fmtCount(r.units, lang)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted">Margin</div>
+                        <div className="text-fg">{fmtRate(r.margin.value, lang)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted">{vi ? 'Hủy' : 'Cancel'}</div>
+                        <div className="text-fg">{fmtRate(r.cancelRate, lang)}</div>
+                      </div>
                     </div>
                   </button>
                 </li>

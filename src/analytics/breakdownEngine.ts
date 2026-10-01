@@ -271,8 +271,15 @@ function memberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<string
     if (list) list.push(l);
     else linesByOrder.set(l.orderId, [l]);
   }
+  // Placed-order sales per member, cancellations included — the same GMV as the KPI card.
+  const placedGross = new Map<string, number>();
   for (const o of slice.orders) {
-    const keys = new Set((linesByOrder.get(o.orderId) || []).map((l) => key(o, l)));
+    const orderLines = linesByOrder.get(o.orderId) || [];
+    for (const l of orderLines) {
+      const k = key(o, l);
+      if (k !== null && k !== undefined) placedGross.set(k, (placedGross.get(k) ?? 0) + (l.grossAmount || 0));
+    }
+    const keys = new Set(orderLines.map((l) => key(o, l)));
     const cancelled = isCancelled(o.status);
     const returned = isReturnOrRefund(o.status);
     for (const k of keys) {
@@ -288,7 +295,7 @@ function memberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<string
   const out = new Map<string, MemberMetrics>();
   for (const [k, c] of counts) {
     const p = profits.get(k) ?? null;
-    const gmv = p?.gmv.value ?? 0;
+    const gmv = placedGross.get(k) ?? 0;
     const memberClicks = clicks ? clicks.get(k) ?? null : null;
     out.set(k, {
       gmv,
@@ -301,9 +308,9 @@ function memberMetrics(slice: DatasetSlice, dim: BreakdownDimension): Map<string
       valid: c.valid,
       cancelled: c.cancelled,
       returned: c.returned,
-      aov: c.valid > 0 ? gmv / c.valid : null,
+      aov: c.placed > 0 ? gmv / c.placed : null,
       cancelRate: c.placed > 0 ? c.cancelled / c.placed : null,
-      refundRate: c.valid > 0 ? c.returned / c.valid : null,
+      refundRate: c.placed > 0 ? c.returned / c.placed : null,
       clicks: memberClicks,
       cvr: memberClicks ? c.placed / memberClicks : null,
       profitDetail: p,

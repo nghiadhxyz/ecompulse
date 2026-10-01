@@ -17,6 +17,9 @@ import {
 import { useSeller } from '../SellerContext';
 import { EvidenceButton, GhostButton, HelpTip, NotEnoughData, Section } from '../ui';
 import { ChannelWeekdayPanel } from '../../workspace/SummaryInsightPanels';
+import { Button, SectionCard } from '../../ui/primitives';
+import { TABLE, Th } from '../../ui/data';
+import { CHANNEL_COLOR } from '../../../theme/chart';
 
 export const AdsLiveView: React.FC = () => {
   const { lang, dataset, range, platforms, openEvidence, goTo } = useSeller();
@@ -27,26 +30,30 @@ export const AdsLiveView: React.FC = () => {
 
   const profitCell = (r: Pick<AdCampaignRow, 'estimatedProfitAfterAds' | 'profitNote' | 'marginIsPartial'>) =>
     r.estimatedProfitAfterAds === null ? (
-      <span className="text-slate-500" title={r.profitNote?.[lang]}>{vi ? 'Không đủ dữ liệu' : 'Not enough data'}</span>
+      <span className="text-muted" title={r.profitNote?.[lang]}>
+        {vi ? 'Không đủ dữ liệu' : 'Not enough data'}
+      </span>
     ) : (
-      <span className={`font-bold ${r.estimatedProfitAfterAds < 0 ? 'text-[#f08080]' : 'text-[#4ade80]'}`}>
+      <span className={`font-semibold ${r.estimatedProfitAfterAds < 0 ? 'text-down' : 'text-up'}`}>
         {fmtMoneyCompact(r.estimatedProfitAfterAds, lang)}
-        {r.marginIsPartial && <span className="text-[10px] text-[#fab219] font-normal"> *</span>}
+        {r.marginIsPartial && <span className="font-normal text-warn"> *</span>}
       </span>
     );
 
   return (
     <div className="space-y-4">
-      <Section
+      <SectionCard
         title={vi ? 'Quảng cáo' : 'Ads'}
-        subtitle={formatRangeVi(range)}
-        right={
+        description={formatRangeVi(range)}
+        tools={
           ads.available && (
-            <button onClick={() => setAdvanced((a) => !a)} aria-expanded={advanced} className="text-xs text-sky-300 inline-flex items-center gap-1">
-              {vi ? 'Chỉ số nâng cao' : 'Advanced metrics'} <ChevronDown className={`w-3.5 h-3.5 transition-transform ${advanced ? 'rotate-180' : ''}`} />
-            </button>
+            <Button variant="ghost" onClick={() => setAdvanced((a) => !a)} aria-expanded={advanced}>
+              {vi ? 'Chỉ số nâng cao' : 'Advanced metrics'} <ChevronDown className={`h-4 w-4 transition-transform ${advanced ? 'rotate-180' : ''}`} aria-hidden />
+            </Button>
           )
         }
+        notesLabel={vi ? 'Ghi chú' : 'Notes'}
+        notes={ads.available && ads.rows.some((r) => r.marginIsPartial) ? [`* ${vi ? 'Ước tính chưa đầy đủ vì thiếu một số chi phí (phí sàn/vận chuyển).' : 'Partial estimate: some costs are missing.'}`] : []}
       >
         {!ads.available ? (
           <NotEnoughData
@@ -56,7 +63,7 @@ export const AdsLiveView: React.FC = () => {
           />
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
+            <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
               {[
                 { l: vi ? 'Chi phí Ads' : 'Ad spend', v: fmtMoneyCompact(ads.totals.spend, lang) },
                 { l: vi ? 'Doanh thu từ Ads' : 'Attributed revenue', v: fmtMoneyCompact(ads.totals.attributedRevenue, lang) },
@@ -64,68 +71,74 @@ export const AdsLiveView: React.FC = () => {
                 { l: 'ROAS', v: fmtMultiple(ads.totals.roas, lang) },
                 { l: vi ? 'Lợi nhuận sau Ads (ước tính)' : 'Est. profit after ads', v: ads.totals.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(ads.totals.estimatedProfitAfterAds, lang), bad: (ads.totals.estimatedProfitAfterAds ?? 0) < 0 },
               ].map((x) => (
-                <div key={x.l} className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
-                  <div className="text-[11px] text-slate-400">{x.l}</div>
-                  <div className={`text-base font-black ${x.bad ? 'text-[#f08080]' : 'text-white'}`}>{x.v}</div>
+                <div key={x.l} className="min-w-0 rounded-control border border-line bg-surface-2 p-3">
+                  <div className="truncate text-small text-muted" title={x.l}>{x.l}</div>
+                  <div className={`mt-0.5 text-xl font-bold tabular ${x.bad ? 'text-down' : 'text-fg'}`}>{x.v}</div>
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 mb-2 flex items-center gap-1">
+            <p className="mb-3 flex items-center gap-1 text-small text-muted">
               {vi ? 'ROAS cao chưa chắc có lời — so với "ROAS hòa vốn" (mức tối thiểu để không lỗ sau giá vốn và phí).' : 'High ROAS is not profit — compare with break-even ROAS.'}
               <HelpTip text={vi ? 'ROAS hòa vốn = 1 ÷ biên lợi nhuận trước quảng cáo của sản phẩm' : 'Break-even ROAS = 1 ÷ margin before ads'} />
             </p>
-            <div className="overflow-x-auto rounded-xl border border-white/10">
-              <table className="w-full text-xs">
-                <thead className="bg-white/[0.04] text-slate-400">
+            <div className={TABLE.frame}>
+              <table className={TABLE.table}>
+                <thead className={TABLE.thead}>
                   <tr>
-                    <th className="text-left font-semibold px-2.5 py-2">{vi ? 'Chiến dịch' : 'Campaign'}</th>
-                    <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Chi phí' : 'Spend'}</th>
-                    <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Doanh thu' : 'Revenue'}</th>
-                    <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Đơn' : 'Orders'}</th>
-                    <th className="text-right font-semibold px-2.5 py-2">ROAS</th>
-                    <th className="text-right font-semibold px-2.5 py-2">{vi ? 'ROAS hòa vốn' : 'Break-even'}</th>
-                    <th className="text-right font-semibold px-2.5 py-2">{vi ? 'Lời sau Ads' : 'Profit after ads'}</th>
-                    {advanced && ['Impr.', 'Clicks', 'CTR', 'CPC', 'CVR', 'CPA'].map((h) => <th key={h} className="text-right font-semibold px-2.5 py-2">{h}</th>)}
-                    <th className="px-2.5 py-2" />
+                    <Th left className="sticky left-0 z-20 bg-surface-2">{vi ? 'Chiến dịch' : 'Campaign'}</Th>
+                    <Th>{vi ? 'Chi phí' : 'Spend'}</Th>
+                    <Th>{vi ? 'Doanh thu' : 'Revenue'}</Th>
+                    <Th>{vi ? 'Đơn' : 'Orders'}</Th>
+                    <Th>ROAS</Th>
+                    <Th>{vi ? 'ROAS hòa vốn' : 'Break-even'}</Th>
+                    <Th>{vi ? 'Lời sau Ads' : 'Profit after ads'}</Th>
+                    {advanced && ['Impr.', 'Clicks', 'CTR', 'CPC', 'CVR', 'CPA'].map((h) => <Th key={h}>{h}</Th>)}
+                    <th className={TABLE.th} />
                   </tr>
                 </thead>
                 <tbody>
-                  {ads.rows.map((r) => (
-                    <tr key={r.key} className="border-t border-white/5 text-slate-200">
-                      <td className="px-2.5 py-2 max-w-[240px]">
-                        <div className="font-semibold text-white truncate">{r.name}</div>
-                        <div className="text-[11px] text-slate-500">{PLATFORM_LABELS[r.platform]}{r.sku ? ` · ${r.sku}` : ''}</div>
-                      </td>
-                      <td className="px-2.5 py-2 text-right">{fmtMoneyCompact(r.spend, lang)}</td>
-                      <td className="px-2.5 py-2 text-right">{fmtMoneyCompact(r.attributedRevenue, lang)}</td>
-                      <td className="px-2.5 py-2 text-right">{fmtCount(r.orders, lang)}</td>
-                      <td className={`px-2.5 py-2 text-right font-semibold ${r.roas !== null && r.breakEvenRoas !== null ? (r.roas < r.breakEvenRoas ? 'text-[#f08080]' : 'text-[#4ade80]') : ''}`}>{fmtMultiple(r.roas, lang)}</td>
-                      <td className="px-2.5 py-2 text-right text-slate-400">{fmtMultiple(r.breakEvenRoas, lang)}</td>
-                      <td className="px-2.5 py-2 text-right">{profitCell(r)}</td>
-                      {advanced && (
-                        <>
-                          <td className="px-2.5 py-2 text-right">{fmtCount(r.impressions, lang)}</td>
-                          <td className="px-2.5 py-2 text-right">{fmtCount(r.clicks, lang)}</td>
-                          <td className="px-2.5 py-2 text-right">{fmtRate(r.ctr, lang, 2)}</td>
-                          <td className="px-2.5 py-2 text-right">{fmtMoneyCompact(r.cpc, lang)}</td>
-                          <td className="px-2.5 py-2 text-right">{fmtRate(r.cvr, lang, 2)}</td>
-                          <td className="px-2.5 py-2 text-right">{fmtMoneyCompact(r.cpa, lang)}</td>
-                        </>
-                      )}
-                      <td className="px-2.5 py-2 text-right">
-                        <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: r.name, filter: { range, platforms, campaignId: r.key.split('|')[1] } })} />
-                      </td>
-                    </tr>
-                  ))}
+                  {ads.rows.map((r) => {
+                    const below = r.roas !== null && r.breakEvenRoas !== null ? r.roas < r.breakEvenRoas : null;
+                    return (
+                      <tr key={r.key} className={`${TABLE.tr} text-fg`}>
+                        <td className="sticky left-0 z-10 max-w-[240px] bg-surface px-3 py-1.5" title={r.name}>
+                          <div className="truncate font-medium text-fg">{r.name}</div>
+                          <div className="text-small text-muted">
+                            {PLATFORM_LABELS[r.platform]}
+                            {r.sku ? ` · ${r.sku}` : ''}
+                          </div>
+                        </td>
+                        <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(r.spend, lang)}</td>
+                        <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(r.attributedRevenue, lang)}</td>
+                        <td className={`${TABLE.td} text-right`}>{fmtCount(r.orders, lang)}</td>
+                        <td className={`${TABLE.td} text-right font-semibold ${below === null ? '' : below ? 'text-down' : 'text-up'}`} title={below === null ? undefined : below ? (vi ? 'Dưới hòa vốn' : 'Below break-even') : vi ? 'Trên hòa vốn' : 'Above break-even'}>
+                          {below !== null && <span aria-hidden>{below ? '↓ ' : '↑ '}</span>}
+                          {fmtMultiple(r.roas, lang)}
+                        </td>
+                        <td className={`${TABLE.td} text-right text-muted`}>{fmtMultiple(r.breakEvenRoas, lang)}</td>
+                        <td className={`${TABLE.td} text-right`}>{profitCell(r)}</td>
+                        {advanced && (
+                          <>
+                            <td className={`${TABLE.td} text-right`}>{fmtCount(r.impressions, lang)}</td>
+                            <td className={`${TABLE.td} text-right`}>{fmtCount(r.clicks, lang)}</td>
+                            <td className={`${TABLE.td} text-right`}>{fmtRate(r.ctr, lang, 2)}</td>
+                            <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(r.cpc, lang)}</td>
+                            <td className={`${TABLE.td} text-right`}>{fmtRate(r.cvr, lang, 2)}</td>
+                            <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(r.cpa, lang)}</td>
+                          </>
+                        )}
+                        <td className={`${TABLE.td} text-right`}>
+                          <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: r.name, filter: { range, platforms, campaignId: r.key.split('|')[1] } })} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
-            {ads.rows.some((r) => r.marginIsPartial) && (
-              <p className="text-[11px] text-[#fab219] mt-2">* {vi ? 'Ước tính chưa đầy đủ vì thiếu một số chi phí (phí sàn/vận chuyển).' : 'Partial estimate: some costs are missing.'}</p>
-            )}
           </>
         )}
-      </Section>
+      </SectionCard>
 
       <Section
         title={vi ? 'Livestream' : 'Livestream'}
@@ -142,18 +155,21 @@ export const AdsLiveView: React.FC = () => {
             {lives.map((r) => {
               const s = r.session;
               return (
-                <li key={s.sessionId} className={`rounded-xl border p-3 ${r.viewersUpOrdersDown ? 'border-[#fab219]/40 bg-[#fab219]/[0.05]' : 'border-white/10 bg-white/[0.02]'}`}>
+                <li key={s.sessionId} className="rounded-control border border-line p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                        <Radio className="w-3.5 h-3.5 text-rose-300" aria-hidden />
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+                        <Radio className="h-4 w-4" style={{ color: CHANNEL_COLOR.live.line }} aria-hidden />
                         {sessionDateLabel(s, lang)} · {PLATFORM_LABELS[s.platform]}
                       </div>
-                      <div className="text-[11px] text-slate-400 truncate">{s.title}{r.durationHours ? ` · ${r.durationHours.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 1 })}h` : ''}</div>
+                      <div className="truncate text-small text-muted">
+                        {s.title}
+                        {r.durationHours ? ` · ${r.durationHours.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 1 })}h` : ''}
+                      </div>
                     </div>
                     <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `Live ${sessionDateLabel(s, lang)} · ${PLATFORM_LABELS[s.platform]}`, filter: { range: { start: s.periodStart ?? s.date, end: s.date }, liveSessionId: s.sessionId } })} />
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mt-2 text-xs">
+                  <div className="mt-3 grid grid-cols-3 gap-3 text-small sm:grid-cols-5 lg:grid-cols-9">
                     {[
                       { l: vi ? 'Người xem' : 'Viewers', v: fmtCount(s.viewers, lang), d: r.viewersChange },
                       { l: vi ? 'Nhấp SP' : 'Clicks', v: fmtCount(s.productClicks, lang) },
@@ -165,17 +181,17 @@ export const AdsLiveView: React.FC = () => {
                       { l: vi ? 'Chuyển đổi' : 'Conversion', v: fmtRate(r.conversion, lang, 2) },
                       { l: vi ? 'Lợi nhuận ƯT' : 'Est. profit', v: r.estimatedProfit === null ? '—' : `${fmtMoneyCompact(r.estimatedProfit, lang)}${r.profitComplete ? '' : '*'}` },
                     ].map((x) => (
-                      <div key={x.l}>
-                        <div className="text-slate-500">{x.l}</div>
-                        <div className="text-white font-semibold">{x.v}</div>
-                        {x.d !== undefined && x.d !== null && <div className={`text-[10px] ${x.d >= 0 ? 'text-[#4ade80]' : 'text-[#f08080]'}`}>{fmtChange(x.d, lang)}</div>}
+                      <div key={x.l} className="min-w-0">
+                        <div className="text-muted">{x.l}</div>
+                        <div className="text-sm font-semibold tabular text-fg">{x.v}</div>
+                        {x.d !== undefined && x.d !== null && <div className={`font-medium tabular ${x.d >= 0 ? 'text-up' : 'text-down'}`}>{fmtChange(x.d, lang)}</div>}
                       </div>
                     ))}
                   </div>
                   {r.previous && (
-                    <p className="text-[11px] text-slate-400 mt-2">
+                    <p className="mt-3 text-small text-muted">
                       {vi ? `So với phiên trước (${fmtDay(r.previous.date)}): ${r.previous.viewers ?? '—'} người xem, ${r.previous.orders ?? '—'} đơn.` : `Previous session (${fmtDay(r.previous.date)}): ${r.previous.viewers ?? '—'} viewers, ${r.previous.orders ?? '—'} orders.`}
-                      {r.viewersUpOrdersDown && <b className="text-[#fab219]"> {vi ? 'Người xem tăng nhưng đơn giảm — cần kiểm tra.' : 'More viewers but fewer orders — worth checking.'}</b>}
+                      {r.viewersUpOrdersDown && <span className="ml-1 inline-flex rounded-full bg-warn-soft px-2 py-0.5 font-medium text-warn">{vi ? 'Người xem tăng nhưng đơn giảm — cần kiểm tra.' : 'More viewers but fewer orders — worth checking.'}</span>}
                     </p>
                   )}
                 </li>

@@ -27,9 +27,10 @@ export function dailySeries(dataset: CanonicalDataset, filter: DatasetFilter): D
       p.orders! += 1;
       if (isCancelled(o.status)) p.cancelled! += 1;
     }
+    // Placed-order sales, cancellations included (as the KPI card).
     for (const l of slice.lines) {
       const o = statusById.get(l.orderId);
-      if (!o || isCancelled(o.status)) continue;
+      if (!o) continue;
       const p = map.get(o.orderDate);
       if (p) p.gmv! += l.grossAmount || 0;
     }

@@ -33,6 +33,9 @@ type Field =
   | 'orderDate'
   | 'status'
   | 'returnType'
+  | 'returnStatus'
+  | 'returnedQty'
+  | 'productId'
   | 'cancelReason'
   | 'returnReason'
   | 'sku'
@@ -80,9 +83,12 @@ const SPECS: PlatformSpec[] = [
       orderDate: ['Ngày đặt hàng', 'Thời gian đặt hàng'],
       status: ['Trạng Thái Đơn Hàng'],
       cancelReason: ['Lý do hủy'],
-      returnReason: ['Trạng thái Trả hàng/Hoàn tiền', 'Lý do trả hàng'],
+      returnReason: ['Lý do trả hàng', 'Trạng thái Trả hàng/Hoàn tiền'],
+      returnStatus: ['Trạng thái Trả hàng/Hoàn tiền'],
+      returnedQty: ['Số lượng sản phẩm được hoàn trả'],
       sku: ['SKU phân loại hàng'],
       skuFallback: ['SKU sản phẩm', 'Mã sản phẩm'],
+      productId: ['Mã sản phẩm'],
       productName: ['Tên sản phẩm'],
       variation: ['Tên phân loại hàng'],
       quantity: ['Số lượng'],
@@ -90,7 +96,7 @@ const SPECS: PlatformSpec[] = [
       unitPrice: ['Giá gốc'],
       dealPrice: ['Giá ưu đãi'],
       orderSellerVoucher: ['Mã giảm giá của Shop'],
-      orderRefund: ['Số tiền hoàn trả', 'Số tiền được hoàn'],
+      orderRefund: ['Số tiền hoàn lại', 'Số tiền hoàn trả', 'Số tiền được hoàn'],
       platformFee: ['Phí cố định'],
       serviceFee: ['Phí Dịch Vụ'],
       paymentFee: ['Phí thanh toán'],
@@ -314,6 +320,11 @@ export function importOrderExport(
     if (returnType && (returnType.includes('return') || returnType.includes('refund') || returnType.includes('trahang')) && !isCancelled(status)) {
       status = returnType.includes('refundonly') || returnType.includes('hoantien') ? 'refunded' : 'returned';
     }
+    // Shopee: a return / refund shows as status "Trả hàng/Hoàn tiền", OR a value in
+    // "Trạng thái Trả hàng/Hoàn tiền", OR items returned > 0 (the order status can still say
+    // "Hoàn thành"). Any of them makes a non-cancelled order a return.
+    const returnedQty = toNumber(cell(row, c.returnedQty)) ?? 0;
+    if (!isCancelled(status) && status !== 'refunded' && (text(cell(row, c.returnStatus)) !== '' || returnedQty > 0)) status = 'returned';
 
     const qty = spec.key === 'lazada' ? 1 : toNumber(cell(row, c.quantity)) ?? 1;
     const unitPrice = toNumber(cell(row, c.dealPrice)) ?? toNumber(cell(row, c.unitPrice));
@@ -368,6 +379,10 @@ export function importOrderExport(
     } else if (!spec.orderLevelRepeated) {
       // Lazada: each item row carries its own status/reason.
       if (!p.order.cancelReason) p.order.cancelReason = text(cell(row, c.cancelReason)) || undefined;
+    } else if (status === 'returned' && !isCancelled(p.order.status) && p.order.status !== 'refunded') {
+      // Shopee: only the returned item row may say so — the whole order is a return.
+      p.order.status = 'returned';
+      for (const s of p.itemStatuses) s.status = 'returned';
     }
     p.lines.push(line);
     p.itemStatuses.push({ status, line });
@@ -376,6 +391,7 @@ export function importOrderExport(
     if (!products.has(sku)) {
       products.set(sku, {
         sku,
+        productId: text(cell(row, c.productId)) || undefined,
         name: productName,
         category: text(cell(row, c.category)) || undefined,
         unitCogs,
@@ -387,6 +403,7 @@ export function importOrderExport(
 
   // Resolve per-item statuses (Lazada partial cancellations).
   let partiallyCancelledItems = 0;
+  let refundFromOrderValue = 0;
   const orders: Order[] = [];
   const lines: OrderLine[] = [];
   for (const p of pending.values()) {
@@ -399,6 +416,12 @@ export function importOrderExport(
       p.order.status = p.itemStatuses[0].status;
     } else if (live.length > 0) {
       p.order.status = mostAdvanced(live.map((s) => s.status));
+    }
+    // No refund-amount column: a returned / refunded order counts its whole value, as the
+    // Shopee report's "Doanh số các đơn Trả hàng/Hoàn tiền" does.
+    if (c.orderRefund === undefined && (p.order.status === 'returned' || p.order.status === 'refunded') && p.order.refundAmount === undefined) {
+      p.order.refundAmount = p.lines.reduce((s, l) => s + (l.grossAmount || 0), 0);
+      refundFromOrderValue++;
     }
     orders.push(p.order);
     lines.push(...p.lines);
@@ -424,6 +447,12 @@ export function importOrderExport(
     warnings.push({
       vi: `${partiallyCancelledItems} sản phẩm bị hủy lẻ trong đơn còn hiệu lực — không tính vào doanh thu.`,
       en: `${partiallyCancelledItems} items were cancelled inside otherwise valid orders — excluded from revenue.`,
+    });
+  }
+  if (refundFromOrderValue > 0) {
+    warnings.push({
+      vi: `File không có cột "Số tiền hoàn lại" — ${refundFromOrderValue} đơn trả hàng/hoàn tiền được tính hoàn toàn bộ giá trị đơn (như báo cáo Shopee).`,
+      en: `No refund-amount column — ${refundFromOrderValue} returned orders count their whole value.`,
     });
   }
   if (c.status === undefined) {

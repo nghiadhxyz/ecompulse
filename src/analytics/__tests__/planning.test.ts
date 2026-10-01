@@ -104,7 +104,7 @@ describe('reports & exports', () => {
     const r = buildReport(demo, 'monthly', { asOf: '2025-09-30', month: '2025-09' })!;
     const csv = reportToCsv(r);
     expect(csv.charCodeAt(0)).toBe(0xfeff);
-    expect(csv).toContain('GMV (đơn hợp lệ),1611613000');
+    expect(csv).toContain('GMV (đơn đặt),1751991000');
   });
 
   it('Excel has one sheet per table plus a summary', () => {
