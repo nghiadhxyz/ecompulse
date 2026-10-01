@@ -1,0 +1,209 @@
+/*
+ * EcomPulse design tokens — the ONE place for colours, type, spacing and radii.
+ *
+ * Pages never use hex codes: they use the Tailwind utilities generated in @theme below
+ * (bg-surface, bg-surface-2, text-fg, text-muted, border-line, text-up, bg-up-soft,
+ * text-down, text-mismatch, text-warn, text-info, text-note, bg-primary-soft, …).
+ * Charts read the same variables through src/theme/chart.ts (stroke="var(--chart-1)").
+ *
+ * Themes: the Seller / Analyst workspace carries data-theme="light" (default) or "dark".
+ * The dark values are also the :root default so the legacy screens (landing, classic
+ * dashboard) that share the top bar keep their dark look.
+ */
+
+/* Fonts: src/styles/fonts.css (bundled, latin + vietnamese). */
+
+/* ---------- DARK (option; also the default outside the workspace) ---------- */
+:root,
+[data-theme='dark'] {
+  --bg: #0b1120;
+  --surface: #111827;
+  --surface-2: #162033;
+  --border: #243044;
+  --text: #e5e9f0;
+  --text-muted: #9aa4b6;
+
+  --primary: #60a5fa;
+  --primary-soft: #16264a;
+  --primary-contrast: #0b1120;
+  --accent: #fb923c;
+
+  --up: #4ade80;
+  --up-soft: #0f2a1c;
+  --down: #fb923c;
+  --down-soft: #2e1a0c;
+  --mismatch: #f87171;
+  --mismatch-soft: #2d1414;
+  --note: #cbd5e1;
+  --note-soft: #1e293b;
+  --warn: #fbbf24;
+  --warn-soft: #2b2110;
+  --info: #38bdf8;
+  --info-soft: #0c2536;
+
+  /* Channels: fill = areas / bars; line = thin lines, dots, outlines. Never text. */
+  --ch-product-card: #3b82f6;
+  --ch-product-card-line: #60a5fa;
+  --ch-affiliate: #f97316;
+  --ch-affiliate-line: #fb923c;
+  --ch-video: #14b8a6;
+  --ch-video-line: #2dd4bf;
+  --ch-live: #8b5cf6;
+  --ch-live-line: #a78bfa;
+  --ch-ads: #94a3b8;
+
+  --chart-1: #60a5fa;
+  --chart-2: #fb923c;
+  --chart-3: #2dd4bf;
+  --chart-4: #a78bfa;
+  --chart-5: #facc15;
+  --chart-6: #f472b6;
+  --chart-grid: #1f2a3c;
+  --chart-axis: #9aa4b6;
+  --chart-anomaly: #fb923c;
+  --chart-sale-day: #94a3b8;
+  --chart-sale-band: #1a2333;
+  --chart-tooltip-bg: #111827;
+
+  --card-shadow: none;
+  --hover: #1a2436;
+  --overlay: rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- LIGHT (default in the workspace) ---------- */
+[data-theme='light'] {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #e5e9f0;
+  --text: #0f172a;
+  --text-muted: #5b6475; /* 5.96:1 on white, 5.56:1 on --bg */
+
+  --primary: #2563eb; /* 5.17:1 on white */
+  --primary-soft: #eaf1ff; /* --primary on it: 4.56:1 */
+  --primary-contrast: #ffffff;
+  --accent: #f97316; /* fills only (2.80:1) */
+
+  /* Status: strong text on a soft fill */
+  --up: #15803d; /* 4.53:1 on --up-soft */
+  --up-soft: #e8f7ee;
+  --down: #c2410c; /* 4.69:1 — orange for ordinary decreases */
+  --down-soft: #fff1e8;
+  --mismatch: #b91c1c; /* 5.66:1 — only "Dữ liệu không khớp" / "Không hợp lệ" */
+  --mismatch-soft: #fdecec;
+  --note: #475569; /* 6.92:1 — "Lưu ý" */
+  --note-soft: #f1f5f9;
+  --warn: #92400e; /* 6.57:1 */
+  --warn-soft: #fef6e0;
+  --info: #0369a1; /* 5.28:1 */
+  --info-soft: #e6f4fb;
+
+  /* Channels: fill for areas / bars, line (darker, ≥ 3:1) for lines, dots, outlines and for
+     stacked charts or any chart read through its legend. Labels use the text colour. */
+  --ch-product-card: #2563eb;
+  --ch-product-card-line: #2563eb;
+  --ch-affiliate: #f97316;
+  --ch-affiliate-line: #ea580c;
+  --ch-video: #14b8a6;
+  --ch-video-line: #0d9488;
+  --ch-live: #8b5cf6;
+  --ch-live-line: #7c3aed;
+  --ch-ads: #64748b; /* dashed outline, never a solid fill */
+
+  /* Multi-series palette (lines use these; bars may use the channel fills) */
+  --chart-1: #2563eb;
+  --chart-2: #ea580c;
+  --chart-3: #0d9488;
+  --chart-4: #7c3aed;
+  --chart-5: #ca8a04;
+  --chart-6: #db2777;
+  --chart-grid: #eef1f5;
+  --chart-axis: #5b6475;
+  --chart-anomaly: #ea580c;
+  --chart-sale-day: #94a3b8;
+  --chart-sale-band: #f1f5f9;
+  --chart-tooltip-bg: #ffffff;
+
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --hover: #f8fafc;
+  --overlay: rgba(15, 23, 42, 0.4);
+}
+
+/* ---------- Tailwind v4: utilities generated from the tokens ---------- */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-hover: var(--hover);
+  --color-overlay: var(--overlay);
+  --color-primary: var(--primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-contrast: var(--primary-contrast);
+  --color-accent: var(--accent);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-mismatch: var(--mismatch);
+  --color-mismatch-soft: var(--mismatch-soft);
+  --color-note: var(--note);
+  --color-note-soft: var(--note-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-ch-product-card: var(--ch-product-card);
+  --color-ch-affiliate: var(--ch-affiliate);
+  --color-ch-video: var(--ch-video);
+  --color-ch-live: var(--ch-live);
+  --color-ch-ads: var(--ch-ads);
+  --font-app: 'Be Vietnam Pro', system-ui, sans-serif;
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --shadow-card: var(--card-shadow);
+}
+
+/* ---------- Type scale (22/16/28/14/12) ---------- */
+@utility text-page {
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 600;
+}
+@utility text-card-title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+@utility text-kpi {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+@utility text-body {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+@utility text-small {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The workspace shell: tokens + app font + page background. */
+.ep-app {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  color-scheme: light;
+}
+.ep-app[data-theme='dark'] {
+  color-scheme: dark;
+}

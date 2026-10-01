@@ -63,7 +63,7 @@ export const AiPrivacySettings: React.FC<{ lang: 'vi' | 'en' }> = ({ lang }) => 
       title={vi ? 'Quyền riêng tư AI' : 'AI privacy'}
       subtitle={vi ? 'Chọn nơi Dolphin được phép gửi câu hỏi. Số liệu luôn được tính trên máy bạn — AI chỉ diễn đạt lại.' : 'Choose where Dolphin may send questions. Numbers are always computed locally — AI only rephrases.'}
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2" role="radiogroup" aria-label={vi ? 'Chế độ AI' : 'AI mode'}>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3" role="radiogroup" aria-label={vi ? 'Chế độ AI' : 'AI mode'}>
         {(Object.keys(PRIVACY_MODE_INFO) as AiPrivacyMode[]).map((m) => {
           const Icon = ICON[m];
           const info = PRIVACY_MODE_INFO[m];
@@ -74,32 +74,32 @@ export const AiPrivacySettings: React.FC<{ lang: 'vi' | 'en' }> = ({ lang }) => 
               role="radio"
               aria-checked={active}
               onClick={() => choose(m)}
-              className={`text-left rounded-xl border p-3 ${active ? 'border-sky-500 bg-sky-500/10' : 'border-white/10 hover:bg-white/[0.04]'}`}
+              className={`rounded-control border p-3.5 text-left ${active ? 'border-primary bg-primary-soft ring-2 ring-primary/20' : 'border-line hover:bg-hover'}`}
             >
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <Icon className="w-4 h-4" aria-hidden /> {vi ? info.vi : info.en}
-                {active && <CheckCircle2 className="w-4 h-4 text-sky-300 ml-auto" aria-label={vi ? 'Đang chọn' : 'Selected'} />}
+              <div className={`flex items-center gap-2 text-sm font-semibold ${active ? 'text-primary' : 'text-fg'}`}>
+                <Icon className="h-4 w-4" aria-hidden /> {vi ? info.vi : info.en}
+                {active && <CheckCircle2 className="ml-auto h-4 w-4" aria-label={vi ? 'Đang chọn' : 'Selected'} />}
               </div>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">{vi ? info.descVi : info.descEn}</p>
+              <p className="mt-1 text-small leading-relaxed text-muted">{vi ? info.descVi : info.descEn}</p>
             </button>
           );
         })}
       </div>
 
       {askConsent && (
-        <div className="mt-3 rounded-xl border border-[#fab219]/40 bg-[#fab219]/[0.06] p-3" role="dialog" aria-label={vi ? 'Xác nhận Cloud AI' : 'Cloud AI consent'}>
-          <h3 className="text-sm font-bold text-white">{vi ? 'Trước khi bật Cloud AI' : 'Before enabling Cloud AI'}</h3>
-          <ul className="text-xs text-slate-300 mt-1.5 space-y-1 list-disc pl-4">
+        <div className="mt-4 rounded-control border border-warn/40 bg-warn-soft p-4" role="dialog" aria-label={vi ? 'Xác nhận Cloud AI' : 'Cloud AI consent'}>
+          <h3 className="text-sm font-semibold text-fg">{vi ? 'Trước khi bật Cloud AI' : 'Before enabling Cloud AI'}</h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-fg">
             <li>{vi ? 'Được gửi: số liệu tổng hợp đã tính (doanh thu, số đơn, tỷ lệ, tên SKU/kênh) và câu hỏi của bạn.' : 'Sent: computed aggregates (revenue, orders, rates, SKU/channel names) and your question.'}</li>
             <li>{vi ? 'Không gửi: file Excel gốc, danh sách đơn, tên/SĐT/địa chỉ người mua, mã người mua.' : 'Never sent: raw Excel, order rows, buyer names/phones/addresses/IDs.'}</li>
             <li>{vi ? 'Dữ liệu đi qua máy chủ EcomPulse tới Google Gemini và chịu điều khoản của Google. Đây không phải "zero knowledge".' : 'Data passes through the EcomPulse server to Google Gemini under Google terms. This is not "zero knowledge".'}</li>
             <li>{vi ? 'AI không tính số liệu và có thể diễn đạt sai — luôn đối chiếu với phần Bằng chứng.' : 'AI does not compute numbers and can phrase things wrongly — always check the Evidence.'}</li>
           </ul>
-          <label className="flex items-center gap-2 text-xs text-slate-200 mt-2">
-            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          <label className="mt-3 flex min-h-10 cursor-pointer items-center gap-2 text-sm font-medium text-fg">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="h-4 w-4 accent-primary" />
             {vi ? 'Tôi đã đọc và đồng ý gửi số liệu tổng hợp đã ẩn danh tới Cloud AI.' : 'I understand and agree to send anonymized aggregates to Cloud AI.'}
           </label>
-          <div className="flex gap-2 mt-2">
+          <div className="mt-2 flex gap-2">
             <PrimaryButton
               disabled={!agree}
               onClick={() => {
@@ -117,11 +117,12 @@ export const AiPrivacySettings: React.FC<{ lang: 'vi' | 'en' }> = ({ lang }) => 
       )}
 
       {mode === 'cloud_ai' && consentDate && (
-        <p className="text-xs text-slate-400 mt-3 flex flex-wrap items-center gap-2">
-          <ShieldCheck className="w-3.5 h-3.5" aria-hidden />
+        <p className="mt-3 flex flex-wrap items-center gap-2 text-small text-muted">
+          <ShieldCheck className="h-4 w-4" aria-hidden />
           {vi ? `Đã đồng ý lúc ${new Date(consentDate).toLocaleString('vi-VN')}.` : `Consent given ${new Date(consentDate).toLocaleString('en-US')}.`}
           <button
-            className="underline underline-offset-2 text-slate-300"
+            type="button"
+            className="inline-flex min-h-10 items-center font-semibold text-primary hover:underline"
             onClick={() => {
               revokeCloudConsent();
               setConsentDate(null);
@@ -133,24 +134,32 @@ export const AiPrivacySettings: React.FC<{ lang: 'vi' | 'en' }> = ({ lang }) => 
       )}
 
       {mode === 'privacy_ai' && (
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-          <h3 className="text-xs font-bold text-slate-300 mb-2">{vi ? 'Mô hình trên máy (OpenAI-compatible: Ollama, LM Studio, llama.cpp…)' : 'On-device model (OpenAI-compatible)'}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px_auto] gap-2 items-end">
-            <label className="text-xs text-slate-400">
+        <div className="mt-4 rounded-control border border-line bg-surface-2 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-fg">{vi ? 'Mô hình trên máy (OpenAI-compatible: Ollama, LM Studio, llama.cpp…)' : 'On-device model (OpenAI-compatible)'}</h3>
+          <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_200px_auto]">
+            <label className="text-small font-medium text-muted">
               {vi ? 'Địa chỉ' : 'Base URL'}
-              <input value={llm.baseUrl} onChange={(e) => setLlm({ ...llm, baseUrl: e.target.value })} className="mt-1 w-full bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1.5 text-sm text-slate-100" />
+              <input value={llm.baseUrl} onChange={(e) => setLlm({ ...llm, baseUrl: e.target.value })} className="mt-1 min-h-10 w-full rounded-control border border-line bg-surface px-2.5 text-sm text-fg" />
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-small font-medium text-muted">
               Model
-              <input value={llm.model} onChange={(e) => setLlm({ ...llm, model: e.target.value })} className="mt-1 w-full bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1.5 text-sm text-slate-100" />
+              <input value={llm.model} onChange={(e) => setLlm({ ...llm, model: e.target.value })} className="mt-1 min-h-10 w-full rounded-control border border-line bg-surface px-2.5 text-sm text-fg" />
             </label>
             <GhostButton onClick={runTest}>
-              {test.state === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : null}
+              {test.state === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
               {vi ? 'Lưu & kiểm tra' : 'Save & test'}
             </GhostButton>
           </div>
-          {test.state === 'ok' && <p className="text-xs text-[#4ade80] mt-2 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" aria-hidden /> {test.text}</p>}
-          {test.state === 'error' && <p className="text-xs text-[#f87171] mt-2 flex items-start gap-1"><XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden /> {test.text}</p>}
+          {test.state === 'ok' && (
+            <p className="mt-3 flex items-center gap-1.5 text-sm text-up">
+              <CheckCircle2 className="h-4 w-4" aria-hidden /> {test.text}
+            </p>
+          )}
+          {test.state === 'error' && (
+            <p className="mt-3 flex items-start gap-1.5 rounded-control bg-down-soft px-3 py-2 text-sm text-down">
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {test.text}
+            </p>
+          )}
         </div>
       )}
     </Section>

@@ -4,7 +4,7 @@ import { UploadCloud, FileSpreadsheet, X, Loader2, ShieldCheck, Trash2, PlayCirc
 import { formatRangeVi, PLATFORM_LABELS, REPORT_KIND_LABELS, type CanonicalDataset, type Lang } from '../../../analytics';
 import { DataQualityPanel } from '../../data/DataQualityPanel';
 import { startImport, type ImportHandle, type ImportOutcome } from '../importClient';
-import { GhostButton, PrimaryButton, Section } from '../ui';
+import { GhostButton, NotEnoughData, PrimaryButton, Section } from '../ui';
 
 export interface ImportLogEntry {
   fileName: string;
@@ -74,32 +74,32 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
             setDragging(false);
             if (!queue && e.dataTransfer.files.length) runFiles(e.dataTransfer.files);
           }}
-          className={`rounded-2xl border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-sky-400 bg-sky-500/10' : 'border-white/15 bg-white/[0.02]'}`}
+          className={`rounded-card border-2 border-dashed p-8 text-center transition-colors ${dragging ? 'border-primary bg-primary-soft' : 'border-line bg-surface-2'}`}
         >
           {queue ? (
-            <div className="max-w-md mx-auto" aria-live="polite">
-              <div className="flex items-center justify-center gap-2 text-sm text-slate-200">
+            <div className="mx-auto max-w-md" aria-live="polite">
+              <div className="flex items-center justify-center gap-2 text-sm text-fg">
                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
                 <span className="truncate">{STAGE[queue.stage]?.[lang] ?? queue.stage}: {queue.name}</span>
               </div>
-              <div className="h-2 rounded-full bg-white/10 mt-3 overflow-hidden" role="progressbar" aria-valuenow={Math.round(queue.fraction * 100)} aria-valuemin={0} aria-valuemax={100}>
-                <div className="h-2 bg-sky-500 transition-all" style={{ width: `${Math.round(queue.fraction * 100)}%` }} />
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={Math.round(queue.fraction * 100)} aria-valuemin={0} aria-valuemax={100}>
+                <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${Math.round(queue.fraction * 100)}%` }} />
               </div>
-              <GhostButton className="mt-3 !text-xs" onClick={cancel}>
-                <X className="w-3.5 h-3.5" /> {vi ? 'Hủy nhập' : 'Cancel import'}
+              <GhostButton className="mt-3" onClick={cancel}>
+                <X className="h-4 w-4" aria-hidden /> {vi ? 'Hủy nhập' : 'Cancel import'}
               </GhostButton>
             </div>
           ) : (
             <>
-              <UploadCloud className="w-8 h-8 mx-auto text-sky-300" aria-hidden />
-              <p className="text-sm font-bold text-white mt-2">{vi ? 'Kéo thả file vào đây hoặc chọn file' : 'Drop files here or choose files'}</p>
-              <p className="text-xs text-slate-400 mt-1 max-w-lg mx-auto">
+              <UploadCloud className="mx-auto h-8 w-8 text-primary" aria-hidden />
+              <p className="mt-2 text-sm font-semibold text-fg">{vi ? 'Kéo thả file vào đây hoặc chọn file' : 'Drop files here or choose files'}</p>
+              <p className="mx-auto mt-1 max-w-lg text-small text-muted">
                 {vi
                   ? 'Hỗ trợ (Shopee, TikTok Shop, Lazada · .xlsx/.csv): file xuất đơn hàng · báo cáo Quảng cáo · Livestream · Hiệu quả sản phẩm (traffic) · Affiliate/Video · Phân tích bán hàng Shopee · danh mục sản phẩm (SKU + Ngành hàng / Nhóm hàng / Giá vốn). Có thể chọn nhiều file cùng lúc.'
                   : 'Supported (Shopee, TikTok Shop, Lazada · .xlsx/.csv): orders, ads, live, product traffic, affiliate/video, Shopee sales analysis, product catalog (SKU + category / niche / COGS). Multiple files allowed.'}
               </p>
-              <PrimaryButton className="mt-3" onClick={() => inputRef.current?.click()}>
-                <FileSpreadsheet className="w-4 h-4" /> {vi ? 'Chọn file' : 'Choose files'}
+              <PrimaryButton className="mt-4" onClick={() => inputRef.current?.click()}>
+                <FileSpreadsheet className="h-4 w-4" aria-hidden /> {vi ? 'Chọn file' : 'Choose files'}
               </PrimaryButton>
               <input
                 ref={inputRef}
@@ -129,27 +129,27 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
         title={vi ? 'Dữ liệu đang dùng' : 'Current data'}
         right={
           <div className="flex flex-wrap gap-2">
-            <GhostButton className="!text-xs" onClick={onLoadDemo}>
-              <PlayCircle className="w-3.5 h-3.5" /> {vi ? 'Dùng dữ liệu demo 3 tháng' : 'Use 3-month demo'}
+            <GhostButton onClick={onLoadDemo}>
+              <PlayCircle className="h-4 w-4" aria-hidden /> {vi ? 'Dùng dữ liệu demo 3 tháng' : 'Use 3-month demo'}
             </GhostButton>
             {sourceKind && sourceKind !== 'legacy' && (
               <GhostButton
-                className="!text-xs !text-rose-300"
+                className="!text-down"
                 onClick={() => {
                   if (window.confirm(vi ? 'Xóa toàn bộ dữ liệu đã nhập khỏi trình duyệt này? Không thể hoàn tác.' : 'Remove all imported data from this browser? This cannot be undone.')) onClear();
                 }}
               >
-                <Trash2 className="w-3.5 h-3.5" /> {vi ? 'Xóa dữ liệu' : 'Clear data'}
+                <Trash2 className="h-4 w-4" aria-hidden /> {vi ? 'Xóa dữ liệu' : 'Clear data'}
               </GhostButton>
             )}
           </div>
         }
       >
         {!dataset ? (
-          <p className="text-sm text-slate-400">{vi ? 'Chưa có dữ liệu. Nhập file hoặc dùng dữ liệu demo.' : 'No data yet. Import files or use the demo.'}</p>
+          <NotEnoughData lang={lang} title={vi ? 'Chưa có dữ liệu' : 'No data yet'} reason={vi ? 'Nhập file hoặc dùng dữ liệu demo.' : 'Import files or use the demo.'} />
         ) : (
           <>
-            <p className="text-xs text-slate-300 mb-2">
+            <p className="mb-3 text-sm text-muted">
               {sourceKind === 'demo'
                 ? vi ? 'Đang xem dữ liệu demo (shop mẫu, không phải dữ liệu thật).' : 'Viewing demo data (sample shop).'
                 : sourceKind === 'legacy'
@@ -158,13 +158,13 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
                     ? vi ? 'Dữ liệu được lưu trên trình duyệt này (IndexedDB).' : 'Data is stored in this browser (IndexedDB).'
                     : vi ? 'Trình duyệt không cho lưu — dữ liệu sẽ mất khi tải lại trang.' : 'Browser storage unavailable — data is lost on reload.'}
             </p>
-            <ul className="space-y-1.5">
+            <ul className="divide-y divide-line rounded-control border border-line">
               {dataset.sources.map((s, i) => (
-                <li key={i} className="flex flex-wrap items-center gap-2 text-xs text-slate-300 rounded-lg bg-white/[0.03] px-2.5 py-1.5">
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" aria-hidden />
-                  <span className="font-semibold text-white truncate max-w-[260px]">{s.fileName}</span>
-                  <span className="text-slate-500">{s.platform !== 'other' ? PLATFORM_LABELS[s.platform] : ''}</span>
-                  {s.rowCount !== undefined && <span className="text-slate-500">{s.rowCount.toLocaleString('vi-VN')} {vi ? 'dòng' : 'rows'}</span>}
+                <li key={i} className="flex min-h-11 flex-wrap items-center gap-2 px-3 py-1.5 text-sm text-muted">
+                  <FileSpreadsheet className="h-4 w-4 text-muted" aria-hidden />
+                  <span className="max-w-[320px] truncate font-medium text-fg" title={s.fileName}>{s.fileName}</span>
+                  <span className="text-small">{s.platform !== 'other' ? PLATFORM_LABELS[s.platform] : ''}</span>
+                  {s.rowCount !== undefined && <span className="text-small tabular">{s.rowCount.toLocaleString('vi-VN')} {vi ? 'dòng' : 'rows'}</span>}
                 </li>
               ))}
             </ul>
@@ -195,47 +195,47 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
   const vi = lang === 'vi';
   const o = entry.outcome;
   if (o.type === 'cancelled') {
-    return <li className="text-xs text-slate-400 rounded-lg border border-white/10 px-3 py-2">{entry.fileName}: {vi ? 'đã hủy' : 'cancelled'}</li>;
+    return <li className="rounded-control border border-line px-3 py-2 text-sm text-muted">{entry.fileName}: {vi ? 'đã hủy' : 'cancelled'}</li>;
   }
   if (o.type === 'error') {
     return (
-      <li className="rounded-lg border border-[#d03b3b]/40 bg-[#d03b3b]/10 px-3 py-2 text-xs text-rose-100 flex gap-2">
-        <AlertTriangle className="w-4 h-4 shrink-0 text-[#f08080]" aria-hidden />
-        <span><b>{entry.fileName}</b>: {o.message[lang]}</span>
+      <li className="flex gap-2 rounded-control bg-down-soft px-3 py-2.5 text-sm text-down">
+        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+        <span><b className="font-semibold">{entry.fileName}</b>: {o.message[lang]}</span>
       </li>
     );
   }
   if (o.type === 'legacy_summary') {
     if (!o.ok) {
       return (
-        <li className="rounded-lg border border-[#d03b3b]/40 px-3 py-2 text-xs text-rose-100">
-          <b>{entry.fileName}</b>: {o.message}
+        <li className="rounded-control bg-down-soft px-3 py-2.5 text-sm text-down">
+          <b className="font-semibold">{entry.fileName}</b>: {o.message}
         </li>
       );
     }
     const read = (o.sheets ?? []).filter((x) => x.kind !== 'skipped');
     const skipped = (o.sheets ?? []).filter((x) => x.kind === 'skipped');
     return (
-      <li className="rounded-lg border border-[#0ca30c]/30 bg-[#0ca30c]/[0.06] px-3 py-2.5 text-xs text-slate-200">
+      <li className="rounded-control border border-line px-3 py-2.5 text-sm text-muted">
         <div className="flex flex-wrap items-center gap-1.5">
-          <CheckCircle2 className="w-3.5 h-3.5 text-[#4ade80]" aria-hidden />
-          <b className="text-white">{entry.fileName}</b>
+          <CheckCircle2 className="h-4 w-4 text-up" aria-hidden />
+          <b className="font-semibold text-fg">{entry.fileName}</b>
           <span>· {vi ? 'Shopee · Phân tích bán hàng' : 'Shopee · Sales analysis'}</span>
           {o.period && <span>· {formatRangeVi(o.period)}</span>}
           {o.sheets && <span>· {vi ? `đọc ${read.length}/${o.sheets.length} sheet` : `${read.length}/${o.sheets.length} sheets read`}</span>}
         </div>
-        <p className="text-slate-400 mt-1">
+        <p className="mt-1 text-small">
           {vi
             ? 'Báo cáo tổng hợp: có số theo ngày, theo kênh/nguồn, Ads, sản phẩm đứng đầu, live, video, affiliate — không có chi tiết từng đơn nên chưa tính được lợi nhuận theo đơn.'
             : 'Summary report: daily, channel/source, ads, top products, live, video, affiliate — no order lines, so no per-order profit.'}
         </p>
         {o.sheets && (
           <details className="mt-1.5">
-            <summary className="cursor-pointer text-sky-300">{vi ? 'Xem từng sheet' : 'Sheets'}</summary>
-            <ul className="mt-1 space-y-0.5 text-slate-400">
+            <summary className="inline-flex min-h-8 cursor-pointer items-center text-small font-semibold text-primary">{vi ? 'Xem từng sheet' : 'Sheets'}</summary>
+            <ul className="mt-1 space-y-0.5 text-small">
               {o.sheets.map((x, i) => (
                 <li key={i}>
-                  {x.kind === 'skipped' ? '○' : '✓'} <span className="text-slate-300">{x.name}</span> — {SHEET_KIND_LABELS[x.kind][lang]}
+                  {x.kind === 'skipped' ? '○' : '✓'} <span className="text-fg">{x.name}</span> — {SHEET_KIND_LABELS[x.kind][lang]}
                   {x.stage ? ` · ${STAGE_LABELS[x.stage][lang]}` : ''}
                   {x.kind !== 'skipped' ? ` · ${x.rows.toLocaleString('vi-VN')} ${vi ? 'dòng' : 'rows'}` : ''}
                 </li>
@@ -243,7 +243,7 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
             </ul>
           </details>
         )}
-        {skipped.length > 0 && <p className="text-[#fab219] mt-1">{vi ? `${skipped.length} sheet chưa nhận dạng được.` : `${skipped.length} sheets not recognised.`}</p>}
+        {skipped.length > 0 && <p className="mt-1 text-small text-warn">{vi ? `${skipped.length} sheet chưa nhận dạng được.` : `${skipped.length} sheets not recognised.`}</p>}
       </li>
     );
   }
@@ -252,10 +252,10 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
     const r = o.result;
     const ok = r.stats.imported > 0;
     return (
-      <li className={`rounded-lg border px-3 py-2.5 text-xs text-slate-200 ${ok ? 'border-[#0ca30c]/30 bg-[#0ca30c]/[0.06]' : 'border-[#fab219]/40 bg-[#fab219]/10'}`}>
+      <li className={`rounded-control px-3 py-2.5 text-sm text-muted ${ok ? 'border border-line' : 'bg-warn-soft'}`}>
         <div className="flex flex-wrap items-center gap-1.5">
-          {ok ? <CheckCircle2 className="w-3.5 h-3.5 text-[#4ade80]" aria-hidden /> : <AlertTriangle className="w-3.5 h-3.5 text-[#fab219]" aria-hidden />}
-          <b className="text-white">{entry.fileName}</b>
+          {ok ? <CheckCircle2 className="h-4 w-4 text-up" aria-hidden /> : <AlertTriangle className="h-4 w-4 text-warn" aria-hidden />}
+          <b className="font-semibold text-fg">{entry.fileName}</b>
           <span>· {REPORT_KIND_LABELS[r.kind][lang]} · {r.label}</span>
           <span>· {r.stats.imported.toLocaleString('vi-VN')} {vi ? 'dòng đã nhập' : 'rows imported'}</span>
           {r.period && <span>· {formatRangeVi(r.period)}</span>}
@@ -264,13 +264,13 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
           )}
         </div>
         {r.warnings.map((w, i) => (
-          <p key={i} className="text-[#fab219] mt-1">• {w[lang]}</p>
+          <p key={i} className="mt-1 text-small text-warn">• {w[lang]}</p>
         ))}
         <details className="mt-1.5">
-          <summary className="cursor-pointer text-sky-300">{vi ? 'Xem cách ánh xạ cột' : 'Column mapping'}</summary>
-          <ul className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 text-slate-400">
+          <summary className="inline-flex min-h-8 cursor-pointer items-center text-small font-semibold text-primary">{vi ? 'Xem cách ánh xạ cột' : 'Column mapping'}</summary>
+          <ul className="mt-1 grid grid-cols-1 gap-x-4 text-small sm:grid-cols-2">
             {Object.entries(r.columnsUsed).map(([field, header]) => (
-              <li key={field}><span className="text-slate-500">{field}</span> ← {header}</li>
+              <li key={field}><span className="font-mono text-muted">{field}</span> ← <span className="text-fg">{header}</span></li>
             ))}
           </ul>
         </details>
@@ -279,27 +279,27 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
   }
   const r = o.result;
   return (
-    <li className="rounded-lg border border-[#0ca30c]/30 bg-[#0ca30c]/[0.06] px-3 py-2.5 text-xs text-slate-200">
+    <li className="rounded-control border border-line px-3 py-2.5 text-sm text-muted">
       <div className="flex flex-wrap items-center gap-1.5">
-        <CheckCircle2 className="w-3.5 h-3.5 text-[#4ade80]" aria-hidden />
-        <b className="text-white">{entry.fileName}</b>
+        <CheckCircle2 className="h-4 w-4 text-up" aria-hidden />
+        <b className="font-semibold text-fg">{entry.fileName}</b>
         <span>· {r.platformLabel}</span>
         <span>· {r.stats.orders.toLocaleString('vi-VN')} {vi ? 'đơn' : 'orders'}, {r.stats.importedLines.toLocaleString('vi-VN')} {vi ? 'dòng sản phẩm' : 'lines'}</span>
         {r.coverage && <span>· {formatRangeVi(r.coverage)}</span>}
       </div>
       {r.warnings.map((w, i) => (
-        <p key={i} className="text-[#fab219] mt-1">• {w[lang]}</p>
+        <p key={i} className="mt-1 text-small text-warn">• {w[lang]}</p>
       ))}
       <details className="mt-1.5">
-        <summary className="cursor-pointer text-sky-300">{vi ? 'Xem cách ánh xạ cột' : 'Column mapping'}</summary>
-        <ul className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 text-slate-400">
+        <summary className="inline-flex min-h-8 cursor-pointer items-center text-small font-semibold text-primary">{vi ? 'Xem cách ánh xạ cột' : 'Column mapping'}</summary>
+        <ul className="mt-1 grid grid-cols-1 gap-x-4 text-small sm:grid-cols-2">
           {Object.entries(r.columnsUsed).map(([field, header]) => (
-            <li key={field}><span className="text-slate-500">{field}</span> ← {header}</li>
+            <li key={field}><span className="font-mono text-muted">{field}</span> ← <span className="text-fg">{header}</span></li>
           ))}
         </ul>
         {r.ignoredPersonalColumns.length > 0 && (
-          <p className="mt-1.5 text-slate-400 flex items-start gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#4ade80] shrink-0" aria-hidden />
+          <p className="mt-1.5 flex items-start gap-1 text-small">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-up" aria-hidden />
             {vi ? 'Không đọc các cột thông tin cá nhân: ' : 'Personal columns not read: '}
             {r.ignoredPersonalColumns.join(', ')}. {vi ? 'Mã người mua được mã hóa một chiều trên máy.' : 'Buyer IDs are hashed locally.'}
           </p>

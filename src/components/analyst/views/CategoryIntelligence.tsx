@@ -3,6 +3,7 @@ import { ChevronRight, Layers } from 'lucide-react';
 import { breakdown, dimensionMemberLabel, formatRangeVi, NONE_KEY, productIntelligence, type BreakdownDimension, type DatasetFilter } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
+import { SectionCard } from '../../ui/primitives';
 import { BreakdownTable } from '../ui';
 import { Product360Panel } from '../Product360Panel';
 
@@ -48,14 +49,16 @@ export const CategoryIntelligence: React.FC = () => {
   return (
     <div className="space-y-4">
       <nav aria-label={vi ? 'Vị trí drill-down' : 'Drill-down path'} className="flex flex-wrap items-center gap-1 text-sm">
-        <Layers className="w-4 h-4 text-slate-400 mr-1" aria-hidden />
+        <Layers className="mr-1 h-4 w-4 text-muted" aria-hidden />
         {crumbs.map((c, i) => (
           <React.Fragment key={i}>
-            {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-600" aria-hidden />}
+            {i > 0 && <ChevronRight className="h-4 w-4 text-muted" aria-hidden />}
             {i === crumbs.length - 1 ? (
-              <span className="font-bold text-white" aria-current="page">{c.label}</span>
+              <span className="px-1 font-semibold text-fg" aria-current="page">{c.label}</span>
             ) : (
-              <button onClick={() => setPath(c.to)} className="text-sky-300 hover:text-sky-200">{c.label}</button>
+              <button type="button" onClick={() => setPath(c.to)} className="inline-flex min-h-10 items-center rounded-control px-1 font-medium text-primary hover:underline">
+                {c.label}
+              </button>
             )}
           </React.Fragment>
         ))}
@@ -68,9 +71,11 @@ export const CategoryIntelligence: React.FC = () => {
           <NotEnoughData lang={lang} reason={tr(lang, b.unavailable)} />
         </Section>
       ) : (
-        <Section
+        <SectionCard
           title={`${levelName} · ${formatRangeVi(range)}`}
-          subtitle={
+          notesLabel={vi ? 'Ghi chú' : 'Notes'}
+          notes={level !== 'sku' ? [vi ? `Traffic/CVR theo lượt nhấp sản phẩm của các SKU trong nhóm. ${b.previousCovered ? '' : 'Kỳ so sánh chưa có dữ liệu.'}` : 'Traffic/CVR use product clicks of SKUs in the group.'] : []}
+          description={
             vi
               ? `So với ${formatRangeVi(previousRange)}. Bấm một dòng để đi sâu${level === 'sku' ? ' vào Product 360' : ''}. Đơn của nhóm là số đơn có chứa sản phẩm thuộc nhóm.`
               : `Vs ${formatRangeVi(previousRange)}. Click a row to drill down.`
@@ -90,12 +95,7 @@ export const CategoryIntelligence: React.FC = () => {
             }}
             rowAction={(r) => <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${levelName}: ${r.label}`, filter: { range: filter.range, platforms: filter.platforms, skus: skusOf(r.key) } })} />}
           />
-          {level !== 'sku' && (
-            <p className="text-[11px] text-slate-500 mt-2">
-              {vi ? `Traffic/CVR theo lượt nhấp sản phẩm của các SKU trong nhóm. ${b.previousCovered ? '' : 'Kỳ so sánh chưa có dữ liệu.'}` : 'Traffic/CVR use product clicks of SKUs in the group.'}
-            </p>
-          )}
-        </Section>
+        </SectionCard>
       )}
     </div>
   );

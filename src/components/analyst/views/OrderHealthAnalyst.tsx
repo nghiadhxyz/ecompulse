@@ -15,6 +15,8 @@ import {
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, KpiCard, NotEnoughData, Section, tr } from '../../seller/ui';
+import { Button } from '../../ui/primitives';
+import { TABLE } from '../../ui/data';
 import { DailyOrderHealthPanel } from '../../workspace/DailyOrderHealthPanel';
 import { BreakdownTable } from '../ui';
 
@@ -83,7 +85,7 @@ export const OrderHealthAnalyst: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard lang={lang} label={vi ? 'Đơn đặt' : 'Orders'} metric={m.orders} cmp={c.orders} compareLabel={compareLabel} />
         <KpiCard lang={lang} label={vi ? 'Tỷ lệ hủy' : 'Cancel rate'} metric={m.cancelRate} cmp={c.cancelRate} goodWhenUp={false} compareLabel={compareLabel} />
         <KpiCard lang={lang} label={vi ? 'Tỷ lệ trả/hoàn' : 'Return/refund rate'} metric={m.refundRate} cmp={c.refundRate} goodWhenUp={false} compareLabel={compareLabel} />
@@ -94,7 +96,7 @@ export const OrderHealthAnalyst: React.FC = () => {
         title={vi ? 'Hủy & hoàn theo chiều' : 'Cancels & returns by dimension'}
         subtitle={vi ? 'Bấm một dòng để xem lý do hủy của nhóm đó' : 'Click a row to see its reasons'}
         right={
-          <label className="text-xs text-slate-300 flex items-center gap-1.5">
+          <label className="flex items-center gap-2 text-sm text-muted">
             {vi ? 'Phân theo' : 'By'}
             <select
               value={dim}
@@ -102,7 +104,7 @@ export const OrderHealthAnalyst: React.FC = () => {
                 setDim(e.target.value as BreakdownDimension);
                 setMember(null);
               }}
-              className="bg-white/[0.06] border border-white/15 rounded-lg px-2 py-1 text-slate-100 [color-scheme:dark]"
+              className="min-h-10 rounded-control border border-line bg-surface px-2.5 text-sm text-fg"
             >
               {DIMS.map((d) => (
                 <option key={d} value={d}>{tr(lang, DIMENSION_LABELS[d])}</option>
@@ -130,26 +132,26 @@ export const OrderHealthAnalyst: React.FC = () => {
 
       <Section
         title={member ? `${vi ? 'Lý do hủy/hoàn' : 'Reasons'} · ${member.label}` : vi ? 'Lý do hủy/hoàn (toàn bộ)' : 'Reasons (all)'}
-        right={member && <button onClick={() => setMember(null)} className="text-xs text-sky-300">{vi ? 'Xem toàn bộ' : 'Show all'}</button>}
+        right={member && <Button variant="ghost" onClick={() => setMember(null)}>{vi ? 'Xem toàn bộ' : 'Show all'}</Button>}
       >
         {!health ? (
           <NotEnoughData lang={lang} reason={vi ? 'Không lọc được lý do cho nhóm này.' : 'Reasons are not filterable for this group.'} />
         ) : health.cancelReasons.length === 0 && health.returnReasons.length === 0 ? (
-          <p className="text-sm text-slate-400">{vi ? 'Không có lý do được ghi nhận.' : 'No reasons recorded.'}</p>
+          <p className="text-sm text-muted">{vi ? 'Không có lý do được ghi nhận.' : 'No reasons recorded.'}</p>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
-              <h3 className="text-xs font-bold text-slate-300 mb-1.5">{vi ? 'Lý do hủy' : 'Cancel reasons'} ({health.lifecycle.cancelled + health.lifecycle.failedDelivery})</h3>
-              <table className="w-full text-xs">
+              <h3 className="mb-2 text-sm font-semibold text-fg">{vi ? 'Lý do hủy' : 'Cancel reasons'} ({health.lifecycle.cancelled + health.lifecycle.failedDelivery})</h3>
+              <table className="w-full text-sm tabular">
                 <tbody>
                   {health.cancelReasons.map((r) => {
                     const prev = prevReason.get(r.reason);
                     return (
-                      <tr key={r.reason} className="border-t border-white/5 text-slate-200">
-                        <td className="py-1.5 pr-2">{r.reason}</td>
+                      <tr key={r.reason} className={`${TABLE.tr} text-fg`}>
+                        <td className="py-1.5 pr-3">{r.reason}</td>
                         <td className="py-1.5 text-right">{r.count}</td>
                         <td className="py-1.5 text-right w-16">{fmtRate(r.share, lang, 0)}</td>
-                        <td className="py-1.5 text-right w-24 text-slate-400">{prev !== undefined ? `${vi ? 'kỳ trước' : 'prev'} ${fmtRate(prev, lang, 0)}` : '—'}</td>
+                        <td className="w-28 py-1.5 text-right text-small text-muted">{prev !== undefined ? `${vi ? 'kỳ trước' : 'prev'} ${fmtRate(prev, lang, 0)}` : '—'}</td>
                       </tr>
                     );
                   })}
@@ -157,12 +159,12 @@ export const OrderHealthAnalyst: React.FC = () => {
               </table>
             </div>
             <div>
-              <h3 className="text-xs font-bold text-slate-300 mb-1.5">{vi ? 'Lý do trả hàng/hoàn tiền' : 'Return reasons'} ({health.lifecycle.returned + health.lifecycle.refunded})</h3>
-              <table className="w-full text-xs">
+              <h3 className="mb-2 text-sm font-semibold text-fg">{vi ? 'Lý do trả hàng/hoàn tiền' : 'Return reasons'} ({health.lifecycle.returned + health.lifecycle.refunded})</h3>
+              <table className="w-full text-sm tabular">
                 <tbody>
                   {health.returnReasons.map((r) => (
-                    <tr key={r.reason} className="border-t border-white/5 text-slate-200">
-                      <td className="py-1.5 pr-2">{r.reason}</td>
+                    <tr key={r.reason} className={`${TABLE.tr} text-fg`}>
+                      <td className="py-1.5 pr-3">{r.reason}</td>
                       <td className="py-1.5 text-right">{r.count}</td>
                       <td className="py-1.5 text-right w-16">{fmtRate(r.share, lang, 0)}</td>
                     </tr>
@@ -172,7 +174,7 @@ export const OrderHealthAnalyst: React.FC = () => {
             </div>
           </div>
         )}
-        {health && health.withoutReason > 0 && <p className="text-[11px] text-slate-500 mt-2">{vi ? `${health.withoutReason} đơn hủy/trả không ghi lý do.` : `${health.withoutReason} without a reason.`}</p>}
+        {health && health.withoutReason > 0 && <p className="mt-3 text-small text-muted">{vi ? `${health.withoutReason} đơn hủy/trả không ghi lý do.` : `${health.withoutReason} without a reason.`}</p>}
       </Section>
     </div>
   );
