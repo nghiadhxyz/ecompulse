@@ -124,7 +124,7 @@ export const SHORTCUT_LABELS: Record<ProductShortcut, { vi: string; en: string }
   bestSelling: { vi: 'Bán chạy nhất', en: 'Best selling' },
   topRevenue: { vi: 'Doanh thu cao nhất', en: 'Top revenue' },
   topProfit: { vi: 'Lời nhiều nhất', en: 'Most profit' },
-  highMargin: { vi: 'Margin cao', en: 'High margin' },
+  highMargin: { vi: 'Biên lợi nhuận cao', en: 'High margin' },
   growing: { vi: 'Đang tăng', en: 'Growing' },
   declining: { vi: 'Đang giảm', en: 'Declining' },
   losing: { vi: 'Đang lỗ', en: 'Losing money' },
