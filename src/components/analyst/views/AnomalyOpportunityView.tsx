@@ -56,7 +56,7 @@ export const AnomalyOpportunityView: React.FC = () => {
       <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       <SectionCard
         title={vi ? 'Phát hiện bất thường' : 'Anomaly scan'}
-        description={vi ? `${formatRangeVi(range)} · mỗi ngày so với trung vị 14 ngày thường trước đó (không tính ngày sale)` : `${formatRangeVi(range)} · each day vs the median of the previous 14 normal days`}
+        description={vi ? `${formatRangeVi(range)}, mỗi ngày so với trung vị 14 ngày thường trước đó (không tính ngày sale)` : `${formatRangeVi(range)}, each day vs the median of the previous 14 normal days`}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={scan.points.length === 0 ? [] : scan.notes.map((n) => tr(lang, n))}
       >
@@ -141,7 +141,7 @@ export const AnomalyOpportunityView: React.FC = () => {
                                 {vi ? 'Theo nguồn' : 'By source'}
                               </Chip>
                             )}
-                            <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${vi ? spec.vi : spec.en} · ${fmtDay(p.date)}`, filter: { range: { start: p.date, end: p.date }, platforms, cancelledOnly: metric === 'cancelRate' || undefined } })} />
+                            <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${vi ? spec.vi : spec.en}, ${fmtDay(p.date)}`, filter: { range: { start: p.date, end: p.date }, platforms, cancelledOnly: metric === 'cancelRate' || undefined } })} />
                           </div>
                         </td>
                       </tr>
@@ -168,11 +168,11 @@ export const AnomalyOpportunityView: React.FC = () => {
         description={
           dataset.orders.length === 0
             ? vi
-              ? `${formatRangeVi(range)} · từ báo cáo tổng hợp (Top 5 sản phẩm, người mua cả kỳ, Top 5 affiliate)`
-              : `${formatRangeVi(range)} · from the summary report`
+              ? `${formatRangeVi(range)}, từ báo cáo tổng hợp (Top 5 sản phẩm, người mua cả kỳ, Top 5 affiliate)`
+              : `${formatRangeVi(range)}, from the summary report`
             : vi
-              ? `${formatRangeVi(range)} so với ${formatRangeVi(previousRange)} · SKU có ít nhất 20 đơn`
-              : `${formatRangeVi(range)} vs ${formatRangeVi(previousRange)} · SKUs with ≥ 20 orders`
+              ? `${formatRangeVi(range)} so với ${formatRangeVi(previousRange)}, SKU có ít nhất 20 đơn`
+              : `${formatRangeVi(range)} vs ${formatRangeVi(previousRange)}, SKUs with ≥ 20 orders`
         }
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[vi ? 'Cơ hội là gợi ý để kiểm tra dựa trên số liệu quá khứ, không đảm bảo kết quả khi tăng hiển thị.' : 'Opportunities are checks suggested by past data, not guaranteed results.']}
@@ -197,7 +197,7 @@ export const AnomalyOpportunityView: React.FC = () => {
                 <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
                   <span className="text-small tabular text-muted">
                     {o.metrics.gmvShare !== null && `${vi ? 'Tỷ trọng GMV' : 'GMV share'} ${fmtRate(o.metrics.gmvShare, lang)}`}
-                    {o.metrics.margin !== null && ` · margin ${fmtRate(o.metrics.margin, lang)}`}
+                    {o.metrics.margin !== null && `, margin ${fmtRate(o.metrics.margin, lang)}`}
                   </span>
                   {o.sku && dataset.orders.length > 0 && <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: tr(lang, o.title), filter: { range, platforms, skus: [o.sku] } })} />}
                 </div>

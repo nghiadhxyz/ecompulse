@@ -108,7 +108,7 @@ export const ReportCenterView: React.FC = () => {
           }
         />
       ) : (
-        <Section title={report.title} subtitle={`${report.period} · ${report.generatedFrom}`}>
+        <Section title={report.title} subtitle={`${report.period}, ${report.generatedFrom}`}>
           <ul className="list-disc space-y-1 pl-5 text-sm text-fg">
             {report.summary.map((s, i) => (
               <li key={i}>{s}</li>

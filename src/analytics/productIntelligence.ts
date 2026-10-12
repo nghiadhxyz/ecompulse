@@ -27,10 +27,10 @@ import type { Bilingual } from './metric';
 export type ProductClass = 'scale' | 'maintain' | 'investigate' | 'reconsider';
 
 export const PRODUCT_CLASS_LABELS: Record<ProductClass, Bilingual> = {
-  scale: { vi: 'Đẩy mạnh (Scale)', en: 'Scale' },
-  maintain: { vi: 'Duy trì (Maintain)', en: 'Maintain' },
-  investigate: { vi: 'Cần xem xét (Investigate)', en: 'Investigate' },
-  reconsider: { vi: 'Cân nhắc lại (Reconsider)', en: 'Reconsider' },
+  scale: { vi: 'Đẩy mạnh', en: 'Scale' },
+  maintain: { vi: 'Duy trì', en: 'Maintain' },
+  investigate: { vi: 'Cần xem xét', en: 'Investigate' },
+  reconsider: { vi: 'Cân nhắc lại', en: 'Reconsider' },
 };
 
 export interface ProductInsight {

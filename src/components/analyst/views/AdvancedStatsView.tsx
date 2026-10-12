@@ -32,7 +32,7 @@ export const AdvancedStatsView: React.FC = () => {
       <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       <SectionCard
         title={vi ? 'Kiểm định khác biệt giữa hai kỳ' : 'Period difference tests'}
-        description={hasComparison ? `${formatRangeVi(range)} ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}` : `${formatRangeVi(range)} · ${vi ? 'Không có kỳ so sánh' : 'No comparison period'}`}
+        description={hasComparison ? `${formatRangeVi(range)} ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}` : `${formatRangeVi(range)}, ${vi ? 'Không có kỳ so sánh' : 'No comparison period'}`}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={st.notes.map((n) => tr(lang, n))}
       >
@@ -81,7 +81,7 @@ export const AdvancedStatsView: React.FC = () => {
         <SectionCard
           span={6}
           title={vi ? 'Tương quan theo ngày' : 'Daily correlation'}
-          description={vi ? 'Pearson r và Spearman ρ (−1 … 1) giữa các chỉ số trong kỳ này · tương quan không phải nhân quả' : 'Pearson r and Spearman ρ · correlation is not causation'}
+          description={vi ? 'Pearson r và Spearman ρ (−1 … 1) giữa các chỉ số trong kỳ này, tương quan không phải nhân quả' : 'Pearson r and Spearman ρ, correlation is not causation'}
           tools={
             <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-sm text-muted">
               <input type="checkbox" checked={excludeSale} onChange={(e) => setExcludeSale(e.target.checked)} className="h-4 w-4 accent-primary" />

@@ -103,7 +103,7 @@ const MultiSelect: React.FC<{ label: string; all: string; options: { key: string
 
 /**
  * Filter bar: sticky at the top of the content, white, one row when wide enough.
- * Left: period · middle: comparison, platform, category, order stage · right: dates in view.
+ * Left: period, middle: comparison, platform, category, order stage, right: dates in view.
  */
 export const AnalystFilterBar: React.FC<Props & { disabled?: FilterDisabled }> = (p) => {
   const vi = p.lang === 'vi';

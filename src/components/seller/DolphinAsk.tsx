@@ -130,11 +130,11 @@ export const DolphinAsk: React.FC = () => {
                             {e.current !== null && <>: {fmtByUnit(e.current, e.unit, lang)}</>} <span className="text-muted">({tr(lang, e.currentLabel)})</span>
                             {e.baseline !== undefined && e.baseline !== null && (
                               <>
-                                {' · '}
+                                {', '}
                                 {fmtByUnit(e.baseline, e.unit, lang)} <span className="text-muted">({e.baselineLabel ? tr(lang, e.baselineLabel) : ''})</span>
                               </>
                             )}
-                            {e.sampleSize !== undefined && <span className="text-muted"> · n={e.sampleSize}</span>}
+                            {e.sampleSize !== undefined && <span className="text-muted">, n={e.sampleSize}</span>}
                           </span>
                           {e.filter && <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: tr(lang, e.label), filter: e.filter!, evidence: [e] })} />}
                         </li>

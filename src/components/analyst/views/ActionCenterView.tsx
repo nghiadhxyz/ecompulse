@@ -28,7 +28,7 @@ const METRICS: { key: KpiKey; vi: string; en: string; goodWhenUp: boolean }[] = 
   { key: 'cancelRate', vi: 'Tỷ lệ hủy', en: 'Cancel rate', goodWhenUp: false },
   { key: 'cvr', vi: 'CVR', en: 'CVR', goodWhenUp: true },
   { key: 'aov', vi: 'AOV', en: 'AOV', goodWhenUp: true },
-  { key: 'margin', vi: 'Margin', en: 'Margin', goodWhenUp: true },
+  { key: 'margin', vi: 'Biên lợi nhuận', en: 'Margin', goodWhenUp: true },
 ];
 
 const STATUSES: ActionStatus[] = ['todo', 'doing', 'done', 'dropped'];
@@ -48,7 +48,7 @@ const ActionCard: React.FC<{ a: ActionItem }> = ({ a }) => {
   const result = useMemo(() => measureAction(dataset, a), [dataset, a]);
   const m = result.window?.metrics.find((x) => x.key === a.metric);
   const overdue = isOverdue(a, asOf);
-  const scopeText = [a.scope.skus?.map((s) => dataset.products.find((p) => p.sku === s)?.name ?? s).join(', '), a.scope.platforms?.map((p) => PLATFORM_LABELS[p]).join(', ')].filter(Boolean).join(' · ') || (vi ? 'Toàn shop' : 'Whole shop');
+  const scopeText = [a.scope.skus?.map((s) => dataset.products.find((p) => p.sku === s)?.name ?? s).join(', '), a.scope.platforms?.map((p) => PLATFORM_LABELS[p]).join(', ')].filter(Boolean).join(', ') || (vi ? 'Toàn shop' : 'Whole shop');
 
   return (
     <li className={`rounded-control border bg-surface p-4 ${overdue ? 'border-warn/50' : 'border-line'}`}>
@@ -56,9 +56,9 @@ const ActionCard: React.FC<{ a: ActionItem }> = ({ a }) => {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-fg">{a.title}</div>
           <div className="mt-0.5 text-small text-muted">
-            {metric[vi ? 'vi' : 'en']} · {scopeText}
-            {a.owner && ` · ${vi ? 'Phụ trách' : 'Owner'}: ${a.owner}`}
-            {a.deadline && ` · ${vi ? 'Hạn' : 'Due'} ${fmtDay(a.deadline)}`}
+            {metric[vi ? 'vi' : 'en']}, {scopeText}
+            {a.owner && `, ${vi ? 'Phụ trách' : 'Owner'}: ${a.owner}`}
+            {a.deadline && `, ${vi ? 'Hạn' : 'Due'} ${fmtDay(a.deadline)}`}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -107,7 +107,7 @@ const ActionCard: React.FC<{ a: ActionItem }> = ({ a }) => {
             <>
               <p className="mt-1 text-sm text-fg">
                 {metric[vi ? 'vi' : 'en']}: {fmtByUnit(m.change.previous, m.unit, lang)} → <b>{fmtByUnit(m.change.current, m.unit, lang)}</b> <ChangeCell c={m.change} rate={m.unit === 'ratio'} goodWhenUp={metric.goodWhenUp} lang={lang} />
-                <span className="text-small text-muted"> · {formatRangeVi(result.window.before)} → {formatRangeVi(result.window.after)}{!result.window.complete ? (vi ? ` (mới có ${result.window.usedDays} ngày)` : ` (${result.window.usedDays} days so far)`) : ''}</span>
+                <span className="text-small text-muted">, {formatRangeVi(result.window.before)} → {formatRangeVi(result.window.after)}{!result.window.complete ? (vi ? ` (mới có ${result.window.usedDays} ngày)` : ` (${result.window.usedDays} days so far)`) : ''}</span>
               </p>
               <p className="mt-0.5 text-small text-muted">{vi ? 'Kết quả đi cùng hành động, chưa chứng minh là do hành động — đối chiếu với các thay đổi khác cùng thời gian.' : 'Moved together with the action; not proof it caused it.'}</p>
             </>

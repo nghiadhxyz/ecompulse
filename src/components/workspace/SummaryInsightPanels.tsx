@@ -134,7 +134,7 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
       title={title ?? (vi ? 'Doanh số tăng/giảm do nguồn nào' : 'Which sources moved sales')}
       subtitle={
         d.available
-          ? `${formatRangeVi(before)} → ${formatRangeVi(after)} · ${vi ? 'doanh số TB/ngày' : 'avg sales/day'} ${fmtMoneyCompact(d.before.gmvPerDay, lang)} → ${fmtMoneyCompact(d.after.gmvPerDay, lang)}`
+          ? `${formatRangeVi(before)} → ${formatRangeVi(after)}, ${vi ? 'doanh số TB/ngày' : 'avg sales/day'} ${fmtMoneyCompact(d.before.gmvPerDay, lang)} → ${fmtMoneyCompact(d.after.gmvPerDay, lang)}`
           : `${formatRangeVi(before)} → ${formatRangeVi(after)}`
       }
     >
@@ -169,7 +169,7 @@ export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange;
                 {top.map((s) => (
                   <tr key={`${s.channel}|${s.source}`} className="h-11 border-t border-line hover:bg-hover text-fg">
                     <td className="px-3 pl-6">
-                      {s.source} <span className="text-muted">· {tr(lang, SUMMARY_CHANNEL_LABELS[s.channel]).split(' (')[0]}</span>
+                      {s.source} <span className="text-muted">, {tr(lang, SUMMARY_CHANNEL_LABELS[s.channel]).split(' (')[0]}</span>
                     </td>
                     <td className="px-3 text-right">{fmtMoneyCompact(s.before, lang)}</td>
                     <td className="px-3 text-right">{fmtMoneyCompact(s.after, lang)}</td>
@@ -232,9 +232,9 @@ export const StageFunnelPanel: React.FC = () => {
                       aria-expanded={sub ? undefined : expanded}
                     >
                       <td className={`px-3 whitespace-nowrap ${sub ? 'pl-8' : ''}`}>{sub ? r.source : tr(lang, SUMMARY_CHANNEL_LABELS[r.channel])}</td>
-                      <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.placed.gmv, lang)} <span className="text-muted">· {fmtOrders(r.placed.orders, lang)}</span></td>
+                      <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.placed.gmv, lang)} <span className="text-muted">, {fmtOrders(r.placed.orders, lang)}</span></td>
                       <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.confirmed.gmv, lang)}</td>
-                      <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.paid.gmv, lang)} <span className="text-muted">· {fmtOrders(r.paid.orders, lang)}</span></td>
+                      <td className="px-3 text-right whitespace-nowrap">{fmtMoneyCompact(r.paid.gmv, lang)} <span className="text-muted">, {fmtOrders(r.paid.orders, lang)}</span></td>
                       <td className="px-3 whitespace-nowrap" title={r.paidRateGmv === null && r.crossPeriod ? tr(lang, CROSS_PERIOD_NOTE) : undefined}>
                         <div className="flex items-center justify-end gap-2">{fmtRate(r.paidRateGmv, lang)}<ShareBar share={r.paidRateGmv} /></div>
                       </td>

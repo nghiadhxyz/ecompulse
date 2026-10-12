@@ -4,7 +4,7 @@ import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { NoticeBadge } from '../../workspace/DataNotices';
 import { Badge, SectionCard } from '../../ui/primitives';
-import { TABLE } from '../../ui/data';
+import { TABLE, StatStrip } from '../../ui/data';
 import { ChangeCell, Th } from '../ui';
 
 export const VideoAffiliateView: React.FC = () => {
@@ -81,7 +81,7 @@ export const VideoAffiliateView: React.FC = () => {
               {kind === 'creator' && hasCommission && <Th>{vi ? 'Hoa hồng' : 'Commission'}</Th>}
               {kind === 'creator' && hasCommission && <Th>{vi ? 'Tỷ lệ HH' : 'Rate'}</Th>}
               {hasProfit && <Th title={vi ? 'Lợi nhuận đóng góp của các đơn gắn với nội dung này (đã trừ hoa hồng)' : 'Contribution profit of attributed orders'}>{vi ? 'Lợi nhuận' : 'Profit'}</Th>}
-              {hasProfit && <Th>Margin</Th>}
+              {hasProfit && <Th>{vi ? 'Biên LN' : 'Margin'}</Th>}
               {hasProfit && <th className={TABLE.th} />}
             </tr>
           </thead>
@@ -104,7 +104,7 @@ export const VideoAffiliateView: React.FC = () => {
                     </div>
                     <div className="truncate text-small text-muted">
                       {PLATFORM_LABELS[r.platform]}
-                      {kind === 'video' ? ` · ${r.contentId} · ${tr(lang, CONTENT_KIND_LABELS[r.kind])}` : ''}
+                      {kind === 'video' ? `, ${r.contentId}, ${tr(lang, CONTENT_KIND_LABELS[r.kind])}` : ''}
                     </div>
                   </td>
                   <td className={`${TABLE.td} text-right`}>{fmtCount(r.views, lang)}</td>
@@ -143,26 +143,20 @@ export const VideoAffiliateView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {va.byKind.map((k) => (
-          <div key={k.kind} className="min-w-0 rounded-card border border-line bg-surface px-4 py-3.5 shadow-card">
-            <div className="truncate text-small text-muted">
-              {tr(lang, CONTENT_KIND_LABELS[k.kind])} · {k.items} {vi ? 'mục' : 'items'}
-            </div>
-            <div className="mt-1 text-kpi text-fg">{fmtMoneyCompact(k.gmv, lang)}</div>
-            <div className="text-small tabular text-muted">
-              {fmtOrders(k.orders, lang)} {vi ? 'đơn' : 'orders'}
-              {k.commission ? ` · ${vi ? 'HH' : 'comm.'} ${fmtMoneyCompact(k.commission, lang)}` : ''}
-            </div>
-            {fromSalesReport && k.channelShare !== null && (
-              <div className="mt-0.5 text-small text-muted" title={vi ? `${fmtMoneyCompact(k.gmv, lang)} / doanh số kênh ${fmtMoneyCompact(k.channelGmv, lang)}` : undefined}>
-                {vi ? `Top ${k.items} · chiếm ${fmtPortion(k.channelShare, lang)} kênh` : `Top ${k.items} · ${fmtPortion(k.channelShare, lang)} of channel`}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      {fromSalesReport && <p className="text-small text-muted">{vi ? 'Số theo video và affiliate từ báo cáo Phân tích bán hàng là Top 5 video và Top 5 affiliate — Shopee không liệt kê tất cả.' : 'Videos and affiliates from the Shopee sales report are the top 5 only.'}</p>}
+      <StatStrip
+        items={va.byKind.map((k) => ({
+          label: `${tr(lang, CONTENT_KIND_LABELS[k.kind])}, ${k.items} ${vi ? 'mục' : 'items'}`,
+          value: fmtMoneyCompact(k.gmv, lang),
+          sub: [
+            `${fmtOrders(k.orders, lang)} ${vi ? 'đơn' : 'orders'}`,
+            k.commission ? `${vi ? 'hoa hồng' : 'comm.'} ${fmtMoneyCompact(k.commission, lang)}` : null,
+            fromSalesReport && k.channelShare !== null ? (vi ? `${k.items} mục đầu, chiếm ${fmtPortion(k.channelShare, lang)} kênh` : `top ${k.items}, ${fmtPortion(k.channelShare, lang)} of channel`) : null,
+          ]
+            .filter(Boolean)
+            .join(', '),
+        }))}
+      />
+      {fromSalesReport && <p className="text-small text-muted">{vi ? 'Số theo video và affiliate từ báo cáo Phân tích bán hàng chỉ gồm 5 video và 5 affiliate đầu bảng. Shopee không liệt kê tất cả.' : 'Videos and affiliates from the Shopee sales report are the top 5 only.'}</p>}
       {va.notes.map((n, i) => (
         <p key={i} className="rounded-control bg-warn-soft px-3 py-2 text-small text-warn">
           {tr(lang, n)}
@@ -170,8 +164,8 @@ export const VideoAffiliateView: React.FC = () => {
       ))}
       {va.creators.length > 0 && (
         <SectionCard
-          title={fromSalesReport ? (vi ? 'Nhà sáng tạo / KOC (Top 5 affiliate)' : 'Creators / KOC (top 5)') : vi ? 'Nhà sáng tạo / KOC' : 'Creators / KOC'}
-          description={`${formatRangeVi(range)} · ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}
+          title={fromSalesReport ? (vi ? 'Nhà sáng tạo / KOC (5 affiliate đầu bảng)' : 'Creators / KOC (top 5)') : vi ? 'Nhà sáng tạo / KOC' : 'Creators / KOC'}
+          description={`${formatRangeVi(range)}, ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}
           notesLabel={vi ? 'Ghi chú' : 'Notes'}
           notes={notesFor(va.creators)}
         >
@@ -180,7 +174,7 @@ export const VideoAffiliateView: React.FC = () => {
       )}
       {va.videos.length > 0 && (
         <SectionCard
-          title={fromSalesReport ? (vi ? 'Video (Top 5)' : 'Videos (top 5)') : vi ? 'Video' : 'Videos'}
+          title={fromSalesReport ? (vi ? 'Video (5 video đầu bảng)' : 'Videos (top 5)') : vi ? 'Video' : 'Videos'}
           description={va.videos.every((v) => v.kind === 'shop_video') ? (vi ? `Cả ${va.videos.length} video đều là video của shop` : `All ${va.videos.length} are shop videos`) : vi ? 'Video của shop và video affiliate có mã nội dung' : 'Shop and affiliate videos with a content ID'}
           notesLabel={vi ? 'Ghi chú' : 'Notes'}
           notes={notesFor(va.videos)}

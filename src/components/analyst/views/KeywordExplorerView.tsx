@@ -21,7 +21,7 @@ import {
 import { useWorkspace } from '../../seller/SellerContext';
 import { GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { Badge, CardGrid, Chip, SectionCard, type Tone } from '../../ui/primitives';
-import { TABLE } from '../../ui/data';
+import { TABLE, StatStrip } from '../../ui/data';
 import { axisProps, CHART, gridProps, tooltipProps } from '../../../theme/chart';
 import { ShareBar, Th } from '../ui';
 
@@ -104,15 +104,7 @@ export const KeywordExplorerView: React.FC = () => {
 
       {ki.rows.length > 0 ? (
         <>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-7">
-            {tiles.map((x) => (
-              <div key={x.l} className="flex min-h-28 min-w-0 flex-col rounded-card border border-line bg-surface px-4 py-3.5 shadow-card">
-                <div className="text-small text-muted">{x.l}</div>
-                <div className={`mt-1 text-xl font-bold tabular ${x.bad ? 'text-down' : 'text-fg'}`}>{x.v}</div>
-                {x.sub && <div className="mt-auto truncate text-small text-muted" title={x.sub}>{x.sub}</div>}
-              </div>
-            ))}
-          </div>
+          <StatStrip items={tiles.map((x) => ({ label: x.l, value: x.v, tone: x.bad ? ('down' as const) : undefined, sub: x.sub, missing: (x as { missing?: boolean }).missing }))} />
           {ki.notes.map((n, i) => (
             <p key={i} className="rounded-control bg-warn-soft px-3 py-2 text-small text-warn">
               {tr(lang, n)}
@@ -121,7 +113,7 @@ export const KeywordExplorerView: React.FC = () => {
 
           <SectionCard
             title={vi ? 'Từ khóa đang chạy' : 'Keywords'}
-            description={`${formatRangeVi(range)} · ${vi ? 'Mỗi từ khóa được xếp một nhóm theo quy tắc ở phần Ghi chú — rê chuột lên nhóm để xem lý do' : 'One class per keyword, rules in the notes'}`}
+            description={`${formatRangeVi(range)}, ${vi ? 'Mỗi từ khóa được xếp một nhóm theo quy tắc ở phần Ghi chú — rê chuột lên nhóm để xem lý do' : 'One class per keyword, rules in the notes'}`}
             tools={
               <div className="flex flex-wrap gap-1" role="group" aria-label={vi ? 'Lọc theo đánh giá' : 'Filter by class'}>
                 <Chip selected={cls === 'all'} onClick={() => setCls('all')}>
@@ -185,7 +177,7 @@ export const KeywordExplorerView: React.FC = () => {
                         </button>
                         <div className="truncate text-small text-muted" title={r.adName}>
                           {r.matchType ? tr(lang, MATCH_TYPE_LABELS[r.matchType]) : ''}
-                          {r.sku ? ` · ${r.sku}` : ''}
+                          {r.sku ? `, ${r.sku}` : ''}
                         </div>
                       </td>
                       <td className={TABLE.td}>
@@ -230,8 +222,8 @@ export const KeywordExplorerView: React.FC = () => {
           <CardGrid>
             <SectionCard
               span={8}
-              title={trendRow ? `${vi ? 'Xu hướng' : 'Trend'} · ${trendRow.keyword}` : vi ? 'Xu hướng từ khóa' : 'Keyword trend'}
-              description={vi ? 'Cột: lượt xem mỗi ngày · Đường: đơn · Vạch đứt: ngày sale. Bấm tên từ khóa trong bảng để đổi.' : 'Bars: impressions · Line: orders · Dashed: sale days. Click a keyword to switch.'}
+              title={trendRow ? `${vi ? 'Xu hướng' : 'Trend'}: ${trendRow.keyword}` : vi ? 'Xu hướng từ khóa' : 'Keyword trend'}
+              description={vi ? 'Cột là lượt xem mỗi ngày, đường là số đơn, vạch đứt là ngày sale. Bấm tên từ khóa trong bảng để đổi.' : 'Bars: impressions, line: orders, dashed: sale days. Click a keyword to switch.'}
             >
               {series ? (
                 <div className="h-56" role="img" aria-label={vi ? 'Lượt xem và đơn theo ngày của từ khóa' : 'Keyword impressions and orders by day'}>
@@ -373,7 +365,7 @@ export const KeywordExplorerView: React.FC = () => {
                       {o.running ? (
                         o.performance ? (
                           <Badge tone={CLASS_TONE[o.performance]}>
-                            {vi ? 'Đang chạy' : 'Running'} · {tr(lang, KEYWORD_CLASS_LABELS[o.performance].label)}
+                            {vi ? 'Đang chạy' : 'Running'}, {tr(lang, KEYWORD_CLASS_LABELS[o.performance].label)}
                           </Badge>
                         ) : (
                           <span className="text-muted">{vi ? 'Đang chạy' : 'Running'}</span>

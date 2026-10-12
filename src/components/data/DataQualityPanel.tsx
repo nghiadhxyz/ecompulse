@@ -62,9 +62,9 @@ export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ dataset, lan
             </h3>
             <p className="mt-0.5 text-small text-muted">
               {grainLabel}
-              {report.coverage && ` · ${formatRangeVi(report.coverage)} (${report.coverageDays} ${vi ? 'ngày' : 'days'})`}
-              {report.platforms.length > 0 && ` · ${report.platforms.map((p) => PLATFORM_LABELS[p]).join(', ')}`}
-              {` · ${available}/${report.capabilities.length} ${vi ? 'nhóm phân tích sẵn sàng' : 'analyses ready'}`}
+              {report.coverage && `, ${formatRangeVi(report.coverage)} (${report.coverageDays} ${vi ? 'ngày' : 'days'})`}
+              {report.platforms.length > 0 && `, ${report.platforms.map((p) => PLATFORM_LABELS[p]).join(', ')}`}
+              {`, ${available}/${report.capabilities.length} ${vi ? 'nhóm phân tích sẵn sàng' : 'analyses ready'}`}
             </p>
           </div>
         </div>

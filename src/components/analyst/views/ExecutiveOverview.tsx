@@ -161,7 +161,7 @@ export const ExecutiveOverview: React.FC = () => {
                   <ChangeCell c={r.change.gmv} lang={lang} />
                   <span className="text-muted">
                     {fmtMoneyCompact(r.change.gmv.absoluteDelta, lang)}
-                    {r.gmvContribution !== null && (vi ? `, chiếm ${Math.round(Math.abs(r.gmvContribution) * 100)}% độ lớn thay đổi toàn shop` : ` · ${Math.round(Math.abs(r.gmvContribution) * 100)}% of the total change`)}
+                    {r.gmvContribution !== null && (vi ? `, chiếm ${Math.round(Math.abs(r.gmvContribution) * 100)}% độ lớn thay đổi toàn shop` : `, ${Math.round(Math.abs(r.gmvContribution) * 100)}% of the total change`)}
                   </span>
                 </li>
               ))}
