@@ -95,8 +95,8 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
               <p className="mt-2 text-sm font-semibold text-fg">{vi ? 'Kéo thả file vào đây hoặc chọn file' : 'Drop files here or choose files'}</p>
               <p className="mx-auto mt-1 max-w-lg text-small text-muted">
                 {vi
-                  ? 'Hỗ trợ (Shopee, TikTok Shop, Lazada · .xlsx/.csv): file xuất đơn hàng · báo cáo Quảng cáo · báo cáo Từ khóa quảng cáo · Livestream · Hiệu quả sản phẩm (traffic) · Affiliate/Video · Phân tích bán hàng Shopee · danh mục sản phẩm (SKU + Ngành hàng / Nhóm hàng / Giá vốn). Có thể chọn nhiều file cùng lúc.'
-                  : 'Supported (Shopee, TikTok Shop, Lazada · .xlsx/.csv): orders, ads, ad keywords, live, product traffic, affiliate/video, Shopee sales analysis, product catalog (SKU + category / niche / COGS). Multiple files allowed.'}
+                  ? 'File .xlsx hoặc .csv của Shopee, TikTok Shop, Lazada: file xuất đơn hàng, báo cáo quảng cáo, báo cáo từ khóa quảng cáo, livestream, hiệu quả sản phẩm (traffic), affiliate/video, Phân tích bán hàng Shopee, danh mục sản phẩm (SKU, ngành hàng, nhóm hàng, giá vốn). Có thể chọn nhiều file cùng lúc.'
+                  : 'Supported (Shopee, TikTok Shop, Lazada, .xlsx/.csv): orders, ads, ad keywords, live, product traffic, affiliate/video, Shopee sales analysis, product catalog (SKU + category / niche / COGS). Multiple files allowed.'}
               </p>
               <PrimaryButton className="mt-4" onClick={() => inputRef.current?.click()}>
                 <FileSpreadsheet className="h-4 w-4" aria-hidden /> {vi ? 'Chọn file' : 'Choose files'}
@@ -220,13 +220,15 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
         <div className="flex flex-wrap items-center gap-1.5">
           <CheckCircle2 className="h-4 w-4 text-up" aria-hidden />
           <b className="font-semibold text-fg">{entry.fileName}</b>
-          <span>· {vi ? 'Shopee · Phân tích bán hàng' : 'Shopee · Sales analysis'}</span>
-          {o.period && <span>· {formatRangeVi(o.period)}</span>}
-          {o.sheets && <span>· {vi ? `đọc ${read.length}/${o.sheets.length} sheet` : `${read.length}/${o.sheets.length} sheets read`}</span>}
         </div>
+        <p className="mt-0.5 text-small">
+          {[vi ? 'Shopee, Phân tích bán hàng' : 'Shopee sales analysis', o.period ? formatRangeVi(o.period) : null, o.sheets ? (vi ? `đọc ${read.length}/${o.sheets.length} sheet` : `${read.length}/${o.sheets.length} sheets read`) : null]
+            .filter(Boolean)
+            .join(', ')}
+        </p>
         <p className="mt-1 text-small">
           {vi
-            ? 'Báo cáo tổng hợp: có số theo ngày, theo kênh/nguồn, Ads, sản phẩm đứng đầu, live, video, affiliate — không có chi tiết từng đơn nên chưa tính được lợi nhuận theo đơn.'
+            ? 'Báo cáo tổng hợp có số theo ngày, theo kênh và nguồn, quảng cáo, sản phẩm đứng đầu, live, video, affiliate. Không có chi tiết từng đơn nên chưa tính được lợi nhuận theo đơn.'
             : 'Summary report: daily, channel/source, ads, top products, live, video, affiliate — no order lines, so no per-order profit.'}
         </p>
         {o.sheets && (
@@ -236,8 +238,8 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
               {o.sheets.map((x, i) => (
                 <li key={i}>
                   {x.kind === 'skipped' ? '○' : '✓'} <span className="text-fg">{x.name}</span> — {SHEET_KIND_LABELS[x.kind][lang]}
-                  {x.stage ? ` · ${STAGE_LABELS[x.stage][lang]}` : ''}
-                  {x.kind !== 'skipped' ? ` · ${x.rows.toLocaleString('vi-VN')} ${vi ? 'dòng' : 'rows'}` : ''}
+                  {x.stage ? `, ${STAGE_LABELS[x.stage][lang]}` : ''}
+                  {x.kind !== 'skipped' ? `, ${x.rows.toLocaleString('vi-VN')} ${vi ? 'dòng' : 'rows'}` : ''}
                 </li>
               ))}
             </ul>
@@ -256,13 +258,17 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
         <div className="flex flex-wrap items-center gap-1.5">
           {ok ? <CheckCircle2 className="h-4 w-4 text-up" aria-hidden /> : <AlertTriangle className="h-4 w-4 text-warn" aria-hidden />}
           <b className="font-semibold text-fg">{entry.fileName}</b>
-          <span>· {REPORT_KIND_LABELS[r.kind][lang]} · {r.label}</span>
-          <span>· {r.stats.imported.toLocaleString('vi-VN')} {vi ? 'dòng đã nhập' : 'rows imported'}</span>
-          {r.period && <span>· {formatRangeVi(r.period)}</span>}
-          {r.catalog && (
-            <span>· {vi ? `${r.catalog.withCategory} SKU có ngành hàng, ${r.catalog.withCogs} SKU có giá vốn` : `${r.catalog.withCategory} with category, ${r.catalog.withCogs} with COGS`}</span>
-          )}
         </div>
+        <p className="mt-0.5 text-small">
+          {[
+            `${REPORT_KIND_LABELS[r.kind][lang]} (${r.label})`,
+            `${r.stats.imported.toLocaleString('vi-VN')} ${vi ? 'dòng đã nhập' : 'rows imported'}`,
+            r.period ? formatRangeVi(r.period) : null,
+            r.catalog ? (vi ? `${r.catalog.withCategory} SKU có ngành hàng, ${r.catalog.withCogs} SKU có giá vốn` : `${r.catalog.withCategory} with category, ${r.catalog.withCogs} with COGS`) : null,
+          ]
+            .filter(Boolean)
+            .join(', ')}
+        </p>
         {r.warnings.map((w, i) => (
           <p key={i} className="mt-1 text-small text-warn">• {w[lang]}</p>
         ))}
@@ -283,10 +289,17 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
       <div className="flex flex-wrap items-center gap-1.5">
         <CheckCircle2 className="h-4 w-4 text-up" aria-hidden />
         <b className="font-semibold text-fg">{entry.fileName}</b>
-        <span>· {r.platformLabel}</span>
-        <span>· {r.stats.orders.toLocaleString('vi-VN')} {vi ? 'đơn' : 'orders'}, {r.stats.importedLines.toLocaleString('vi-VN')} {vi ? 'dòng sản phẩm' : 'lines'}</span>
-        {r.coverage && <span>· {formatRangeVi(r.coverage)}</span>}
       </div>
+      <p className="mt-0.5 text-small">
+        {[
+          r.platformLabel,
+          `${r.stats.orders.toLocaleString('vi-VN')} ${vi ? 'đơn' : 'orders'}`,
+          `${r.stats.importedLines.toLocaleString('vi-VN')} ${vi ? 'dòng sản phẩm' : 'lines'}`,
+          r.coverage ? formatRangeVi(r.coverage) : null,
+        ]
+          .filter(Boolean)
+          .join(', ')}
+      </p>
       {r.warnings.map((w, i) => (
         <p key={i} className="mt-1 text-small text-warn">• {w[lang]}</p>
       ))}

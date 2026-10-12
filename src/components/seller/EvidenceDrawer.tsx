@@ -66,11 +66,11 @@ export const EvidenceDrawer: React.FC<{ dataset: CanonicalDataset; request: Evid
                 <div className="text-xs text-muted font-semibold">{tr(lang, e.label)}</div>
                 <div className="mt-1 text-sm text-fg">
                   <span className="font-black">{fmtByUnit(e.current, e.unit, lang)}</span>
-                  <span className="text-muted"> · {tr(lang, e.currentLabel)}</span>
+                  <span className="text-muted">, {tr(lang, e.currentLabel)}</span>
                 </div>
                 {e.baseline !== undefined && e.baselineLabel && (
                   <div className="text-xs text-fg mt-0.5">
-                    {fmtByUnit(e.baseline, e.unit, lang)} <span className="text-muted">· {tr(lang, e.baselineLabel)}</span>
+                    {fmtByUnit(e.baseline, e.unit, lang)} <span className="text-muted">, {tr(lang, e.baselineLabel)}</span>
                   </div>
                 )}
                 {e.sampleSize !== undefined && <div className="text-[11px] text-muted mt-1">{vi ? `Cỡ mẫu: ${e.sampleSize} đơn` : `Sample: ${e.sampleSize} orders`}</div>}

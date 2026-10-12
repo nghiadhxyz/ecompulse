@@ -44,8 +44,8 @@ export const DataMapping: React.FC = () => {
         <ul className="divide-y divide-line rounded-control border border-line text-sm text-muted">
           {dataset.sources.map((s, i) => (
             <li key={i} className="px-3 py-2">
-              <b className="font-medium text-fg">{s.fileName}</b> · {s.reportType} · {s.platform !== 'other' ? PLATFORM_LABELS[s.platform] : vi ? 'nhiều sàn' : 'multi'}
-              {s.rowCount !== undefined && ` · ${s.rowCount.toLocaleString('vi-VN')} ${vi ? 'dòng' : 'rows'}`}
+              <b className="font-medium text-fg">{s.fileName}</b>, {s.reportType}, {s.platform !== 'other' ? PLATFORM_LABELS[s.platform] : vi ? 'nhiều sàn' : 'multi'}
+              {s.rowCount !== undefined && `, ${s.rowCount.toLocaleString('vi-VN')} ${vi ? 'dòng' : 'rows'}`}
             </li>
           ))}
         </ul>
@@ -56,7 +56,7 @@ export const DataMapping: React.FC = () => {
         notes={[vi ? 'Ngành hàng lấy từ cột "Ngành hàng" trong file (mẫu EcomPulse) hoặc danh mục sản phẩm. File xuất đơn của sàn thường không có cột này.' : 'Categories come from the file or the product catalog.']}
         description={
           vi
-            ? `${rows.length} SKU · có ngành hàng ${pct(rows.filter((r) => r.category).length)}% · có nhóm hàng ${pct(rows.filter((r) => r.subcategory).length)}% · có giá vốn ${pct(rows.filter((r) => r.cogs !== undefined).length)}%`
+            ? `${rows.length} SKU, có ngành hàng ${pct(rows.filter((r) => r.category).length)}%, có nhóm hàng ${pct(rows.filter((r) => r.subcategory).length)}%, có giá vốn ${pct(rows.filter((r) => r.cogs !== undefined).length)}%`
             : `${rows.length} SKUs`
         }
         tools={<GhostButton onClick={() => goTo('settings')}>{vi ? 'Nhập giá vốn' : 'Enter COGS'}</GhostButton>}

@@ -18,7 +18,7 @@ import { useSeller } from '../SellerContext';
 import { EvidenceButton, GhostButton, HelpTip, NotEnoughData, Section } from '../ui';
 import { ChannelWeekdayPanel } from '../../workspace/SummaryInsightPanels';
 import { Button, SectionCard } from '../../ui/primitives';
-import { TABLE, Th } from '../../ui/data';
+import { TABLE, Th, StatStrip } from '../../ui/data';
 import { CHANNEL_COLOR } from '../../../theme/chart';
 
 export const AdsLiveView: React.FC = () => {
@@ -63,22 +63,23 @@ export const AdsLiveView: React.FC = () => {
           />
         ) : (
           <>
-            <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {[
-                { l: vi ? 'Chi phí Ads' : 'Ad spend', v: fmtMoneyCompact(ads.totals.spend, lang) },
-                { l: vi ? 'Doanh thu từ Ads' : 'Attributed revenue', v: fmtMoneyCompact(ads.totals.attributedRevenue, lang) },
-                { l: vi ? 'Đơn từ Ads' : 'Orders', v: fmtCount(ads.totals.orders, lang) },
-                { l: 'ROAS', v: fmtMultiple(ads.totals.roas, lang) },
-                { l: vi ? 'Lợi nhuận sau Ads (ước tính)' : 'Est. profit after ads', v: ads.totals.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(ads.totals.estimatedProfitAfterAds, lang), bad: (ads.totals.estimatedProfitAfterAds ?? 0) < 0 },
-              ].map((x) => (
-                <div key={x.l} className="min-w-0 rounded-control border border-line bg-surface-2 p-3">
-                  <div className="truncate text-small text-muted" title={x.l}>{x.l}</div>
-                  <div className={`mt-0.5 text-xl font-bold tabular ${x.bad ? 'text-down' : 'text-fg'}`}>{x.v}</div>
-                </div>
-              ))}
-            </div>
+            <StatStrip
+              className="mb-4"
+              items={[
+                { label: vi ? 'Chi phí quảng cáo' : 'Ad spend', value: fmtMoneyCompact(ads.totals.spend, lang) },
+                { label: vi ? 'Doanh thu từ quảng cáo' : 'Attributed revenue', value: fmtMoneyCompact(ads.totals.attributedRevenue, lang) },
+                { label: vi ? 'Đơn từ quảng cáo' : 'Orders', value: fmtCount(ads.totals.orders, lang) },
+                { label: 'ROAS', value: fmtMultiple(ads.totals.roas, lang) },
+                {
+                  label: vi ? 'Lợi nhuận sau quảng cáo (ước tính)' : 'Est. profit after ads',
+                  value: ads.totals.estimatedProfitAfterAds === null ? (vi ? 'Không đủ dữ liệu' : 'N/A') : fmtMoneyCompact(ads.totals.estimatedProfitAfterAds, lang),
+                  missing: ads.totals.estimatedProfitAfterAds === null,
+                  tone: (ads.totals.estimatedProfitAfterAds ?? 0) < 0 ? 'down' : undefined,
+                },
+              ]}
+            />
             <p className="mb-3 flex items-center gap-1 text-small text-muted">
-              {vi ? 'ROAS cao chưa chắc có lời — so với "ROAS hòa vốn" (mức tối thiểu để không lỗ sau giá vốn và phí).' : 'High ROAS is not profit — compare with break-even ROAS.'}
+              {vi ? 'ROAS cao chưa chắc có lời. Hãy so với "ROAS hòa vốn": mức tối thiểu để không lỗ sau giá vốn và phí.' : 'High ROAS is not profit — compare with break-even ROAS.'}
               <HelpTip text={vi ? 'ROAS hòa vốn = 1 ÷ biên lợi nhuận trước quảng cáo của sản phẩm' : 'Break-even ROAS = 1 ÷ margin before ads'} />
             </p>
             <div className={TABLE.frame}>
@@ -91,7 +92,7 @@ export const AdsLiveView: React.FC = () => {
                     <Th>{vi ? 'Đơn' : 'Orders'}</Th>
                     <Th>ROAS</Th>
                     <Th>{vi ? 'ROAS hòa vốn' : 'Break-even'}</Th>
-                    <Th>{vi ? 'Lời sau Ads' : 'Profit after ads'}</Th>
+                    <Th>{vi ? 'Lời sau quảng cáo' : 'Profit after ads'}</Th>
                     {advanced && ['Impr.', 'Clicks', 'CTR', 'CPC', 'CVR', 'CPA'].map((h) => <Th key={h}>{h}</Th>)}
                     <th className={TABLE.th} />
                   </tr>
@@ -105,7 +106,7 @@ export const AdsLiveView: React.FC = () => {
                           <div className="truncate font-medium text-fg">{r.name}</div>
                           <div className="text-small text-muted">
                             {PLATFORM_LABELS[r.platform]}
-                            {r.sku ? ` · ${r.sku}` : ''}
+                            {r.sku ? `, ${r.sku}` : ''}
                           </div>
                         </td>
                         <td className={`${TABLE.td} text-right`}>{fmtMoneyCompact(r.spend, lang)}</td>
@@ -144,7 +145,7 @@ export const AdsLiveView: React.FC = () => {
         title={vi ? 'Livestream' : 'Livestream'}
         subtitle={
           lives.length > 0 && lives.every((r) => r.session.periodStart !== undefined)
-            ? `${formatRangeVi(range)} · ${vi ? `Top ${lives.length} phiên theo báo cáo Shopee, không phải tất cả phiên` : `top ${lives.length} sessions from the Shopee report`}`
+            ? `${formatRangeVi(range)}. ${vi ? `${lives.length} phiên nổi bật theo báo cáo Shopee, không phải tất cả phiên` : `top ${lives.length} sessions from the Shopee report`}`
             : formatRangeVi(range)
         }
       >
@@ -160,14 +161,14 @@ export const AdsLiveView: React.FC = () => {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 text-sm font-semibold text-fg">
                         <Radio className="h-4 w-4" style={{ color: CHANNEL_COLOR.live.line }} aria-hidden />
-                        {sessionDateLabel(s, lang)} · {PLATFORM_LABELS[s.platform]}
+                        {sessionDateLabel(s, lang)}, {PLATFORM_LABELS[s.platform]}
                       </div>
                       <div className="truncate text-small text-muted">
                         {s.title}
-                        {r.durationHours ? ` · ${r.durationHours.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 1 })}h` : ''}
+                        {r.durationHours ? `, ${r.durationHours.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', { maximumFractionDigits: 1 })}h` : ''}
                       </div>
                     </div>
-                    <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `Live ${sessionDateLabel(s, lang)} · ${PLATFORM_LABELS[s.platform]}`, filter: { range: { start: s.periodStart ?? s.date, end: s.date }, liveSessionId: s.sessionId } })} />
+                    <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `Live ${sessionDateLabel(s, lang)}, ${PLATFORM_LABELS[s.platform]}`, filter: { range: { start: s.periodStart ?? s.date, end: s.date }, liveSessionId: s.sessionId } })} />
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-3 text-small sm:grid-cols-5 lg:grid-cols-9">
                     {[

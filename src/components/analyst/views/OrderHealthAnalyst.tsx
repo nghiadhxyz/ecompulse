@@ -14,9 +14,9 @@ import {
   type Platform,
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
-import { EvidenceButton, KpiCard, NotEnoughData, Section, tr } from '../../seller/ui';
+import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { Button } from '../../ui/primitives';
-import { TABLE } from '../../ui/data';
+import { FigureStrip, TABLE } from '../../ui/data';
 import { DailyOrderHealthPanel } from '../../workspace/DailyOrderHealthPanel';
 import { BreakdownTable } from '../ui';
 
@@ -85,12 +85,16 @@ export const OrderHealthAnalyst: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard lang={lang} label={vi ? 'Đơn đặt' : 'Orders'} metric={m.orders} cmp={c.orders} compareLabel={compareLabel} />
-        <KpiCard lang={lang} label={vi ? 'Tỷ lệ hủy' : 'Cancel rate'} metric={m.cancelRate} cmp={c.cancelRate} goodWhenUp={false} compareLabel={compareLabel} />
-        <KpiCard lang={lang} label={vi ? 'Tỷ lệ trả/hoàn' : 'Return/refund rate'} metric={m.refundRate} cmp={c.refundRate} goodWhenUp={false} compareLabel={compareLabel} />
-        <KpiCard lang={lang} label={vi ? 'Tỷ lệ hoàn tất' : 'Completion rate'} metric={m.completionRate} cmp={c.completionRate} compareLabel={compareLabel} />
-      </div>
+      <FigureStrip
+        lang={lang}
+        compareLabel={compareLabel}
+        items={[
+          { key: 'orders', label: vi ? 'Đơn đặt' : 'Orders', metric: m.orders, cmp: c.orders },
+          { key: 'cancelRate', label: vi ? 'Tỷ lệ hủy' : 'Cancel rate', metric: m.cancelRate, cmp: c.cancelRate, goodWhenUp: false },
+          { key: 'refundRate', label: vi ? 'Tỷ lệ trả/hoàn' : 'Return/refund rate', metric: m.refundRate, cmp: c.refundRate, goodWhenUp: false },
+          { key: 'completionRate', label: vi ? 'Tỷ lệ hoàn tất' : 'Completion rate', metric: m.completionRate, cmp: c.completionRate },
+        ]}
+      />
 
       <Section
         title={vi ? 'Hủy & hoàn theo chiều' : 'Cancels & returns by dimension'}
@@ -124,14 +128,14 @@ export const OrderHealthAnalyst: React.FC = () => {
             onRowClick={(r) => setMember(r)}
             rowAction={(r) => {
               const ev = evidenceFor(r.key, { cancelledOnly: true });
-              return ev ? <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${vi ? 'Đơn hủy' : 'Cancelled'} · ${r.label}`, filter: ev })} /> : null;
+              return ev ? <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${vi ? 'Đơn hủy' : 'Cancelled'}, ${r.label}`, filter: ev })} /> : null;
             }}
           />
         )}
       </Section>
 
       <Section
-        title={member ? `${vi ? 'Lý do hủy/hoàn' : 'Reasons'} · ${member.label}` : vi ? 'Lý do hủy/hoàn (toàn bộ)' : 'Reasons (all)'}
+        title={member ? `${vi ? 'Lý do hủy/hoàn' : 'Reasons'}, ${member.label}` : vi ? 'Lý do hủy/hoàn (toàn bộ)' : 'Reasons (all)'}
         right={member && <Button variant="ghost" onClick={() => setMember(null)}>{vi ? 'Xem toàn bộ' : 'Show all'}</Button>}
       >
         {!health ? (

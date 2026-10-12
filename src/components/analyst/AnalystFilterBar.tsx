@@ -103,15 +103,32 @@ const MultiSelect: React.FC<{ label: string; all: string; options: { key: string
 
 /**
  * Filter bar: sticky at the top of the content, white, one row when wide enough.
- * Left: period · middle: comparison, platform, category, order stage · right: dates in view.
+ * Left: period, middle: comparison, platform, category, order stage, right: dates in view.
  */
 export const AnalystFilterBar: React.FC<Props & { disabled?: FilterDisabled }> = (p) => {
   const vi = p.lang === 'vi';
   const d = p.disabled ?? {};
   const dim = (reason?: string) => (reason ? 'opacity-50' : '');
+  // Phones: one summary line; the controls open below it.
+  const [open, setOpen] = useState(false);
+  const presetLabel = PRESETS.find((x) => x.key === p.preset);
   return (
-    <div className="sticky top-16 z-20 -mx-1 rounded-card border border-line bg-surface px-3 py-2 shadow-card">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <div className="sticky top-16 z-20 -mx-1 rounded-card border border-line bg-surface px-3 py-2">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex min-h-11 w-full items-center gap-2 text-left text-sm lg:hidden"
+      >
+        <CalendarDays className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">
+          <b className="font-semibold text-fg">{presetLabel ? (vi ? presetLabel.vi : presetLabel.en) : formatRangeVi(p.range)}</b>
+          <span className="text-muted">{vi ? `, so với ${formatRangeVi(p.previousRange)}` : `, vs ${formatRangeVi(p.previousRange)}`}</span>
+        </span>
+        <span className="shrink-0 font-semibold text-primary">{open ? (vi ? 'Đóng' : 'Close') : vi ? 'Đổi bộ lọc' : 'Filters'}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+      </button>
+      <div className={`${open ? 'flex' : 'hidden'} flex-wrap items-center gap-x-3 gap-y-2 pt-2 lg:flex lg:pt-0`}>
         <div className="flex items-center gap-1">
           <CalendarDays className="h-4 w-4 text-muted" aria-hidden />
           <Tabs
@@ -174,7 +191,7 @@ export const AnalystFilterBar: React.FC<Props & { disabled?: FilterDisabled }> =
           />
         </div>
 
-        <span className="ml-auto text-small text-muted tabular">
+        <span className="ml-auto hidden text-small text-muted tabular lg:inline">
           <b className="font-semibold text-fg">{formatRangeVi(p.range)}</b> {vi ? 'so với' : 'vs'} <b className="font-semibold text-fg">{formatRangeVi(p.previousRange)}</b>
         </span>
       </div>

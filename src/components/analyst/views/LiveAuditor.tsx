@@ -4,7 +4,7 @@ import { sessionDateLabel, compareSessions, fmtCount, fmtDay, fmtMoneyCompact, f
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, GhostButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { SectionCard } from '../../ui/primitives';
-import { TABLE } from '../../ui/data';
+import { TABLE, StatStrip } from '../../ui/data';
 import { CHANNEL_COLOR } from '../../../theme/chart';
 import { ChangeCell, Th } from '../ui';
 import { FunnelView } from './TrafficFunnel';
@@ -24,9 +24,9 @@ export const LiveAuditor: React.FC = () => {
     const d = la.inferredDates[r.session.sessionId];
     return d ? `${fmtDay(d)} (${vi ? 'ngày suy luận' : 'inferred date'})` : sessionDateLabel(r.session, lang);
   };
-  const label = (r: LiveSessionRow) => `${dateOf(r)} · ${PLATFORM_LABELS[r.session.platform]}`;
+  const label = (r: LiveSessionRow) => `${dateOf(r)}, ${PLATFORM_LABELS[r.session.platform]}`;
   // Session picker: title + id, so sessions with the same date stay distinguishable (7.4).
-  const optionLabel = (r: LiveSessionRow) => `${r.session.title ?? (vi ? 'Không tên' : 'Untitled')} · ${r.session.sessionId.replace(/^.*-/, '')}`;
+  const optionLabel = (r: LiveSessionRow) => `${r.session.title ?? (vi ? 'Không tên' : 'Untitled')}, ${r.session.sessionId.replace(/^.*-/, '')}`;
   // Odd live records: grey notes (Shopee's own inconsistencies) and red invalid relations.
   const liveNotices = useMemo(
     () => dataNotices(dataset, baseFilter.range, baseFilter.platforms).filter((n) => n.kind === 'atc_without_viewers' || n.kind === 'sessions_over_channel' || (n.kind === 'unique_clicks_over_viewers' && n.ref.channel === 'live')),
@@ -38,11 +38,11 @@ export const LiveAuditor: React.FC = () => {
   if (la.sessions.length === 0) {
     return (
       <div className="space-y-4">
-        <Section title="Live Session Auditor">
+        <Section title={vi ? 'Livestream' : 'Live Session Auditor'}>
           <NotEnoughData
             lang={lang}
             reason={vi ? 'Chưa có dữ liệu phiên live trong khoảng này (phiên live của báo cáo Phân tích bán hàng chỉ có tổng cả kỳ — chọn trọn kỳ). Nhập báo cáo Livestream của Shopee / TikTok ở Data Hub.' : 'No live sessions in this range. Import a live report in the Data Hub.'}
-            action={<GhostButton onClick={() => goTo('dataHub')}>Data Hub</GhostButton>}
+            action={<GhostButton onClick={() => goTo('dataHub')}>{vi ? 'Nhập dữ liệu' : 'Import data'}</GhostButton>}
           />
         </Section>
         <ChannelWeekdayPanel channel="live" />
@@ -98,20 +98,20 @@ export const LiveAuditor: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-        {[
+      <StatStrip
+        items={[
           { l: vi ? 'Số phiên' : 'Sessions', v: String(la.totals.sessions) },
           { l: vi ? 'Tổng giờ live' : 'Hours', v: la.totals.hours === null ? '—' : la.totals.hours.toFixed(1) },
           { l: 'GMV', v: fmtMoneyCompact(la.totals.gmv, lang) },
           { l: vi ? 'Đơn' : 'Orders', v: fmtCount(la.totals.orders, lang) },
-          { l: 'GMV/h', v: fmtMoneyCompact(la.totals.gmvPerHour, lang) },
-        ].map((x) => (
-          <div key={x.l} className="min-w-0 rounded-card border border-line bg-surface px-4 py-3.5 shadow-card">
-            <div className="text-small text-muted">{x.l}</div>
-            <div className="mt-1 text-kpi text-fg">{x.v}</div>
-          </div>
-        ))}
-      </div>
+          { l: vi ? 'GMV mỗi giờ' : 'GMV/h', v: fmtMoneyCompact(la.totals.gmvPerHour, lang) },
+        ].map((x: { l: string; v: string; sub?: string; tone?: string }) => ({
+          label: x.l,
+          value: x.v,
+          sub: x.sub,
+          tone: x.tone === 'text-up' ? ('up' as const) : x.tone === 'text-down' ? ('down' as const) : undefined,
+        }))}
+      />
       {la.insight && (
         <p className="flex items-start gap-2 rounded-control bg-down-soft px-3 py-2.5 text-sm font-medium text-down">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
@@ -122,7 +122,7 @@ export const LiveAuditor: React.FC = () => {
       <div className="space-y-1.5 rounded-card border border-line bg-surface px-4 py-3 shadow-card">
         <p className="text-sm font-semibold text-fg">
           {vi ? `${la.watchedSessions}/${la.sessions.length} phiên có người xem` : `${la.watchedSessions}/${la.sessions.length} sessions had viewers`}
-          {topListOnly && <span className="text-small font-normal text-muted"> · {vi ? `Top ${la.sessions.length} phiên theo báo cáo Shopee (Shopee chỉ liệt kê Top 5)` : `Top ${la.sessions.length} from the Shopee report`}</span>}
+          {topListOnly && <span className="text-small font-normal text-muted">, {vi ? `${la.sessions.length} phiên đầu bảng theo báo cáo Shopee (Shopee chỉ liệt kê 5 phiên)` : `Top ${la.sessions.length} from the Shopee report`}</span>}
         </p>
         <DataNoticesList notices={liveNotices} lang={lang} />
         {la.notes.map((n, i) => (
@@ -135,7 +135,7 @@ export const LiveAuditor: React.FC = () => {
 
       <SectionCard
         title={byGmv ? (vi ? 'Xếp hạng phiên theo GMV' : 'Sessions ranked by GMV') : vi ? 'Xếp hạng phiên theo GMV/giờ' : 'Sessions ranked by GMV/hour'}
-        description={`${formatRangeVi(range)} · ${byGmv ? (vi ? 'báo cáo không có thời lượng phiên nên chưa tính được GMV/giờ' : 'no durations in the report, so no GMV/hour') : vi ? 'đã chuẩn hóa theo thời lượng' : 'normalized by duration'}`}
+        description={`${formatRangeVi(range)}, ${byGmv ? (vi ? 'báo cáo không có thời lượng phiên nên chưa tính được GMV/giờ' : 'no durations in the report, so no GMV/hour') : vi ? 'đã chuẩn hóa theo thời lượng' : 'normalized by duration'}`}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[vi ? 'Dòng tô vàng: người xem tăng nhưng đơn giảm so với phiên trước. Lợi nhuận live = đơn gắn với phiên, chưa trừ chi phí tổ chức live (host, quà tặng) nếu chưa nhập.' : 'Highlighted: more viewers but fewer orders than the previous session.']}
       >
@@ -228,8 +228,8 @@ export const LiveAuditor: React.FC = () => {
               <thead className={TABLE.thead}>
                 <tr>
                   <Th left>{vi ? 'Chỉ số' : 'Metric'}</Th>
-                  <Th>A · {label(cmp.a)}</Th>
-                  <Th>B · {label(cmp.b)}</Th>
+                  <Th>A: {label(cmp.a)}</Th>
+                  <Th>B: {label(cmp.b)}</Th>
                   <Th>{vi ? 'B so với A' : 'B vs A'}</Th>
                 </tr>
               </thead>

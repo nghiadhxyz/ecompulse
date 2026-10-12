@@ -52,7 +52,7 @@ export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map
           return (
             <li key={k} className="flex min-h-7 items-center gap-2 px-1 text-small text-muted opacity-70">
               <span className="h-px flex-1 border-t border-dashed border-line" aria-hidden />
-              {name(k)} · {vi ? 'không đủ dữ liệu' : 'no data'}
+              {name(k)}, {vi ? 'không đủ dữ liệu' : 'no data'}
             </li>
           );
         }
@@ -65,13 +65,13 @@ export const FunnelView: React.FC<{ f: Funnel; lang: 'vi' | 'en'; ppByStep?: Map
                 {pp !== undefined && pp !== null && (
                   <span className={`font-medium ${pp >= 0 ? 'text-up' : 'text-down'}`}>
                     {' '}
-                    · <span aria-hidden>{pp >= 0 ? '↑' : '↓'}</span> {fmtPp(pp, lang)} {vi ? 'so với kỳ trước' : 'vs prev'}
+                   , <span aria-hidden>{pp >= 0 ? '↑' : '↓'}</span> {fmtPp(pp, lang)} {vi ? 'so với kỳ trước' : 'vs prev'}
                   </span>
                 )}
                 {leak && (
                   <>
                     {' '}
-                    · <AlertTriangle className="inline h-3.5 w-3.5 align-[-2px]" aria-hidden /> {vi ? 'rơi nhiều nhất' : 'biggest leak'}
+                   , <AlertTriangle className="inline h-3.5 w-3.5 align-[-2px]" aria-hidden /> {vi ? 'rơi nhiều nhất' : 'biggest leak'}
                   </>
                 )}
               </div>
@@ -131,7 +131,7 @@ export const TrafficFunnel: React.FC = () => {
         <SectionCard
           span={6}
           title={vi ? 'Phễu chuyển đổi' : 'Conversion funnel'}
-          description={`${formatRangeVi(range)} · ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}
+          description={`${formatRangeVi(range)}, ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}
           notesLabel={notesLabel}
           notes={[
             ...cur.notes.map((n) => tr(lang, n)),
@@ -158,7 +158,7 @@ export const TrafficFunnel: React.FC = () => {
           <SectionCard
             span={6}
             title={vi ? 'Phễu theo kênh' : 'Funnel by channel'}
-            description={`${formatRangeVi(range)} · ${vi ? 'dòng kênh trong sheet nguồn truy cập, đơn đặt' : 'channel row, placed orders'}`}
+            description={`${formatRangeVi(range)}, ${vi ? 'dòng kênh trong sheet nguồn truy cập, đơn đặt' : 'channel row, placed orders'}`}
             tools={
               <Tabs<SummaryChannel>
                 size="sm"

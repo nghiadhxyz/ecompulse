@@ -39,7 +39,7 @@ export const IMPACT_METRICS: { key: KpiKey; label: Bilingual; goodWhenUp: boolea
   { key: 'cvr', label: { vi: 'CVR', en: 'CVR' }, goodWhenUp: true },
   { key: 'cancelRate', label: { vi: 'Tỷ lệ hủy', en: 'Cancel rate' }, goodWhenUp: false },
   { key: 'profit', label: { vi: 'Lợi nhuận', en: 'Profit' }, goodWhenUp: true },
-  { key: 'margin', label: { vi: 'Margin', en: 'Margin' }, goodWhenUp: true },
+  { key: 'margin', label: { vi: 'Biên lợi nhuận', en: 'Margin' }, goodWhenUp: true },
 ];
 
 export interface ImpactMetric {

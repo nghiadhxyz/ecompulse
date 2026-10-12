@@ -40,10 +40,10 @@ interface SellerWorkspaceProps {
 }
 
 const NAV: { key: SellerView; icon: typeof Home; vi: string; en: string; short: string }[] = [
-  { key: 'home', icon: Home, vi: 'Tổng quan', en: 'Home', short: 'Home' },
+  { key: 'home', icon: Home, vi: 'Tổng quan', en: 'Home', short: 'Tổng quan' },
   { key: 'products', icon: Package, vi: 'Sản phẩm', en: 'Products', short: 'Sản phẩm' },
   { key: 'orders', icon: ShoppingBag, vi: 'Đơn hàng', en: 'Orders', short: 'Đơn' },
-  { key: 'adsLive', icon: Megaphone, vi: 'Ads & Live', en: 'Ads & Live', short: 'Ads/Live' },
+  { key: 'adsLive', icon: Megaphone, vi: 'Quảng cáo & Live', en: 'Ads & Live', short: 'Quảng cáo' },
   { key: 'dolphin', icon: Bot, vi: 'Dolphin AI', en: 'Dolphin AI', short: 'Dolphin' },
   { key: 'data', icon: Database, vi: 'Dữ liệu', en: 'Data', short: 'Dữ liệu' },
   { key: 'settings', icon: Settings, vi: 'Cài đặt', en: 'Settings', short: 'Cài đặt' },
@@ -186,13 +186,13 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
   return (
     <div className="mx-auto w-full max-w-[1440px] pb-20 md:pb-0">
       {/* Desktop / tablet navigation */}
-      <nav className="mb-4 hidden gap-1 overflow-x-auto rounded-card border border-line bg-surface p-1.5 shadow-card md:flex" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
+      <nav className="mb-6 hidden gap-1 overflow-x-auto border-b border-line pb-2 md:flex" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
         {NAV.map((n) => (
           <button
             key={n.key}
             onClick={() => setView(n.key)}
             aria-current={view === n.key ? 'page' : undefined}
-            className={`flex min-h-10 items-center gap-2 rounded-control px-3.5 text-sm font-medium whitespace-nowrap ${view === n.key ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-hover hover:text-fg'}`}
+            className={`flex min-h-10 items-center gap-2 rounded-control px-3.5 text-sm whitespace-nowrap ${view === n.key ? 'bg-primary-soft font-semibold text-primary' : 'font-medium text-fg/80 hover:bg-hover hover:text-fg'}`}
           >
             <n.icon className="w-4 h-4" aria-hidden /> {vi ? n.vi : n.en}
           </button>
@@ -208,10 +208,10 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
             key={n.key}
             onClick={() => setView(n.key)}
             aria-current={view === n.key ? 'page' : undefined}
-            className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${view === n.key ? 'text-primary' : 'text-muted'}`}
+            className={`flex min-h-14 flex-col items-center justify-center gap-0.5 py-1.5 text-[11px] leading-tight font-semibold ${view === n.key ? 'text-primary' : 'text-muted'}`}
           >
             <n.icon className="w-5 h-5" aria-hidden />
-            <span className="truncate max-w-full px-0.5">{vi ? n.short : n.en}</span>
+            <span className="max-w-full px-0.5 text-center break-words">{vi ? n.short : n.en}</span>
           </button>
         ))}
       </nav>

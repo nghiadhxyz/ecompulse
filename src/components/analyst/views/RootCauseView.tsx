@@ -84,7 +84,7 @@ export const RootCauseView: React.FC = () => {
                     <td className={TABLE.td}>
                       <Badge tone={ROLE[n.role].tone}>{vi ? ROLE[n.role].vi : ROLE[n.role].en}</Badge>
                     </td>
-                    <td className={`${TABLE.td} text-right`}>{n.evidence && <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${tr(lang, spec.label)} · ${n.label}`, filter: n.evidence! })} />}</td>
+                    <td className={`${TABLE.td} text-right`}>{n.evidence && <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${tr(lang, spec.label)}, ${n.label}`, filter: n.evidence! })} />}</td>
                   </tr>
                 );
               })}
@@ -98,7 +98,7 @@ export const RootCauseView: React.FC = () => {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Root Cause"
+        title={vi ? 'Nguyên nhân thay đổi' : 'Root Cause'}
         description={vi ? `Thay đổi nằm ở đâu: ${formatRangeVi(range)} so với ${formatRangeVi(previousRange)}` : `Where the change sits: ${formatRangeVi(range)} vs ${formatRangeVi(previousRange)}`}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={r.unavailable ? [] : r.notes.map((n) => tr(lang, n))}
@@ -146,7 +146,7 @@ export const RootCauseView: React.FC = () => {
                         <b className="font-semibold">{p.label}</b>{' '}
                         <span className="text-small tabular text-muted">
                           {fmtContribution(p.contribution)}
-                          {p.share !== null ? ` · ${fmtRate(Math.abs(p.share), lang, 0)}` : ''}
+                          {p.share !== null ? `, ${fmtRate(Math.abs(p.share), lang, 0)}` : ''}
                         </span>
                       </span>
                     </li>

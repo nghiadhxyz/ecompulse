@@ -54,7 +54,7 @@ export const RevenueProfit: React.FC = () => {
     <div className="space-y-4">
       <SectionCard
         title={vi ? 'Thác nước lợi nhuận' : 'Profit waterfall'}
-        description={`${formatRangeVi(range)} · ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}
+        description={`${formatRangeVi(range)}, ${vi ? 'so với' : 'vs'} ${formatRangeVi(previousRange)}`}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[vi ? 'Cột cuối: thay đổi so với kỳ so sánh (chi phí tăng hiển thị màu cam).' : 'Last column: change vs comparison (cost increases in orange).']}
       >

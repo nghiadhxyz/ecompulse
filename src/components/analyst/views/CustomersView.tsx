@@ -3,7 +3,7 @@ import { customerIntelligence, fmtCount, fmtMoneyCompact, fmtRate, formatRangeVi
 import { useWorkspace } from '../../seller/SellerContext';
 import { EvidenceButton, NotEnoughData, Section, tr } from '../../seller/ui';
 import { Button, SectionCard } from '../../ui/primitives';
-import { TABLE } from '../../ui/data';
+import { TABLE, StatStrip } from '../../ui/data';
 import { ShareBar, Th } from '../ui';
 import { CustomerTrendPanel } from '../../workspace/SummaryInsightPanels';
 
@@ -17,7 +17,7 @@ export const CustomersView: React.FC = () => {
       <div className="space-y-4">
         <CustomerTrendPanel />
         <Section title={vi ? 'Phân nhóm RFM, cohort (cần mã người mua)' : 'RFM & cohorts (need buyer IDs)'}>
-          <NotEnoughData lang={lang} reason={tr(lang, ci.unavailable!)} action={<Button onClick={() => goTo('dataHub')}>Data Hub</Button>} />
+          <NotEnoughData lang={lang} reason={tr(lang, ci.unavailable!)} action={<Button onClick={() => goTo('dataHub')}>{lang === 'vi' ? 'Nhập dữ liệu' : 'Import data'}</Button>} />
         </Section>
       </div>
     );
@@ -27,26 +27,26 @@ export const CustomersView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <Section title={vi ? 'Khách hàng' : 'Customers'} subtitle={vi ? `${formatRangeVi(range)} · mã khách ẩn danh theo sàn` : `${formatRangeVi(range)} · pseudonymous per platform`}>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-          {[
+      <Section title={vi ? 'Khách hàng' : 'Customers'} subtitle={vi ? `${formatRangeVi(range)}, mã khách ẩn danh theo sàn` : `${formatRangeVi(range)}, pseudonymous per platform`}>
+        <StatStrip
+          items={[
             { l: vi ? 'Khách mua' : 'Customers', v: fmtCount(k.customers, lang) },
             { l: vi ? 'Khách mới' : 'New', v: fmtCount(k.newCustomers, lang) },
             { l: vi ? 'Khách quay lại' : 'Returning', v: fmtCount(k.returningCustomers, lang) },
             { l: vi ? 'GMV từ khách quay lại' : 'GMV from returning', v: fmtRate(k.returningGmvShare, lang) },
             { l: vi ? 'Mua ≥ 2 lần trong kỳ' : '2+ orders in period', v: fmtRate(k.repeatWithinRange, lang) },
             { l: vi ? 'GMV / khách' : 'GMV / customer', v: fmtMoneyCompact(k.gmvPerCustomer, lang) },
-          ].map((x) => (
-            <div key={x.l} className="min-w-0 rounded-control border border-line bg-surface-2 p-3">
-              <div className="truncate text-small text-muted">{x.l}</div>
-              <div className="mt-0.5 text-xl font-bold tabular text-fg">{x.v}</div>
-            </div>
-          ))}
-        </div>
+          ].map((x: { l: string; v: string; sub?: string; tone?: string }) => ({
+            label: x.l,
+            value: x.v,
+            sub: x.sub,
+            tone: x.tone === 'text-up' ? ('up' as const) : x.tone === 'text-down' ? ('down' as const) : undefined,
+          }))}
+        />
         {ci.byPlatform.length > 1 && (
           <p className="mt-3 text-small text-muted">
             {vi ? 'Tỷ lệ khách quay lại theo sàn: ' : 'Returning share by platform: '}
-            {ci.byPlatform.map((p) => `${PLATFORM_LABELS[p.platform]} ${fmtRate(p.returningShare, lang)} (${fmtCount(p.customers, lang)} khách)`).join(' · ')}
+            {ci.byPlatform.map((p) => `${PLATFORM_LABELS[p.platform]} ${fmtRate(p.returningShare, lang)} (${fmtCount(p.customers, lang)} khách)`).join(', ')}
           </p>
         )}
       </Section>

@@ -29,15 +29,15 @@ const HEAD: Record<BreakdownColumn, { vi: string; en: string; title?: string }> 
   gmvChange: { vi: 'Δ GMV', en: 'Δ GMV' },
   contribution: { vi: 'Đóng góp Δ', en: 'Contribution', title: 'Phần của thay đổi GMV toàn bộ do nhóm này tạo ra' },
   orders: { vi: 'Đơn', en: 'Orders' },
-  units: { vi: 'SL', en: 'Units' },
-  clicks: { vi: 'Traffic', en: 'Traffic', title: 'Lượt nhấp sản phẩm' },
+  units: { vi: 'Số lượng', en: 'Units' },
+  clicks: { vi: 'Lượt nhấp', en: 'Traffic', title: 'Lượt nhấp sản phẩm' },
   cvr: { vi: 'CVR', en: 'CVR' },
   aov: { vi: 'AOV', en: 'AOV' },
   cancel: { vi: 'Hủy', en: 'Cancel' },
   refund: { vi: 'Trả/hoàn', en: 'Refund' },
-  net: { vi: 'DT thuần', en: 'Net rev.' },
+  net: { vi: 'Doanh thu thuần', en: 'Net rev.' },
   profit: { vi: 'Lợi nhuận', en: 'Profit' },
-  margin: { vi: 'Margin', en: 'Margin' },
+  margin: { vi: 'Biên LN', en: 'Margin' },
   profitChange: { vi: 'Δ LN', en: 'Δ Profit' },
 };
 
@@ -153,7 +153,7 @@ export const BreakdownTable: React.FC<{
     </table>
   </div>
   {!hasProfit && requested.some((c) => PROFIT_COLUMNS.includes(c)) && (
-    <p className="mt-2 text-small text-muted">{vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận và margin.' : 'No COGS yet, so no profit or margin.'}</p>
+    <p className="mt-2 text-small text-muted">{vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận và biên lợi nhuận.' : 'No COGS yet, so no profit or margin.'}</p>
   )}
   </>
   );

@@ -40,7 +40,7 @@ export const ReportCenterView: React.FC = () => {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Report Center"
+        title={vi ? 'Xuất báo cáo' : 'Report Center'}
         description={vi ? 'Báo cáo tạo trên máy từ cùng engine với các màn hình — xuất CSV, Excel, PDF.' : 'Reports built locally from the same engine as the screens.'}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[
@@ -108,7 +108,7 @@ export const ReportCenterView: React.FC = () => {
           }
         />
       ) : (
-        <Section title={report.title} subtitle={`${report.period} · ${report.generatedFrom}`}>
+        <Section title={report.title} subtitle={`${report.period}, ${report.generatedFrom}`}>
           <ul className="list-disc space-y-1 pl-5 text-sm text-fg">
             {report.summary.map((s, i) => (
               <li key={i}>{s}</li>

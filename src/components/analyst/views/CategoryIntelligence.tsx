@@ -72,7 +72,7 @@ export const CategoryIntelligence: React.FC = () => {
         </Section>
       ) : (
         <SectionCard
-          title={`${levelName} · ${formatRangeVi(range)}`}
+          title={`${levelName}, ${formatRangeVi(range)}`}
           notesLabel={vi ? 'Ghi chú' : 'Notes'}
           notes={level !== 'sku' ? [vi ? `Traffic/CVR theo lượt nhấp sản phẩm của các SKU trong nhóm. ${b.previousCovered ? '' : 'Kỳ so sánh chưa có dữ liệu.'}` : 'Traffic/CVR use product clicks of SKUs in the group.'] : []}
           description={

@@ -179,7 +179,7 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
           ...(m.profit.current !== null
             ? [
                 { label: { vi: 'Lợi nhuận ước tính', en: 'Est. profit' }, unit: 'vnd' as const, current: m.profit.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.profit.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } },
-                { label: { vi: 'Margin', en: 'Margin' }, unit: 'ratio' as const, current: m.margin.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.margin.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } },
+                { label: { vi: 'Biên lợi nhuận', en: 'Margin' }, unit: 'ratio' as const, current: m.margin.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.margin.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } },
               ]
             : [{ label: { vi: 'Số đơn', en: 'Orders' }, unit: 'count' as const, current: m.orders.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.orders.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' } }]),
           { label: { vi: 'Tỷ lệ hủy', en: 'Cancel rate' }, unit: 'ratio', current: m.cancelRate.current, currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: m.cancelRate.previous, baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' }, filter: { ...baseEv, cancelledOnly: true } },
@@ -403,7 +403,7 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
           vi: `Nên nhìn tỷ lệ trên doanh thu thuần: chi phí tăng theo doanh thu là bình thường; ${top.filter((c) => c.shareNow > c.sharePrev + 0.01).map((c) => c.l.label.vi).join(', ') || 'không khoản nào'} tăng nhanh hơn doanh thu.`,
           en: 'Look at cost as a share of net revenue.',
         },
-        nextChecks: top.filter((c) => c.shareNow > c.sharePrev + 0.01).map((c) => (c.l.key === 'ads' ? { vi: 'Mở Ads Intelligence để xem chiến dịch dưới hòa vốn.', en: 'Open Ads Intelligence.' } : { vi: `Kiểm tra ${c.l.label.vi.toLowerCase()} theo SKU ở trang Doanh thu & Lợi nhuận.`, en: `Check ${c.l.label.en} by SKU.` })),
+        nextChecks: top.filter((c) => c.shareNow > c.sharePrev + 0.01).map((c) => (c.l.key === 'ads' ? { vi: 'Mở trang Quảng cáo để xem chiến dịch dưới hòa vốn.', en: 'Open Ads Intelligence.' } : { vi: `Kiểm tra ${c.l.label.vi.toLowerCase()} theo SKU ở trang Doanh thu & Lợi nhuận.`, en: `Check ${c.l.label.en} by SKU.` })),
       });
     }
 

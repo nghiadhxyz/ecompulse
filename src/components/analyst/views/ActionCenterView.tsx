@@ -28,7 +28,7 @@ const METRICS: { key: KpiKey; vi: string; en: string; goodWhenUp: boolean }[] = 
   { key: 'cancelRate', vi: 'Tỷ lệ hủy', en: 'Cancel rate', goodWhenUp: false },
   { key: 'cvr', vi: 'CVR', en: 'CVR', goodWhenUp: true },
   { key: 'aov', vi: 'AOV', en: 'AOV', goodWhenUp: true },
-  { key: 'margin', vi: 'Margin', en: 'Margin', goodWhenUp: true },
+  { key: 'margin', vi: 'Biên lợi nhuận', en: 'Margin', goodWhenUp: true },
 ];
 
 const STATUSES: ActionStatus[] = ['todo', 'doing', 'done', 'dropped'];
@@ -48,7 +48,7 @@ const ActionCard: React.FC<{ a: ActionItem }> = ({ a }) => {
   const result = useMemo(() => measureAction(dataset, a), [dataset, a]);
   const m = result.window?.metrics.find((x) => x.key === a.metric);
   const overdue = isOverdue(a, asOf);
-  const scopeText = [a.scope.skus?.map((s) => dataset.products.find((p) => p.sku === s)?.name ?? s).join(', '), a.scope.platforms?.map((p) => PLATFORM_LABELS[p]).join(', ')].filter(Boolean).join(' · ') || (vi ? 'Toàn shop' : 'Whole shop');
+  const scopeText = [a.scope.skus?.map((s) => dataset.products.find((p) => p.sku === s)?.name ?? s).join(', '), a.scope.platforms?.map((p) => PLATFORM_LABELS[p]).join(', ')].filter(Boolean).join(', ') || (vi ? 'Toàn shop' : 'Whole shop');
 
   return (
     <li className={`rounded-control border bg-surface p-4 ${overdue ? 'border-warn/50' : 'border-line'}`}>
@@ -56,9 +56,9 @@ const ActionCard: React.FC<{ a: ActionItem }> = ({ a }) => {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-fg">{a.title}</div>
           <div className="mt-0.5 text-small text-muted">
-            {metric[vi ? 'vi' : 'en']} · {scopeText}
-            {a.owner && ` · ${vi ? 'Phụ trách' : 'Owner'}: ${a.owner}`}
-            {a.deadline && ` · ${vi ? 'Hạn' : 'Due'} ${fmtDay(a.deadline)}`}
+            {metric[vi ? 'vi' : 'en']}, {scopeText}
+            {a.owner && `, ${vi ? 'Phụ trách' : 'Owner'}: ${a.owner}`}
+            {a.deadline && `, ${vi ? 'Hạn' : 'Due'} ${fmtDay(a.deadline)}`}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -107,7 +107,7 @@ const ActionCard: React.FC<{ a: ActionItem }> = ({ a }) => {
             <>
               <p className="mt-1 text-sm text-fg">
                 {metric[vi ? 'vi' : 'en']}: {fmtByUnit(m.change.previous, m.unit, lang)} → <b>{fmtByUnit(m.change.current, m.unit, lang)}</b> <ChangeCell c={m.change} rate={m.unit === 'ratio'} goodWhenUp={metric.goodWhenUp} lang={lang} />
-                <span className="text-small text-muted"> · {formatRangeVi(result.window.before)} → {formatRangeVi(result.window.after)}{!result.window.complete ? (vi ? ` (mới có ${result.window.usedDays} ngày)` : ` (${result.window.usedDays} days so far)`) : ''}</span>
+                <span className="text-small text-muted">, {formatRangeVi(result.window.before)} → {formatRangeVi(result.window.after)}{!result.window.complete ? (vi ? ` (mới có ${result.window.usedDays} ngày)` : ` (${result.window.usedDays} days so far)`) : ''}</span>
               </p>
               <p className="mt-0.5 text-small text-muted">{vi ? 'Kết quả đi cùng hành động, chưa chứng minh là do hành động — đối chiếu với các thay đổi khác cùng thời gian.' : 'Moved together with the action; not proof it caused it.'}</p>
             </>
@@ -135,7 +135,7 @@ export const ActionCenterView: React.FC = () => {
   const [filter, setFilter] = useState<ActionStatus | 'open' | 'all'>('open');
   const platforms = useMemo(() => [...new Set(dataset.orders.map((o) => o.platform))], [dataset]);
 
-  if (!planning) return <NotEnoughData lang={lang} reason={vi ? 'Action Center chỉ có trong Analyst workspace.' : 'Action Center is in the Analyst workspace.'} />;
+  if (!planning) return <NotEnoughData lang={lang} reason={vi ? 'Việc cần làm chỉ có trong chế độ Phân tích.' : 'Action Center is in the Analyst workspace.'} />;
   const list = planning.actions.filter((a) => (filter === 'all' ? true : filter === 'open' ? a.status === 'todo' || a.status === 'doing' : a.status === filter));
   const overdue = planning.actions.filter((a) => isOverdue(a, asOf)).length;
 
@@ -157,10 +157,10 @@ export const ActionCenterView: React.FC = () => {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Action Center"
+        title={vi ? 'Việc cần làm' : 'Action Center'}
         description={vi ? 'Nhận định → bằng chứng → hành động → người phụ trách → hạn → trạng thái → đo kết quả.' : 'Insight → evidence → action → owner → deadline → status → result.'}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
-        notes={[vi ? 'Mẹo: bấm "Thêm vào Action Center" ở các cảnh báo để tạo hành động kèm bằng chứng.' : 'Tip: use "Add to Action Center" on alerts to carry the evidence.']}
+        notes={[vi ? 'Mẹo: bấm "Thêm vào Việc cần làm" ở các cảnh báo để tạo việc kèm bằng chứng.' : 'Tip: use "Add to Action Center" on alerts to carry the evidence.']}
         tools={
           <GhostButton onClick={() => downloadIcs(null, planning.actions, 'EcomPulse_han_hanh_dong')} disabled={!planning.actions.some((a) => a.deadline)}>
             <CalendarPlus className="w-4 h-4" aria-hidden /> {vi ? 'Xuất hạn (.ics)' : 'Deadlines (.ics)'}

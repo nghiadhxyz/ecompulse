@@ -21,7 +21,7 @@ export const Product360Panel: React.FC<{ sku: string; insight?: ProductInsight }
   return (
     <Section
       title={`${p.name}`}
-      subtitle={[sku, p.category, p.subcategory].filter(Boolean).join(' · ')}
+      subtitle={[sku, p.category, p.subcategory].filter(Boolean).join(', ')}
       right={<EvidenceButton lang={lang} onClick={() => openEvidence({ title: `${p.name} (${sku})`, filter: { range: baseFilter.range, platforms: baseFilter.platforms, skus: [sku] } })} />}
     >
       {insight && (
@@ -81,7 +81,7 @@ export const Product360Panel: React.FC<{ sku: string; insight?: ProductInsight }
                 <div key={a.key} className="flex flex-wrap justify-between gap-2">
                   <span className="font-medium text-fg">{a.name}</span>
                   <span className="tabular">
-                    {vi ? 'Chi phí' : 'Spend'} {fmtMoneyCompact(a.spend, lang)} · ROAS {fmtMultiple(a.roas, lang)} · {vi ? 'hòa vốn' : 'break-even'} {fmtMultiple(a.breakEvenRoas, lang)} ·{' '}
+                    {vi ? 'Chi phí' : 'Spend'} {fmtMoneyCompact(a.spend, lang)}, ROAS {fmtMultiple(a.roas, lang)}, {vi ? 'hòa vốn' : 'break-even'} {fmtMultiple(a.breakEvenRoas, lang)} ·{' '}
                     <span className={`font-medium ${(a.estimatedProfitAfterAds ?? 0) < 0 ? 'text-down' : 'text-up'}`}>
                       {vi ? 'lời sau Ads' : 'profit after ads'} {fmtMoneyCompact(a.estimatedProfitAfterAds, lang)}
                     </span>
