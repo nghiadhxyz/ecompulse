@@ -177,6 +177,52 @@ export interface AffiliatePerformance {
   buyers?: number;
 }
 
+export type KeywordMatchType = 'broad' | 'exact' | 'phrase' | 'other';
+
+/**
+ * Search-ad keyword performance (Shopee "Từ khóa" export, TikTok search terms).
+ * One row per keyword of one ad, for a day or — with periodStart — for a whole period.
+ * The report's own rates (CTR, ROAS…) are not stored; engines recompute them.
+ */
+export interface KeywordPerformance {
+  date: string;
+  periodStart?: string;
+  platform: Platform;
+  keyword: string;
+  matchType?: KeywordMatchType;
+  /** Ad / campaign the keyword belongs to. */
+  adName?: string;
+  productId?: string;
+  sku?: string;
+  /** Max bid per click (VND). */
+  bid?: number;
+  /** Average ad position (1 = top). */
+  avgPosition?: number;
+  impressions?: number;
+  clicks?: number;
+  orders?: number;
+  units?: number;
+  /** GMV the ad platform attributes to the keyword. */
+  gmv?: number;
+  spend?: number;
+}
+
+/**
+ * Keyword planner snapshot (Shopee "Gợi ý từ khóa"): search demand and the suggested bid,
+ * including keywords the shop does not bid on yet. Not tied to the analysed range.
+ */
+export interface KeywordSuggestion {
+  platform: Platform;
+  keyword: string;
+  /** Searches in the latest window (usually 30 days). */
+  searchVolume?: number;
+  /** Searches in the window before, for the trend. */
+  previousSearchVolume?: number;
+  suggestedBid?: number;
+  /** True when the shop already bids on the keyword. */
+  running?: boolean;
+}
+
 /** Daily traffic facts, optionally per SKU. Enables CVR and funnel. */
 export interface TrafficDaily {
   /** Day of the row, or the last day of a period total (see periodStart). */
@@ -402,6 +448,10 @@ export interface CanonicalDataset {
   liveSessions: LiveSession[];
   affiliates: AffiliatePerformance[];
   traffic: TrafficDaily[];
+  /** Search-ad keyword rows (optional). */
+  keywords?: KeywordPerformance[];
+  /** Keyword planner snapshot (optional). */
+  keywordSuggestions?: KeywordSuggestion[];
   dailyMetrics: DailyMetric[];
   costs: Cost[];
   settlements: Settlement[];

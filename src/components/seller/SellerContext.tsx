@@ -17,6 +17,7 @@ export type AnalystView =
   | 'funnel'
   | 'campaign'
   | 'ads'
+  | 'keywords'
   | 'live'
   | 'video'
   | 'rootCause'

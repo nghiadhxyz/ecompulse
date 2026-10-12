@@ -95,8 +95,8 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
               <p className="mt-2 text-sm font-semibold text-fg">{vi ? 'Kéo thả file vào đây hoặc chọn file' : 'Drop files here or choose files'}</p>
               <p className="mx-auto mt-1 max-w-lg text-small text-muted">
                 {vi
-                  ? 'Hỗ trợ (Shopee, TikTok Shop, Lazada · .xlsx/.csv): file xuất đơn hàng · báo cáo Quảng cáo · Livestream · Hiệu quả sản phẩm (traffic) · Affiliate/Video · Phân tích bán hàng Shopee · danh mục sản phẩm (SKU + Ngành hàng / Nhóm hàng / Giá vốn). Có thể chọn nhiều file cùng lúc.'
-                  : 'Supported (Shopee, TikTok Shop, Lazada · .xlsx/.csv): orders, ads, live, product traffic, affiliate/video, Shopee sales analysis, product catalog (SKU + category / niche / COGS). Multiple files allowed.'}
+                  ? 'Hỗ trợ (Shopee, TikTok Shop, Lazada · .xlsx/.csv): file xuất đơn hàng · báo cáo Quảng cáo · báo cáo Từ khóa quảng cáo · Livestream · Hiệu quả sản phẩm (traffic) · Affiliate/Video · Phân tích bán hàng Shopee · danh mục sản phẩm (SKU + Ngành hàng / Nhóm hàng / Giá vốn). Có thể chọn nhiều file cùng lúc.'
+                  : 'Supported (Shopee, TikTok Shop, Lazada · .xlsx/.csv): orders, ads, ad keywords, live, product traffic, affiliate/video, Shopee sales analysis, product catalog (SKU + category / niche / COGS). Multiple files allowed.'}
               </p>
               <PrimaryButton className="mt-4" onClick={() => inputRef.current?.click()}>
                 <FileSpreadsheet className="h-4 w-4" aria-hidden /> {vi ? 'Chọn file' : 'Choose files'}

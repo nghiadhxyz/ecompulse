@@ -67,6 +67,13 @@ export function mergeIntoWorkspace(base: CanonicalDataset | null, incoming: Cano
   ws.liveSessions = mergeKeyed(ws.liveSessions, incoming.liveSessions, (s) => `${s.platform}|${s.sessionId}`);
   ws.affiliates = mergeKeyed(ws.affiliates, incoming.affiliates, (a) => `${a.periodStart ?? ''}|${a.date ?? ''}|${a.platform}|${a.creatorId}|${a.contentId ?? ''}`);
   ws.traffic = mergeKeyed(ws.traffic, incoming.traffic, (t) => `${t.periodStart ?? ''}|${t.date}|${t.platform}|${t.sku ?? ''}`);
+  if (ws.keywords?.length || incoming.keywords?.length) {
+    ws.keywords = mergeKeyed(ws.keywords ?? [], incoming.keywords ?? [], (k) => `${k.periodStart ?? ''}|${k.date}|${k.platform}|${k.adName ?? ''}|${k.sku ?? ''}|${k.keyword}|${k.matchType ?? ''}`);
+  }
+  if (ws.keywordSuggestions?.length || incoming.keywordSuggestions?.length) {
+    // A planner export is a snapshot: the newer file replaces the keywords it lists.
+    ws.keywordSuggestions = mergeKeyed(ws.keywordSuggestions ?? [], incoming.keywordSuggestions ?? [], (k) => `${k.platform}|${k.keyword}`);
+  }
   ws.salesSummaries = mergeKeyed(ws.salesSummaries ?? [], incoming.salesSummaries ?? [], (r) => `${r.platform}|${r.periodStart ?? ''}|${r.date}|${r.stage}|${r.dimension}|${r.channel}|${r.key}`);
   ws.dailyMetrics = mergeKeyed(ws.dailyMetrics, incoming.dailyMetrics, (d) => `${d.date}|${d.platform}`);
   if (ws.reportedFigures?.length || incoming.reportedFigures?.length) {

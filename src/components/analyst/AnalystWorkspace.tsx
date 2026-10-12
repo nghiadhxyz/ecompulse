@@ -19,6 +19,7 @@ import {
   PanelLeftOpen,
   PlayCircle,
   Radio,
+  Search,
   Settings2,
   ShieldCheck,
   Sigma,
@@ -63,6 +64,7 @@ import { TrafficFunnel } from './views/TrafficFunnel';
 import { DataMapping } from './views/DataMapping';
 import { CampaignCalendar } from './views/CampaignCalendar';
 import { AdsIntelligenceView } from './views/AdsIntelligenceView';
+import { KeywordExplorerView } from './views/KeywordExplorerView';
 import { LiveAuditor } from './views/LiveAuditor';
 import { VideoAffiliateView } from './views/VideoAffiliateView';
 import { RootCauseView } from './views/RootCauseView';
@@ -129,6 +131,7 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
       { key: 'funnel', vi: 'Traffic & Funnel', en: 'Traffic & Funnel', icon: Workflow, descVi: 'Doanh thu theo kênh, nguồn truy cập và phễu' },
       { key: 'campaign', vi: 'Campaign & Calendar', en: 'Campaign & Calendar', icon: CalendarRange, descVi: 'Ngày sale, ngày thường và so sánh chiến dịch' },
       { key: 'ads', vi: 'Ads Intelligence', en: 'Ads Intelligence', icon: Megaphone, descVi: 'Chi phí, doanh thu quy đổi và ROAS' },
+      { key: 'keywords', vi: 'Keyword Explorer', en: 'Keyword Explorer', icon: Search, descVi: 'Từ khóa nào hiệu quả, từ khóa nào lãng phí và cơ hội từ khóa mới' },
       { key: 'live', vi: 'Livestream', en: 'Livestream', icon: Radio, descVi: 'Phiên live, người xem và phễu live' },
       { key: 'video', vi: 'Video & Affiliate', en: 'Video & Affiliate', icon: Video, descVi: 'Video của shop và KOC' },
     ],
@@ -164,7 +167,7 @@ const DATA_ITEMS: NavItem[] = [
 ];
 const ALL_ITEMS = [...GROUPS.flatMap((g) => g.items), ...DATA_ITEMS];
 
-const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'live', 'video', 'rootCause', 'anomaly', 'changeImpact', 'planning', 'actions', 'reports', 'customers', 'whatIf', 'stats', 'mapping', 'dataQuality'];
+const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'keywords', 'live', 'video', 'rootCause', 'anomaly', 'changeImpact', 'planning', 'actions', 'reports', 'customers', 'whatIf', 'stats', 'mapping', 'dataQuality'];
 
 export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted, onOpenClassic }) => {
   const vi = lang === 'vi';
@@ -331,6 +334,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
             {view === 'funnel' && <TrafficFunnel />}
             {view === 'campaign' && <CampaignCalendar />}
             {view === 'ads' && <AdsIntelligenceView />}
+            {view === 'keywords' && <KeywordExplorerView />}
             {view === 'live' && <LiveAuditor />}
             {view === 'video' && <VideoAffiliateView />}
             {view === 'rootCause' && <RootCauseView />}

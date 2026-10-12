@@ -26,10 +26,11 @@ import type { Bilingual } from '../metric';
 import type { DateRange } from '../period';
 import type { SheetInput, WorkbookInput } from './orderExport';
 
-export type ReportKind = 'ads' | 'live' | 'traffic' | 'affiliate' | 'catalog';
+export type ReportKind = 'ads' | 'keywords' | 'live' | 'traffic' | 'affiliate' | 'catalog';
 
 export const REPORT_KIND_LABELS: Record<ReportKind, Bilingual> = {
   ads: { vi: 'Báo cáo quảng cáo', en: 'Ads report' },
+  keywords: { vi: 'Báo cáo từ khóa quảng cáo', en: 'Ad keyword report' },
   live: { vi: 'Báo cáo livestream', en: 'Live report' },
   traffic: { vi: 'Báo cáo traffic sản phẩm', en: 'Product traffic report' },
   affiliate: { vi: 'Báo cáo affiliate / video', en: 'Affiliate / video report' },
