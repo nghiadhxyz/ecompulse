@@ -1,5 +1,5 @@
-import React from 'react';
-import { CalendarDays } from 'lucide-react';
+import React, { useState } from 'react';
+import { CalendarDays, ChevronDown } from 'lucide-react';
 import { OrderStagePicker } from '../workspace/OrderStagePicker';
 import { Tabs } from '../ui/primitives';
 import type { SummaryStage } from '../../analytics';
@@ -35,9 +35,21 @@ export const FilterBar: React.FC<FilterBarProps> = ({ lang, preset, onPreset, cu
   const vi = lang === 'vi';
   const platformOptions: (Platform | 'all')[] = ['all', 'shopee', 'tiktok', 'lazada'];
   const field = 'min-h-10 rounded-control border border-line bg-surface px-2.5 text-sm text-fg';
+  // Phones: one summary line; the controls open below it.
+  const [open, setOpen] = useState(false);
+  const presetLabel = PRESETS.find((p) => p.key === preset);
   return (
-    <div className="sticky top-16 z-20 rounded-card border border-line bg-surface px-3 py-2 shadow-card">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <div className="sticky top-16 z-20 rounded-card border border-line bg-surface px-3 py-2">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-11 w-full items-center gap-2 text-left text-sm lg:hidden">
+        <CalendarDays className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">
+          <b className="font-semibold text-fg">{presetLabel ? (vi ? presetLabel.vi : presetLabel.en) : formatRangeVi(range)}</b>
+          <span className="text-muted">{vi ? `, so với ${formatRangeVi(previousRange)}` : `, vs ${formatRangeVi(previousRange)}`}</span>
+        </span>
+        <span className="shrink-0 font-semibold text-primary">{open ? (vi ? 'Đóng' : 'Close') : vi ? 'Đổi bộ lọc' : 'Filters'}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+      </button>
+      <div className={`${open ? 'flex' : 'hidden'} flex-wrap items-center gap-x-3 gap-y-2 pt-2 lg:flex lg:pt-0`}>
         <div className="flex items-center gap-1">
           <CalendarDays className="h-4 w-4 text-muted" aria-hidden />
           <Tabs
@@ -67,7 +79,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ lang, preset, onPreset, cu
           />
         </div>
         {stage && onStage && <OrderStagePicker stage={stage} onChange={onStage} lang={lang} />}
-        <span className="ml-auto text-small text-muted tabular">
+        <span className="ml-auto hidden text-small text-muted tabular lg:inline">
           <b className="font-semibold text-fg">{formatRangeVi(range)}</b> {vi ? 'so với' : 'vs'} <b className="font-semibold text-fg">{formatRangeVi(previousRange)}</b>
         </span>
       </div>

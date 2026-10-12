@@ -1,12 +1,9 @@
 import React, { useMemo } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
-  addDays,
   breakdown,
-  buildDailyBrief,
   compareRanges,
   dailySeries,
-  fmtDay,
   fmtMoney,
   fmtMoneyCompact,
   formatRangeVi,
@@ -15,7 +12,7 @@ import {
 } from '../../../analytics';
 import { useWorkspace } from '../../seller/SellerContext';
 import { NotEnoughData, tr } from '../../seller/ui';
-import { Button } from '../../ui/primitives';
+import { BriefLead } from '../../workspace/BriefLead';
 import { CardGrid, SectionCard } from '../../ui/primitives';
 import { AlertStack, FigureStrip, MetricLedger, type KpiItem, type StackItem } from '../../ui/data';
 import { axisProps, CHART, gridProps, legendProps, tooltipProps, xAxisProps } from '../../../theme/chart';
@@ -49,9 +46,6 @@ export const ExecutiveOverview: React.FC = () => {
   const prev = useMemo(() => dailySeries(dataset, { ...baseFilter, range: previousRange }), [dataset, baseFilter, previousRange]);
   const byPlatform = useMemo(() => breakdown(dataset, baseFilter, 'platform', previousRange, lang), [dataset, baseFilter, previousRange, lang]);
   const gmvBasis = cmp.current.metrics.gmv.basis;
-  // The Dolphin brief as the Alerts page opens it (the day before the latest date) — reused, not rewritten.
-  const briefDay = addDays(asOf, -1);
-  const brief = useMemo(() => buildDailyBrief(dataset, briefDay, platforms), [dataset, briefDay, platforms]);
   const byCategory = useMemo(() => breakdown(dataset, baseFilter, 'category', previousRange, lang), [dataset, baseFilter, previousRange, lang]);
 
   // No data in the comparison period: no Δ anywhere, and say so instead of "chưa đủ mẫu".
@@ -87,18 +81,7 @@ export const ExecutiveOverview: React.FC = () => {
     <div className="space-y-8">
       <AlertStack items={alerts} lang={lang} label={(n) => (vi ? `${n} lưu ý về kỳ so sánh` : `${n} notes on the comparison`)} />
 
-      {brief.summary[lang] && (
-        <section aria-labelledby="brief-title" className="max-w-[72ch]">
-          <h2 id="brief-title" className="text-small text-muted">
-            {vi ? `Bản tin Dolphin ngày ${fmtDay(briefDay)}` : `Dolphin brief, ${fmtDay(briefDay)}`}
-          </h2>
-          <p className="mt-1 text-lead text-fg">{brief.summary[lang]}</p>
-          {brief.limitations.length > 0 && <p className="mt-1 text-small text-muted">{brief.limitations.map((l) => l[lang]).join(' ')}</p>}
-          <Button variant="ghost" className="-ml-3 mt-1" onClick={() => goTo('alerts')}>
-            {vi ? 'Xem bản tin và cảnh báo' : 'Open the brief and alerts'}
-          </Button>
-        </section>
-      )}
+      <BriefLead dataset={dataset} asOf={asOf} platforms={platforms} lang={lang} onOpen={() => goTo('alerts')} />
 
       <section aria-label={vi ? 'Chỉ số chính của kỳ' : 'Headline figures'} className="space-y-6">
         <FigureStrip items={primary} lang={lang} compareLabel={compareLabel} accentFirst />

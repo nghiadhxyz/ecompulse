@@ -105,6 +105,8 @@ export interface KpiItem {
   definition?: string;
   /** What to do when the metric is missing (chip link). */
   missingAction?: { label: string; onClick: () => void };
+  /** Short detail under the name in the ledger ("Tỷ lệ hủy 19,7%"). */
+  sub?: string;
 }
 
 /**
@@ -282,6 +284,7 @@ export const MetricLedger: React.FC<{ items: KpiItem[]; lang: Lang; title?: stri
           <div key={i.key} className="flex min-h-12 items-center justify-between gap-3 border-b border-line py-2">
             <dt className="min-w-0">
               <MetricLabel item={i} lang={lang} />
+              {i.sub && <div className="text-small text-muted">{i.sub}</div>}
             </dt>
             <dd className="flex shrink-0 items-center gap-2">
               <span className="font-figure text-xl font-semibold tabular text-fg font-stretch-85%">{fmtByUnit(i.metric.value, i.metric.unit, lang, true)}</span>

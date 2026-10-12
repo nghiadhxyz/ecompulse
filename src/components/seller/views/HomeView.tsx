@@ -18,11 +18,12 @@ import {
   type ProfitResult,
 } from '../../../analytics';
 import { useSeller } from '../SellerContext';
-import { EvidenceButton, GhostButton, HelpTip, KpiCard, NotEnoughData, Section, SeverityBadge, SourceBadge, tr } from '../ui';
+import { EvidenceButton, GhostButton, NotEnoughData, Section, SeverityBadge, SourceBadge, tr } from '../ui';
+import { BriefLead } from '../../workspace/BriefLead';
 import { SummaryChannelsPanel } from '../../workspace/SummaryPanels';
 import { ChartTotalNote } from '../../workspace/MismatchBox';
 import { SubsidyPanel } from '../../workspace/SummaryInsightPanels';
-import { AlertStack } from '../../ui/data';
+import { AlertStack, FigureStrip, MetricLedger, type KpiItem } from '../../ui/data';
 import { CHART, axisProps, gridProps, tooltipProps } from '../../../theme/chart';
 
 
@@ -52,8 +53,37 @@ export const HomeView: React.FC = () => {
   const returnsCmp = sumComparison(c.returnedOrders, c.refundedOrders);
   const topAlerts = alerts.filter((a) => a.severity !== 'info').slice(0, 3);
 
+  // Same figures as before, now as the headline strip (4) and the ledger (the rest).
+  const primary: KpiItem[] = [
+    { key: 'gmv', label: vi ? 'Doanh thu' : 'Revenue', metric: k.gmv, cmp: c.gmv },
+    { key: 'netRevenue', label: vi ? 'Doanh thu thực nhận' : 'Net revenue', metric: k.netRevenue, cmp: c.netRevenue, definition: vi ? 'Doanh thu − doanh số hủy − tiền hoàn cho khách' : 'Revenue − cancelled sales − refunds' },
+    { key: 'profit', label: vi ? 'Lợi nhuận ước tính' : 'Est. profit', metric: k.profit, cmp: c.profit, missingAction: { label: vi ? 'Nhập giá vốn' : 'Enter COGS', onClick: () => goTo('settings') } },
+    { key: 'orders', label: vi ? 'Đơn hàng' : 'Orders', metric: k.orders, cmp: c.orders },
+  ];
+  const secondary: KpiItem[] = [
+    { key: 'margin', label: vi ? 'Biên lợi nhuận' : 'Margin', metric: k.margin, cmp: c.margin },
+    { key: 'units', label: vi ? 'Sản phẩm bán ra' : 'Units sold', metric: k.units, cmp: c.units },
+    { key: 'aov', label: vi ? 'Giá trị trung bình mỗi đơn' : 'AOV', metric: k.aov, cmp: c.aov },
+    {
+      key: 'cancelled',
+      label: vi ? 'Đơn hủy' : 'Cancelled',
+      metric: k.cancelledOrders,
+      cmp: c.cancelRate,
+      goodWhenUp: false,
+      sub: k.cancelRate.value !== null ? `${vi ? 'Tỷ lệ hủy' : 'Rate'} ${fmtRate(k.cancelRate.value, lang)}` : undefined,
+    },
+    {
+      key: 'returns',
+      label: vi ? 'Đơn hoàn/trả' : 'Returns',
+      metric: returns,
+      cmp: returnsCmp,
+      goodWhenUp: false,
+      sub: k.refundRate.value !== null ? `${vi ? 'Tỷ lệ hoàn/trả' : 'Rate'} ${fmtRate(k.refundRate.value, lang)}` : undefined,
+    },
+  ];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <AlertStack
         lang={lang}
         items={
@@ -63,46 +93,18 @@ export const HomeView: React.FC = () => {
                   id: 'cmp',
                   tone: cmp.previous.coverage === 'none' ? 'info' : 'warn',
                   title: vi ? (cmp.previous.coverage === 'none' ? 'Không có kỳ so sánh' : 'Kỳ so sánh chỉ có một phần dữ liệu') : 'Comparison period not fully covered',
-                  detail: vi ? `${formatRangeVi(previousRange)} — một số chỉ số không so sánh được.` : formatRangeVi(previousRange),
+                  detail: vi ? `${formatRangeVi(previousRange)}: một số chỉ số không so sánh được.` : formatRangeVi(previousRange),
                 },
               ]
             : []
         }
       />
-      <div className="grid grid-cols-2 gap-4 min-[900px]:grid-cols-3 min-[1200px]:grid-cols-4 min-[1440px]:grid-cols-5">
-        <KpiCard lang={lang} label={vi ? 'Doanh thu' : 'Revenue'} metric={k.gmv} cmp={c.gmv} compareLabel={compareLabel} emphasis />
-        <KpiCard
-          lang={lang}
-          label={vi ? 'Doanh thu thực nhận' : 'Net revenue'}
-          metric={k.netRevenue}
-          cmp={c.netRevenue}
-          compareLabel={compareLabel}
-          definition={vi ? 'Doanh thu − doanh số hủy − tiền hoàn cho khách' : 'Revenue − cancelled sales − refunds'}
-        />
-        <KpiCard lang={lang} label={vi ? 'Lợi nhuận ước tính' : 'Est. profit'} metric={k.profit} cmp={c.profit} compareLabel={compareLabel} emphasis />
-        <KpiCard lang={lang} label={vi ? 'Biên lợi nhuận' : 'Margin'} metric={k.margin} cmp={c.margin} compareLabel={compareLabel} />
-        <KpiCard lang={lang} label={vi ? 'Đơn hàng' : 'Orders'} metric={k.orders} cmp={c.orders} compareLabel={compareLabel} />
-        <KpiCard lang={lang} label={vi ? 'Sản phẩm bán ra' : 'Units sold'} metric={k.units} cmp={c.units} compareLabel={compareLabel} />
-        <KpiCard lang={lang} label={vi ? 'Giá trị TB/đơn (AOV)' : 'AOV'} metric={k.aov} cmp={c.aov} compareLabel={compareLabel} />
-        <KpiCard
-          lang={lang}
-          label={vi ? 'Đơn hủy' : 'Cancelled'}
-          metric={k.cancelledOrders}
-          cmp={c.cancelRate}
-          goodWhenUp={false}
-          compareLabel={compareLabel}
-          sub={k.cancelRate.value !== null ? `${vi ? 'Tỷ lệ hủy' : 'Rate'} ${fmtRate(k.cancelRate.value, lang)}` : undefined}
-        />
-        <KpiCard
-          lang={lang}
-          label={vi ? 'Đơn hoàn/trả' : 'Returns'}
-          metric={returns}
-          cmp={returnsCmp}
-          goodWhenUp={false}
-          compareLabel={compareLabel}
-          sub={k.refundRate.value !== null ? `${vi ? 'Tỷ lệ' : 'Rate'} ${fmtRate(k.refundRate.value, lang)}` : undefined}
-        />
-      </div>
+      <BriefLead dataset={dataset} asOf={asOf} platforms={platforms} lang={lang} onOpen={() => goTo('dolphin')} />
+
+      <section aria-label={vi ? 'Chỉ số chính của kỳ' : 'Headline figures'} className="space-y-6">
+        <FigureStrip items={primary} lang={lang} compareLabel={compareLabel} accentFirst />
+        <MetricLedger items={secondary} lang={lang} title={vi ? 'Chỉ số khác' : 'Other metrics'} />
+      </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
         <div className="xl:col-span-3">
@@ -198,7 +200,7 @@ const ProfitSection: React.FC<{ profit: ProfitResult | null }> = ({ profit }) =>
   return (
     <Section
       title={title}
-      subtitle={vi ? 'Doanh thu trừ đi mọi chi phí đã biết — xem nguồn của từng khoản' : 'Revenue minus every known cost — with the source of each line'}
+      subtitle={vi ? 'Doanh thu trừ đi mọi chi phí đã biết, kèm nguồn của từng khoản' : 'Revenue minus every known cost — with the source of each line'}
       right={<EvidenceButton lang={lang} onClick={() => openEvidence({ title, filter: { range, platforms } })} />}
     >
       {profit.warnings.length > 0 && (

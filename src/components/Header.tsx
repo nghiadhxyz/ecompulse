@@ -225,9 +225,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   onClick={onOpenWorkspaceMode}
                   className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold whitespace-nowrap shrink-0 transition-all ${
-                    workspaceMode === 'seller'
-                      ? 'bg-down-soft border-down/30 text-down hover:bg-down-soft'
-                      : 'bg-primary-soft border-primary/30 text-primary hover:bg-primary-soft'
+                    lean
+                      ? 'bg-surface border-line text-fg hover:bg-hover'
+                      : workspaceMode === 'seller'
+                        ? 'bg-down-soft border-down/30 text-down hover:bg-down-soft'
+                        : 'bg-primary-soft border-primary/30 text-primary hover:bg-primary-soft'
                   }`}
                   title={language === 'vi' ? 'Đổi chế độ làm việc' : 'Switch workspace mode'}
                 >
