@@ -134,7 +134,7 @@ footer; `span={12|8|6|4}` inside a `CardGrid`), `PageTitle`, `CardGrid`, `EmptyS
   planning, data quality): label (up to 2 lines, fixed height so figures align) → figure at
   `text-kpi` → optional `sub`; tone `up` / `down` / `warn`. 2 columns on phones, 3 from `sm`, 4–7
   from `lg` by count. Replaces every hand-made row of KPI boxes.
-- `KpiCard` / `KpiGrid` — kept for compatibility; no workspace page uses them any more.
+- `KpiCard` / `KpiGrid` — kept for compatibility; only the product profile panel (`Product360Panel`) still uses `KpiCard`.
 - `DeltaBadge`, `DataFlag`, `AlertStack`, `DataTable` + `TABLE` + `Th`, `ShareBar`, `FunnelBars` —
   as in v1.
 
