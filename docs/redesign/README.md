@@ -130,7 +130,11 @@ footer; `span={12|8|6|4}` inside a `CardGrid`), `PageTitle`, `CardGrid`, `EmptyS
 - **`MetricLedger`** (v2) — the remaining metrics as rows (name left; figure and change right),
   2 columns from `md`; an optional `sub` line under the name ("Tỷ lệ hủy 19,7%"); no comparison
   shows "—" with the reason in the tooltip.
-- `KpiCard` / `KpiGrid` — still used by pages not yet converted.
+- **`StatStrip`** (v2) — page figures that arrive already formatted (ads, live, keywords, customers,
+  planning, data quality): label (up to 2 lines, fixed height so figures align) → figure at
+  `text-kpi` → optional `sub`; tone `up` / `down` / `warn`. 2 columns on phones, 3 from `sm`, 4–7
+  from `lg` by count. Replaces every hand-made row of KPI boxes.
+- `KpiCard` / `KpiGrid` — kept for compatibility; no workspace page uses them any more.
 - `DeltaBadge`, `DataFlag`, `AlertStack`, `DataTable` + `TABLE` + `Th`, `ShareBar`, `FunnelBars` —
   as in v1.
 
