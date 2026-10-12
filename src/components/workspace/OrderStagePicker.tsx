@@ -28,6 +28,6 @@ export const OrderStagePicker: React.FC<{ stage: SummaryStage; onChange: (s: Sum
 export const PlacedOnlyNote: React.FC<{ lang: Lang; show: boolean }> = ({ lang, show }) =>
   show ? (
     <p className="inline-flex rounded-control bg-info-soft px-2.5 py-1 text-small text-info">
-      {STAGE_BASIS.placed[lang]} · {PLACED_ONLY_NOTE[lang]}
+      {STAGE_BASIS.placed[lang]}, {PLACED_ONLY_NOTE[lang]}
     </p>
   ) : null;

@@ -118,7 +118,7 @@ export const ChangeImpactView: React.FC = () => {
                       <td className={TABLE.td}>{tr(lang, CHANGE_TYPE_LABELS[e.type])}</td>
                       <td className={TABLE.td}>
                         {e.sku ? dataset.products.find((p) => p.sku === e.sku)?.name ?? e.sku : vi ? 'Toàn shop' : 'Whole shop'}
-                        {e.platform ? ` · ${PLATFORM_LABELS[e.platform]}` : ''}
+                        {e.platform ? `, ${PLATFORM_LABELS[e.platform]}` : ''}
                       </td>
                       <td className="min-w-[220px] px-3 py-1.5">{e.description}</td>
                       <td className={`${TABLE.td} text-muted`}>{e.userAdded ? (vi ? 'Bạn thêm' : 'You') : vi ? 'Từ dữ liệu' : 'From data'}</td>
@@ -149,7 +149,7 @@ export const ChangeImpactView: React.FC = () => {
       {event && impact && (
         <SectionCard
           title={vi ? `Trước / sau: ${event.description}` : `Before / after: ${event.description}`}
-          description={`${tr(lang, impact.scopeLabel)} · ${vi ? 'áp dụng' : 'from'} ${fmtDay(event.date)}/${event.date.slice(0, 4)}`}
+          description={`${tr(lang, impact.scopeLabel)}, ${vi ? 'áp dụng' : 'from'} ${fmtDay(event.date)}/${event.date.slice(0, 4)}`}
           tools={
             w && (
               <Tabs<string>
@@ -204,9 +204,9 @@ export const ChangeImpactView: React.FC = () => {
                 </table>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-small text-muted">
-                <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: vi ? `Trước thay đổi · ${formatRangeVi(w.before)}` : 'Before', filter: { range: w.before, ...eventScope(event) } })} />
+                <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: vi ? `Trước thay đổi, ${formatRangeVi(w.before)}` : 'Before', filter: { range: w.before, ...eventScope(event) } })} />
                 <span>{vi ? 'trước' : 'before'}</span>
-                <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: vi ? `Sau thay đổi · ${formatRangeVi(w.after)}` : 'After', filter: { range: w.after, ...eventScope(event) } })} />
+                <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: vi ? `Sau thay đổi, ${formatRangeVi(w.after)}` : 'After', filter: { range: w.after, ...eventScope(event) } })} />
                 <span>{vi ? 'sau' : 'after'}</span>
               </div>
             </>

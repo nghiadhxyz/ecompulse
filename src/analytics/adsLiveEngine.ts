@@ -10,7 +10,7 @@
  * session on the same platform.
  */
 import type { AdPerformance, CanonicalDataset, LiveSession, Platform } from './model';
-import { sliceDataset, type DatasetFilter } from './filters';
+import { sliceDataset, type DatasetFilter, type DatasetSlice } from './filters';
 import { computeProfit, computeProfitByGroup } from './profitEngine';
 import { adCvr, breakEvenRoas, cpa, cpc, ctr, estimatedMarginBeforeAds, profitAfterAds, roas } from './adsFormulas';
 import { safeDivide } from './metric';
@@ -56,15 +56,20 @@ function sumOrNull(rows: AdPerformance[], pick: (a: AdPerformance) => number | u
   return rows.some((r) => typeof pick(r) === 'number') ? rows.reduce((s, r) => s + (pick(r) || 0), 0) : null;
 }
 
-export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): AdsSummary {
-  const slice = sliceDataset(dataset, filter);
-  const empty = {
-    spend: 0, attributedRevenue: null, orders: null, roas: null, paidRevenue: null, paidRoas: null, impressions: null, clicks: null, ctr: null, cpc: null, cvr: null, cpa: null,
-    marginBeforeAds: null, breakEvenRoas: null, estimatedProfitAfterAds: null, marginIsPartial: false, marginIsEstimate: false,
-  };
-  if (dataset.ads.length === 0) return { available: false, rows: [], totals: empty };
+export interface AdMargin {
+  /** Margin before ads; null when it cannot be computed or estimated. */
+  margin: number | null;
+  /** From the shop-wide estimates in Settings, not from COGS. */
+  isEstimate: boolean;
+  /** Some costs are missing from the margin. */
+  partial: boolean;
+}
 
-  // Margin before ads per SKU and for the shop, from the profit engine.
+/**
+ * Margin before ads for an advertised SKU (or the shop when no SKU), from the profit engine;
+ * falls back to the Settings estimate when COGS are unknown. Shared by Ads and keywords.
+ */
+export function adMarginResolver(dataset: CanonicalDataset, slice: DatasetSlice): (sku?: string) => AdMargin {
   const bySku = computeProfitByGroup(slice, (_o, l) => l.sku, { adsFor: () => [] });
   const skuMargin = (sku: string): number | null => {
     const p = bySku.get(sku);
@@ -77,6 +82,25 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
   const shopPartial = shop.warnings.some((w) => !w.vi.includes('quảng cáo') && !w.vi.includes('Ads'));
   // No COGS (summary report): fall back to the gross margin and fees entered in Settings.
   const estimate = estimatedMarginBeforeAds(dataset.costSettings);
+  return (sku) => {
+    const costMargin = sku ? skuMargin(sku) : shopMargin;
+    const isEstimate = costMargin === null && estimate !== null;
+    const margin = isEstimate ? estimate : costMargin;
+    return { margin, isEstimate, partial: !isEstimate && margin !== null && (sku ? skuPartial(sku) : shopPartial) };
+  };
+}
+
+export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): AdsSummary {
+  const slice = sliceDataset(dataset, filter);
+  const empty = {
+    spend: 0, attributedRevenue: null, orders: null, roas: null, paidRevenue: null, paidRoas: null, impressions: null, clicks: null, ctr: null, cpc: null, cvr: null, cpa: null,
+    marginBeforeAds: null, breakEvenRoas: null, estimatedProfitAfterAds: null, marginIsPartial: false, marginIsEstimate: false,
+  };
+  if (dataset.ads.length === 0) return { available: false, rows: [], totals: empty };
+
+  // Margin before ads per SKU and for the shop, from the profit engine.
+  const marginOf = adMarginResolver(dataset, slice);
+  const shopM = marginOf();
 
   const groups = new Map<string, AdPerformance[]>();
   for (const a of slice.ads) {
@@ -94,9 +118,7 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
     const orders = sumOrNull(rows, (r) => r.orders);
     const impressions = sumOrNull(rows, (r) => r.impressions);
     const clicks = sumOrNull(rows, (r) => r.clicks);
-    const costMargin = sku ? skuMargin(sku) : shopMargin;
-    const isEstimate = costMargin === null && estimate !== null;
-    const margin = isEstimate ? estimate : costMargin;
+    const { margin, isEstimate, partial } = marginOf(sku);
     let profitNote: AdCampaignRow['profitNote'];
     if (revenue === null) profitNote = { vi: 'Báo cáo Ads không có doanh thu quy đổi.', en: 'The ads report has no attributed revenue.' };
     else if (margin === null) {
@@ -125,7 +147,7 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
       marginBeforeAds: margin,
       breakEvenRoas: breakEvenRoas(margin),
       estimatedProfitAfterAds: revenue !== null && spend !== null ? profitAfterAds(revenue, spend, margin) : null,
-      marginIsPartial: !isEstimate && margin !== null && (sku ? skuPartial(sku) : shopPartial),
+      marginIsPartial: partial,
       marginIsEstimate: isEstimate,
       profitNote,
     };
@@ -144,9 +166,9 @@ export function adsSummary(dataset: CanonicalDataset, filter: DatasetFilter): Ad
   const { key: _k, name: _n, platform: _p, sku: _s, profitNote: _pn, ...totals } = {
     ...total,
     estimatedProfitAfterAds: allKnown ? rows.reduce((s, r) => s + (r.estimatedProfitAfterAds || 0), 0) : null,
-    marginBeforeAds: shopMargin ?? estimate,
-    breakEvenRoas: breakEvenRoas(shopMargin ?? estimate),
-    marginIsEstimate: shopMargin === null && estimate !== null,
+    marginBeforeAds: shopM.margin,
+    breakEvenRoas: breakEvenRoas(shopM.margin),
+    marginIsEstimate: shopM.isEstimate,
   };
   return { available: true, rows, totals };
 }

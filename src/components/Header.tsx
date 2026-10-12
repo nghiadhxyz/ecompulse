@@ -142,6 +142,8 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  // Workspace (Seller / Analyst): plan, tour and security move into the account menu.
+  const lean = !!hideDataControls && !!currentUser;
   const isPaid = currentSub.planId !== 'experience';
   const isEnterprise = currentSub.planId === 'enterprise';
 
@@ -223,9 +225,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   onClick={onOpenWorkspaceMode}
                   className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold whitespace-nowrap shrink-0 transition-all ${
-                    workspaceMode === 'seller'
-                      ? 'bg-down-soft border-down/30 text-down hover:bg-down-soft'
-                      : 'bg-primary-soft border-primary/30 text-primary hover:bg-primary-soft'
+                    lean
+                      ? 'bg-surface border-line text-fg hover:bg-hover'
+                      : workspaceMode === 'seller'
+                        ? 'bg-down-soft border-down/30 text-down hover:bg-down-soft'
+                        : 'bg-primary-soft border-primary/30 text-primary hover:bg-primary-soft'
                   }`}
                   title={language === 'vi' ? 'Đổi chế độ làm việc' : 'Switch workspace mode'}
                 >
@@ -233,13 +237,13 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>
                     {workspaceMode === 'seller'
                       ? language === 'vi' ? 'Chủ shop' : 'Seller'
-                      : language === 'vi' ? 'Analyst' : 'Analyst'}
+                      : language === 'vi' ? 'Phân tích' : 'Analyst'}
                   </span>
                 </button>
               )}
 
               {/* Security Shield Compact Badge */}
-              <div className="hidden lg:flex items-center shrink-0">
+              <div className={`${lean ? 'hidden' : 'hidden lg:flex'} items-center shrink-0`}>
                 <SecurityStatusBadge
                   variant="compact"
                   onClick={() => setShowSecurityModal(true)}
@@ -251,7 +255,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 id="btn-pricing-plans"
                 onClick={handleOpenPricing}
-                className={`hidden md:inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border transition-all text-xs font-bold shadow-sm whitespace-nowrap shrink-0 group ${
+                className={`${lean ? 'hidden' : 'hidden md:inline-flex'} items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border transition-all text-xs font-bold shadow-sm whitespace-nowrap shrink-0 group ${
                   isEnterprise
                     ? 'bg-primary-soft border-primary/30 text-primary'
                     : isPaid
@@ -344,7 +348,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 id="btn-header-tour-guide"
                 onClick={() => setShowTourModal(true)}
-                className="hidden lg:inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-bold text-primary hover:text-fg bg-primary-soft hover:bg-hover border border-primary/30 rounded-xl transition-all shadow-sm whitespace-nowrap shrink-0 active:scale-95"
+                className={`${lean ? 'hidden' : 'hidden lg:inline-flex'} items-center space-x-1.5 px-2.5 py-1.5 text-xs font-bold text-primary hover:text-fg bg-primary-soft hover:bg-hover border border-primary/30 rounded-xl transition-all shadow-sm whitespace-nowrap shrink-0 active:scale-95`}
                 title="Mở Tour hướng dẫn sử dụng 1 phút"
               >
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
@@ -457,6 +461,17 @@ export const Header: React.FC<HeaderProps> = ({
                             <span>Trung Tâm Bảo Mật On-Premise</span>
                           </button>
 
+                          <button
+                            onClick={() => {
+                              setShowUserMenu(false);
+                              setShowTourModal(true);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-semibold text-primary hover:text-fg hover:bg-primary-soft rounded-xl transition-all flex items-center space-x-2"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-primary" />
+                            <span>{language === 'vi' ? 'Xem hướng dẫn 1 phút' : '1-minute tour'}</span>
+                          </button>
+
                           {onOpenWorkspaceMode && (
                             <button
                               onClick={() => {
@@ -466,7 +481,7 @@ export const Header: React.FC<HeaderProps> = ({
                               className="w-full text-left px-3 py-2 text-xs font-semibold text-primary hover:text-fg hover:bg-primary-soft rounded-xl transition-all flex items-center space-x-2"
                             >
                               <LineChart className="w-3.5 h-3.5 text-primary" />
-                              <span>{language === 'vi' ? 'Chế độ làm việc (Seller / Analyst)' : 'Workspace mode (Seller / Analyst)'}</span>
+                              <span>{language === 'vi' ? 'Đổi chế độ: Chủ shop hoặc Phân tích' : 'Workspace mode (Seller / Analyst)'}</span>
                             </button>
                           )}
 

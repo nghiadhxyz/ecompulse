@@ -6,6 +6,7 @@
 import * as XLSX from 'xlsx';
 import { detectReport, importOrderExport, type SheetInput } from '../analytics/importers/orderExport';
 import { detectTableReport, importTableReport } from '../analytics/importers/reportImporters';
+import { detectKeywordReport, importKeywordReport } from '../analytics/importers/keywordReport';
 import { importShopeeSalesAnalysis } from '../analytics/importers/shopeeSalesAnalysis';
 
 export type ImportWorkerRequest = { file: File };
@@ -60,9 +61,14 @@ ctx.onmessage = async (e: MessageEvent<ImportWorkerRequest>) => {
       post({ type: 'progress', stage: 'mapping', fraction: 0.6 });
       post({ type: 'shopee_summary', extra: importShopeeSalesAnalysis({ fileName: file.name, sheets }) });
     } else {
+      // Keyword reports first: they also carry the Ads columns and would be read as ad rows.
+      const keywords = detectKeywordReport({ fileName: file.name, sheets });
       // Ads / live / traffic / affiliate reports and product catalogs.
-      const table = detectTableReport({ fileName: file.name, sheets });
-      if (table) {
+      const table = keywords ? null : detectTableReport({ fileName: file.name, sheets });
+      if (keywords) {
+        post({ type: 'progress', stage: 'mapping', fraction: 0.7 });
+        post({ type: 'report', result: importKeywordReport({ fileName: file.name, sheets }, keywords) });
+      } else if (table) {
         post({ type: 'progress', stage: 'mapping', fraction: 0.7 });
         post({ type: 'report', result: importTableReport({ fileName: file.name, sheets }, table) });
       } else {

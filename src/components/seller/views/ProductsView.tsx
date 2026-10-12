@@ -73,26 +73,28 @@ export const ProductsView: React.FC = () => {
   return (
     <div className="space-y-4">
       <Section title={vi ? '“Sản phẩm tốt nhất” theo từng tiêu chí' : '“Best product” by criterion'} subtitle={vi ? 'Mỗi tiêu chí có thể là một sản phẩm khác nhau' : 'Each criterion may be a different product'}>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <ul className="divide-y divide-line border-y border-line">
           {leaderItems.map((l) => (
-            <button
-              key={l.label}
-              type="button"
-              disabled={!l.row}
-              onClick={() => l.row && open(l.row)}
-              className="rounded-control border border-line bg-surface-2 p-3 text-left hover:bg-hover disabled:cursor-default disabled:opacity-60"
-            >
-              <div className="flex items-center gap-1 text-small font-medium text-muted">
-                <Trophy className="h-3.5 w-3.5" aria-hidden /> {l.label}
-              </div>
-              <div className="mt-1 line-clamp-2 text-sm font-semibold text-fg">{l.row ? l.row.name : vi ? 'Không đủ dữ liệu' : 'Not enough data'}</div>
-              {l.row && <div className="mt-0.5 text-small font-semibold tabular text-primary">{l.value}</div>}
-            </button>
+            <li key={l.label}>
+              <button
+                type="button"
+                disabled={!l.row}
+                onClick={() => l.row && open(l.row)}
+                title={l.row ? (vi ? 'Xem các đơn của sản phẩm này' : 'Show this product’s orders') : undefined}
+                className="grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 py-2 text-left hover:bg-hover disabled:cursor-default sm:grid-cols-[12rem_minmax(0,1fr)_auto]"
+              >
+                <span className="col-start-1 row-start-1 flex items-center gap-1.5 text-small text-muted">
+                  <Trophy className="h-3.5 w-3.5 shrink-0" aria-hidden /> {l.label}
+                </span>
+                <span className="col-span-2 row-start-2 truncate text-sm font-medium text-fg sm:col-span-1 sm:col-start-2 sm:row-start-1">{l.row ? l.row.name : vi ? 'Không đủ dữ liệu' : 'Not enough data'}</span>
+                <span className="col-start-2 row-start-1 text-right font-figure text-lg font-semibold tabular text-fg font-stretch-85% sm:col-start-3">{l.row ? l.value : ''}</span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       </Section>
 
-      <Section title={vi ? 'Hiệu quả sản phẩm' : 'Product performance'} subtitle={`${formatRangeVi(range)} · ${vi ? 'tăng trưởng so với' : 'growth vs'} ${formatRangeVi(previousRange)}`}>
+      <Section title={vi ? 'Hiệu quả sản phẩm' : 'Product performance'} subtitle={`${formatRangeVi(range)}, ${vi ? 'tăng trưởng so với' : 'growth vs'} ${formatRangeVi(previousRange)}`}>
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="flex flex-1 flex-wrap gap-1" role="group" aria-label={vi ? 'Lọc nhanh' : 'Shortcuts'}>
             {SHORTCUTS.map((s) => (
@@ -130,12 +132,12 @@ export const ProductsView: React.FC = () => {
                 <thead className={TABLE.thead}>
                   <tr>
                     <Th left className="sticky left-0 z-20 bg-surface-2">{vi ? 'Sản phẩm' : 'Product'}</Th>
-                    <Th>{vi ? 'SL bán' : 'Units'}</Th>
+                    <Th>{vi ? 'Số lượng bán' : 'Units'}</Th>
                     <Th>{vi ? 'Đơn' : 'Orders'}</Th>
-                    <Th>GMV</Th>
-                    <Th>{vi ? 'DT thuần' : 'Net rev.'}</Th>
+                    <Th title="GMV">{vi ? 'Doanh thu' : 'GMV'}</Th>
+                    <Th>{vi ? 'Thực nhận' : 'Net rev.'}</Th>
                     <Th>{vi ? 'Lợi nhuận' : 'Profit'}</Th>
-                    <Th>Margin</Th>
+                    <Th>{vi ? 'Biên LN' : 'Margin'}</Th>
                     <Th>{vi ? 'Tỷ lệ hủy' : 'Cancel'}</Th>
                     <Th>{vi ? 'Tăng trưởng' : 'Growth'}</Th>
                   </tr>
@@ -147,7 +149,7 @@ export const ProductsView: React.FC = () => {
                         <div className="truncate font-medium text-fg">{r.name}</div>
                         <div className="text-small text-muted">
                           {r.sku}
-                          {r.comboId ? ' · Combo' : ''}
+                          {r.comboId ? ', combo' : ''}
                         </div>
                       </td>
                       <td className={`${TABLE.td} text-right`}>{fmtCount(r.units, lang)}</td>
@@ -182,7 +184,7 @@ export const ProductsView: React.FC = () => {
                     <div className="text-small text-muted">{r.sku}</div>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-small tabular">
                       <div>
-                        <div className="text-muted">GMV</div>
+                        <div className="text-muted">{vi ? 'Doanh thu' : 'GMV'}</div>
                         <div className="font-semibold text-fg">{fmtMoneyCompact(r.gmv, lang)}</div>
                       </div>
                       <div>
@@ -194,11 +196,11 @@ export const ProductsView: React.FC = () => {
                         <div className={`font-semibold ${growthClass(r.growth.percentageDelta) || 'text-fg'}`}>{fmtChange(r.growth.percentageDelta, lang)}</div>
                       </div>
                       <div>
-                        <div className="text-muted">{vi ? 'SL bán' : 'Units'}</div>
+                        <div className="text-muted">{vi ? 'Số lượng bán' : 'Units'}</div>
                         <div className="text-fg">{fmtCount(r.units, lang)}</div>
                       </div>
                       <div>
-                        <div className="text-muted">Margin</div>
+                        <div className="text-muted">{vi ? 'Biên LN' : 'Margin'}</div>
                         <div className="text-fg">{fmtRate(r.margin.value, lang)}</div>
                       </div>
                       <div>

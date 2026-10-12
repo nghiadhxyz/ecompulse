@@ -62,14 +62,14 @@ export const ProductsCombo: React.FC = () => {
         onChange={setTab}
         options={[
           { key: 'classes', label: vi ? 'Phân loại sản phẩm' : 'Classification' },
-          { key: 'p360', label: 'Product 360' },
+          { key: 'p360', label: vi ? 'Hồ sơ sản phẩm' : 'Product 360' },
           { key: 'combo', label: 'Combo' },
         ]}
       />
 
       {tab === 'classes' && (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 border-y border-line lg:grid-cols-4" role="group" aria-label={vi ? 'Lọc theo nhóm' : 'Filter by class'}>
             {(['scale', 'maintain', 'investigate', 'reconsider'] as ProductClass[]).map((k) => {
               const members = pi.rows.filter((r) => r.classification === k);
               const share = members.reduce((s, r) => s + r.row.current.gmv, 0) / totalGmv;
@@ -80,16 +80,17 @@ export const ProductsCombo: React.FC = () => {
                   type="button"
                   onClick={() => setCls(on ? 'all' : k)}
                   aria-pressed={on}
-                  className={`rounded-card border bg-surface p-4 text-left shadow-card hover:bg-hover ${on ? 'border-primary ring-2 ring-primary/30' : 'border-line'}`}
+                  title={vi ? (on ? 'Bỏ lọc' : 'Chỉ xem nhóm này') : undefined}
+                  className={`border-line px-3 py-3 text-left hover:bg-hover max-lg:[&:nth-child(-n+2)]:border-b lg:border-l lg:first:border-l-0 [&:nth-child(even)]:border-l ${on ? 'bg-primary-soft' : ''}`}
                 >
                   <div className="flex items-center gap-2 text-small font-semibold text-muted">
                     <span className={`h-2 w-2 rounded-full ${TONE_DOT[CLASS_TONE[k]]}`} aria-hidden />
                     {tr(lang, PRODUCT_CLASS_LABELS[k])}
                   </div>
-                  <div className="mt-1 text-2xl font-bold tabular text-fg">
+                  <div className="mt-1 text-kpi text-fg">
                     {members.length} <span className="text-small font-medium text-muted">SKU</span>
                   </div>
-                  <div className="text-small tabular text-muted">{fmtRate(share, lang)} GMV</div>
+                  <div className="text-small tabular text-muted">{vi ? `${fmtRate(share, lang)} doanh số` : `${fmtRate(share, lang)} of GMV`}</div>
                 </button>
               );
             })}
@@ -98,8 +99,8 @@ export const ProductsCombo: React.FC = () => {
             title={vi ? 'Phân loại & ABC' : 'Classification & ABC'}
             description={
               vi
-                ? `${formatRangeVi(range)} · ABC: A ${pi.abcCounts.A}, B ${pi.abcCounts.B}, C ${pi.abcCounts.C} SKU · margin shop ${fmtRate(pi.shopMargin, lang)}${pi.trafficAvailable ? '' : ' · Zombie: cần dữ liệu traffic'}`
-                : `${formatRangeVi(range)} · ABC: A ${pi.abcCounts.A}, B ${pi.abcCounts.B}, C ${pi.abcCounts.C}`
+                ? `${formatRangeVi(range)}, ABC: A ${pi.abcCounts.A}, B ${pi.abcCounts.B}, C ${pi.abcCounts.C} SKU, biên lợi nhuận shop ${fmtRate(pi.shopMargin, lang)}${pi.trafficAvailable ? '' : ', mục "xem nhiều, không bán" cần dữ liệu lượt nhấp'}`
+                : `${formatRangeVi(range)}, ABC: A ${pi.abcCounts.A}, B ${pi.abcCounts.B}, C ${pi.abcCounts.C}`
             }
             notesLabel={vi ? 'Ghi chú' : 'Notes'}
             notes={[
@@ -116,11 +117,11 @@ export const ProductsCombo: React.FC = () => {
                     <Th>ABC</Th>
                     <Th>GMV</Th>
                     <Th>Δ GMV</Th>
-                    <Th title={vi ? 'Tăng trưởng trung bình ngày thường, 14 ngày gần nhất so với 14 ngày trước' : 'Normal-day momentum'}>Momentum</Th>
+                    <Th title={vi ? 'Tăng trưởng trung bình ngày thường, 14 ngày gần nhất so với 14 ngày trước' : 'Normal-day momentum'}>{vi ? 'Đà tăng' : 'Momentum'}</Th>
                     <Th>{vi ? 'Lợi nhuận' : 'Profit'}</Th>
-                    <Th>Margin</Th>
+                    <Th>{vi ? 'Biên LN' : 'Margin'}</Th>
                     <Th>{vi ? 'Hủy' : 'Cancel'}</Th>
-                    <Th left>{vi ? 'Nhóm đề xuất · lý do' : 'Class · why'}</Th>
+                    <Th left>{vi ? 'Nhóm đề xuất và lý do' : 'Class and why'}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -137,8 +138,8 @@ export const ProductsCombo: React.FC = () => {
                         <div className="truncate font-medium text-fg">{r.row.label}</div>
                         <div className="text-small text-muted">
                           {r.row.key}
-                          {r.isHero && <span className="ml-1 text-up">· Hero</span>}
-                          {r.isZombie && <span className="ml-1 text-down">· Zombie</span>}
+                          {r.isHero && <span className="text-up" title={vi ? 'Nhóm A, biên lợi nhuận từ mức shop trở lên, không giảm' : undefined}>, {vi ? 'chủ lực' : 'hero'}</span>}
+                          {r.isZombie && <span className="text-down" title={vi ? 'Từ 200 lượt nhấp nhưng tối đa 1 đơn hợp lệ' : undefined}>, {vi ? 'xem nhiều, không bán' : 'zombie'}</span>}
                         </div>
                       </td>
                       <td className={`${TABLE.td} text-right font-semibold`}>{r.abc}</td>
@@ -197,7 +198,7 @@ export const ProductsCombo: React.FC = () => {
                     <Th>{vi ? 'Giỏ bán lẻ' : 'Single basket'}</Th>
                     <Th>CVR</Th>
                     <Th>{vi ? 'Hủy combo / lẻ' : 'Cancel combo / single'}</Th>
-                    <Th>{vi ? 'Margin combo / lẻ' : 'Margin combo / single'}</Th>
+                    <Th>{vi ? 'Biên LN combo / lẻ' : 'Margin combo / single'}</Th>
                     <Th>{vi ? 'Lợi nhuận' : 'Profit'}</Th>
                   </tr>
                 </thead>

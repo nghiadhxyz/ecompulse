@@ -88,7 +88,7 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
       : 'Part of the period: sums of daily unique counts';
 
   return (
-    <Section title={title ?? (vi ? 'Doanh thu đến từ đâu' : 'Where revenue comes from')} subtitle={vi ? `Theo kênh và nguồn truy cập · ${formatRangeVi(range)}` : `By channel and traffic source · ${formatRangeVi(range)}`} right={<Badge>{STAGE_BASIS[stage][lang]}</Badge>}>
+    <Section title={title ?? (vi ? 'Doanh thu đến từ đâu' : 'Where revenue comes from')} subtitle={vi ? `Theo kênh và nguồn truy cập, ${formatRangeVi(range)}` : `By channel and traffic source, ${formatRangeVi(range)}`} right={<Badge>{STAGE_BASIS[stage][lang]}</Badge>}>
       {!mix.available ? (
         <NotEnoughData lang={lang} reason={tr(lang, mix.notes[0] ?? { vi: 'Không có số liệu theo kênh trong khoảng này.', en: 'No channel data in this range.' })} />
       ) : (
@@ -103,7 +103,7 @@ export const SummaryChannelsPanel: React.FC<{ title?: string }> = ({ title }) =>
                   <Th title={vi ? 'Shopee chia một đơn cho nhiều nguồn theo mức đóng góp nên số đơn có thể lẻ' : 'Can be fractional'}>{vi ? 'Đơn' : 'Orders'}</Th>
                   <Th>{vi ? 'Lượt nhấp' : 'Clicks'}</Th>
                   <Th title={vi ? 'Đơn / lượt nhấp' : 'Orders / clicks'}>{vi ? 'Chuyển đổi' : 'Conv.'}</Th>
-                  <Th title={uniqueTitle}>{vi ? 'CTR duy nhất · nhấp/người xem' : 'Unique CTR · clicks/viewer'}{mix.uniqueIsDistinct ? '' : '*'}</Th>
+                  <Th title={uniqueTitle}>{vi ? 'CTR duy nhất (nhấp/người xem)' : 'Unique CTR (clicks/viewer)'}{mix.uniqueIsDistinct ? '' : '*'}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -184,7 +184,7 @@ export const SummaryProductsPanel: React.FC = () => {
   return (
     <Section
       title={vi ? `Top ${SUMMARY_TOP_N} sản phẩm mỗi kênh (báo cáo Shopee)` : `Top ${SUMMARY_TOP_N} products per channel (Shopee report)`}
-      subtitle={sp.period ? (vi ? `Tổng cả kỳ ${formatRangeVi(sp.period)} · Shopee chỉ liệt kê ${SUMMARY_TOP_N} sản phẩm đầu mỗi kênh, không phải tất cả` : `Period ${formatRangeVi(sp.period)} · Shopee lists only the top ${SUMMARY_TOP_N}`) : undefined}
+      subtitle={sp.period ? (vi ? `Tổng cả kỳ ${formatRangeVi(sp.period)}, Shopee chỉ liệt kê ${SUMMARY_TOP_N} sản phẩm đầu mỗi kênh, không phải tất cả` : `Period ${formatRangeVi(sp.period)}, Shopee lists only the top ${SUMMARY_TOP_N}`) : undefined}
       right={
         sp.byChannel.length > 1 ? (
           <div className="flex flex-wrap gap-1" role="group" aria-label={vi ? 'Kênh' : 'Channel'}>
@@ -202,7 +202,7 @@ export const SummaryProductsPanel: React.FC = () => {
       ) : (
         <>
           <p className="text-xs text-muted mb-2">
-            {vi ? `Top ${current.rows.length} · ${tr(lang, SUMMARY_CHANNEL_LABELS[current.channel])} · chiếm ${fmtRate(current.coverage, lang, 0)} doanh số kênh` : `Top ${current.rows.length} · ${fmtRate(current.coverage, lang, 0)} of channel sales`}
+            {vi ? `Top ${current.rows.length}, ${tr(lang, SUMMARY_CHANNEL_LABELS[current.channel])}, chiếm ${fmtRate(current.coverage, lang, 0)} doanh số kênh` : `Top ${current.rows.length}, ${fmtRate(current.coverage, lang, 0)} of channel sales`}
           </p>
           <div className={TABLE.frame}>
             <table className={TABLE.table}>

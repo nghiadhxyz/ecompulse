@@ -72,7 +72,7 @@ export const OrdersView: React.FC = () => {
               <td className={`${TABLE.td} text-right`}>{fmtCount(r.returned, lang)}</td>
               <td className={`${TABLE.td} text-right`}>{fmtRate(r.returnRate, lang)}</td>
               <td className={`${TABLE.td} text-right`}>
-                <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${vi ? 'Đơn hủy' : 'Cancelled'} · ${label(r.key)}`, filter: { range, platforms, ...filterFor(r.key), cancelledOnly: true } })} />
+                <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: `${vi ? 'Đơn hủy' : 'Cancelled'}: ${label(r.key)}`, filter: { range, platforms, ...filterFor(r.key), cancelledOnly: true } })} />
               </td>
             </tr>
           ))}
@@ -83,38 +83,41 @@ export const OrdersView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <Section title={vi ? 'Tình trạng đơn hàng' : 'Order lifecycle'} subtitle={`${formatRangeVi(range)} · ${fmtCount(L.total, lang)} ${vi ? 'đơn' : 'orders'}`}>
-        <div className="flex flex-wrap items-stretch gap-2">
+      <Section title={vi ? 'Tình trạng đơn hàng' : 'Order lifecycle'} subtitle={`${formatRangeVi(range)}, ${fmtCount(L.total, lang)} ${vi ? 'đơn' : 'orders'}`}>
+        <ol className="grid grid-cols-2 border-y border-line sm:grid-cols-3 lg:grid-cols-5" aria-label={vi ? 'Các bước của đơn hàng' : 'Order steps'}>
           {flow.map((s, i) => (
-            <React.Fragment key={s.key}>
+            <li key={s.key} className="relative border-line max-lg:border-b max-lg:[&:nth-last-child(-n+1)]:border-b-0 lg:border-l lg:first:border-l-0">
               <button
                 type="button"
                 onClick={() => openEvidence({ title: vi ? s.vi : s.en, filter: { range, platforms, statuses: [...s.statuses] } })}
-                className="min-w-[88px] flex-1 rounded-control border border-line bg-surface-2 px-3 py-2 text-left hover:bg-hover"
+                title={vi ? 'Xem các đơn ở bước này' : 'Show these orders'}
+                className="flex w-full flex-col px-3 py-3 text-left hover:bg-hover lg:px-4"
               >
-                <div className="text-small text-muted">{vi ? s.vi : s.en}</div>
-                <div className="text-xl font-bold tabular text-fg">{fmtCount(s.n, lang)}</div>
+                <span className="text-small text-muted">{vi ? s.vi : s.en}</span>
+                <span className="text-kpi text-fg">{fmtCount(s.n, lang)}</span>
               </button>
-              {i < flow.length - 1 && <ChevronRight className="hidden h-4 w-4 self-center text-muted sm:block" aria-hidden />}
-            </React.Fragment>
+              {i < flow.length - 1 && <ChevronRight className="absolute -right-2 top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 rounded-full bg-surface text-muted lg:block" aria-hidden />}
+            </li>
           ))}
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        </ol>
+        <ul className="mt-4 grid grid-cols-3 border-y border-line" aria-label={vi ? 'Đơn không hoàn tất' : 'Exits'}>
           {exits.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => openEvidence({ title: vi ? s.vi : s.en, filter: { range, platforms, ...s.filter } })}
-              className="rounded-control border border-line bg-surface px-3 py-2 text-left hover:bg-hover"
-            >
-              <div className="flex items-center gap-1.5 text-small text-muted">
-                <span className="h-2 w-2 rounded-full bg-down" aria-hidden />
-                {vi ? s.vi : s.en}
-              </div>
-              <div className="text-xl font-bold tabular text-fg">{fmtCount(s.n, lang)}</div>
-            </button>
+            <li key={s.key} className="border-l border-line first:border-l-0">
+              <button
+                type="button"
+                onClick={() => openEvidence({ title: vi ? s.vi : s.en, filter: { range, platforms, ...s.filter } })}
+                title={vi ? 'Xem các đơn này' : 'Show these orders'}
+                className="flex w-full flex-col px-3 py-3 text-left hover:bg-hover lg:px-4"
+              >
+                <span className="flex items-center gap-1.5 text-small text-muted">
+                  <span className="h-2 w-2 rounded-full bg-down" aria-hidden />
+                  {vi ? s.vi : s.en}
+                </span>
+                <span className="text-kpi text-fg">{fmtCount(s.n, lang)}</span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
           <span>
             {vi ? 'Tỷ lệ hủy' : 'Cancel rate'}: <b className="font-semibold tabular text-fg">{fmtRate(health.cancelRate, lang)}</b>
@@ -165,7 +168,7 @@ export const OrdersView: React.FC = () => {
                   <div className="flex justify-between text-fg">
                     <span className="truncate pr-2">{r.reason}</span>
                     <span className="whitespace-nowrap tabular text-muted">
-                      {r.count} · {fmtRate(r.share, lang, 0)}
+                      {r.count} {vi ? 'đơn' : ''}, {fmtRate(r.share, lang, 0)}
                     </span>
                   </div>
                   <div className="mt-1 h-1.5 rounded-full bg-surface-2">
@@ -183,7 +186,7 @@ export const OrdersView: React.FC = () => {
                   <li key={r.reason} className="flex justify-between text-sm text-fg">
                     <span>{r.reason}</span>
                     <span className="tabular text-muted">
-                      {r.count} · {fmtRate(r.share, lang, 0)}
+                      {r.count} {vi ? 'đơn' : ''}, {fmtRate(r.share, lang, 0)}
                     </span>
                   </li>
                 ))}
@@ -205,8 +208,8 @@ export const OrdersView: React.FC = () => {
                   <span className="h-2 flex-1 rounded-full bg-surface-2">
                     <span className="block h-2 rounded-full bg-down" style={{ width: `${(d.cancelled / maxDay) * 100}%` }} />
                   </span>
-                  <span className="w-24 whitespace-nowrap text-right tabular">
-                    {d.cancelled}/{d.placed} · {fmtRate(d.cancelRate, lang)}
+                  <span className="w-28 whitespace-nowrap text-right tabular" title={vi ? `${d.cancelled} đơn hủy trên ${d.placed} đơn đặt` : undefined}>
+                    {d.cancelled}/{d.placed}, {fmtRate(d.cancelRate, lang)}
                   </span>
                 </button>
               </li>

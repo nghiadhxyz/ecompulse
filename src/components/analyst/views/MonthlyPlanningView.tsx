@@ -19,7 +19,7 @@ import {
 import { useWorkspace } from '../../seller/SellerContext';
 import { GhostButton, NotEnoughData, PrimaryButton, Section, tr } from '../../seller/ui';
 import { SectionCard } from '../../ui/primitives';
-import { TABLE } from '../../ui/data';
+import { TABLE, StatStrip } from '../../ui/data';
 import { axisProps, CHART, gridProps, legendProps, tooltipProps } from '../../../theme/chart';
 import { Th } from '../ui';
 import { usePlanning } from '../../workspace/usePlanning';
@@ -77,7 +77,7 @@ export const MonthlyPlanningView: React.FC = () => {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Monthly Planning"
+        title={vi ? 'Kế hoạch tháng' : 'Monthly Planning'}
         description={vi ? 'Đặt mục tiêu GMV tháng, chia theo ngày dựa trên lịch sử của shop và theo dõi tiến độ.' : 'Set a monthly GMV target, spread by the shop history, and track progress.'}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[
@@ -158,7 +158,7 @@ export const MonthlyPlanningView: React.FC = () => {
               {draft.events.map((e) => (
                 <li key={e.id} className="flex items-center justify-between py-0.5 text-sm text-fg">
                   <span>
-                    <span className="tabular">{fmtDay(e.date)}</span> · {e.title} <span className="text-small text-muted">({e.kind})</span>
+                    <span className="tabular">{fmtDay(e.date)}</span>: {e.title} <span className="text-small text-muted">({e.kind})</span>
                   </span>
                   <button type="button" onClick={() => setDraft({ ...draft, events: draft.events.filter((x) => x.id !== e.id) })} className="inline-flex h-10 w-10 items-center justify-center rounded-control text-muted hover:bg-hover hover:text-fg" aria-label={vi ? 'Xóa' : 'Delete'}>
                     <Trash2 className="h-4 w-4" aria-hidden />
@@ -185,22 +185,21 @@ export const MonthlyPlanningView: React.FC = () => {
 
       {saved && progress && (
         <SectionCard title={vi ? `Tiến độ ${month.slice(5)}/${month.slice(0, 4)}` : `Progress ${month}`} description={formatRangeVi(progress.range)} notesLabel={vi ? 'Ghi chú' : 'Notes'} notes={progress.notes.map((n) => tr(lang, n))}>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {[
+          <StatStrip
+            items={[
               { l: vi ? 'Mục tiêu tháng' : 'Target', v: fmtMoneyCompact(saved.targetGmv, lang) },
               { l: progress.lastDataDay ? (vi ? `Thực tế đến ${fmtDay(progress.lastDataDay)}` : `Actual to ${fmtDay(progress.lastDataDay)}`) : vi ? 'Thực tế' : 'Actual', v: progress.toDate ? fmtMoneyCompact(progress.toDate.actual, lang) : '—' },
               { l: vi ? 'So với kế hoạch đến nay' : 'vs plan to date', v: progress.toDate ? fmtRate(progress.toDate.ratio, lang, 0) : '—', tone: paceClass(progress.toDate?.ratio) },
               progress.days.every((d) => d.actual !== null)
                 ? { l: vi ? 'Kết quả cả tháng' : 'Full-month result', v: fmtMoneyCompact(progress.toDate?.actual ?? null, lang), sub: vi ? 'Tháng đã đủ dữ liệu' : 'Month complete' }
                 : { l: vi ? 'Ước tính cuối tháng' : 'Estimated month end', v: progress.projection !== null ? fmtMoneyCompact(progress.projection, lang) : '—', sub: vi ? 'Ước tính, không phải cam kết' : 'Estimate only' },
-            ].map((x) => (
-              <div key={x.l} className="min-w-0 rounded-control border border-line bg-surface-2 p-3">
-                <div className="truncate text-small text-muted">{x.l}</div>
-                <div className={`mt-0.5 text-xl font-bold tabular ${x.tone || 'text-fg'}`}>{x.v}</div>
-                {x.sub && <div className="text-small text-muted">{x.sub}</div>}
-              </div>
-            ))}
-          </div>
+            ].map((x: { l: string; v: string; sub?: string; tone?: string }) => ({
+              label: x.l,
+              value: x.v,
+              sub: x.sub,
+              tone: x.tone === 'text-up' ? ('up' as const) : x.tone === 'text-down' ? ('down' as const) : x.tone === 'text-warn' ? ('warn' as const) : undefined,
+            }))}
+          />
           {progress.requiredPerWeekday !== null && progress.remainingTarget > 0 && (
             <p className="mt-4 text-sm text-fg">
               {vi

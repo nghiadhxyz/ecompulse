@@ -86,7 +86,7 @@ const SummaryWhatIfView: React.FC = () => {
   return (
     <div className="space-y-4">
       <Section
-        title={vi ? 'What-If · Mô phỏng / Ước tính' : 'What-If · Simulation / Estimate'}
+        title={vi ? 'Mô phỏng What-If (ước tính)' : 'What-If simulation (estimate)'}
         subtitle={
           vi
             ? `Dựa trên báo cáo tổng hợp ${formatRangeVi(range)} (đơn đặt), không cần giá vốn — mô phỏng, không phải dự báo.`
@@ -134,7 +134,7 @@ const SummaryWhatIfView: React.FC = () => {
         <NotEnoughData lang={lang} reason={tr(lang, r.unavailable!)} />
       ) : (
         <SectionCard
-          title={vi ? `Kết quả mô phỏng · Mức ${r.level}` : `Simulated result · Level ${r.level}`}
+          title={vi ? `Kết quả mô phỏng, mức ${r.level}` : `Simulated result, level ${r.level}`}
           description={r.level === 1 ? (vi ? 'Doanh số, đơn, Ads, ROAS — không cần giá vốn' : 'Sales, orders, Ads, ROAS') : vi ? 'Thêm lợi nhuận ước tính theo số bạn nhập' : 'Plus an estimated profit'}
           notesLabel={vi ? 'Ghi chú' : 'Notes'}
           notes={r.notes.map((n) => tr(lang, n))}
@@ -198,7 +198,7 @@ const OrderWhatIfView: React.FC = () => {
   return (
     <div className="space-y-4">
       <Section
-        title={vi ? 'What-If · Mô phỏng / Ước tính' : 'What-If · Simulation / Estimate'}
+        title={vi ? 'Mô phỏng What-If (ước tính)' : 'What-If simulation (estimate)'}
         subtitle={vi ? `Dựa trên chi phí thực tế ${formatRangeVi(range)} — kết quả là mô phỏng, không phải dự báo.` : `Built on actual costs of ${formatRangeVi(range)} — a simulation, not a forecast.`}
         right={
           <label className="flex items-center gap-2 text-sm text-muted">
@@ -246,7 +246,7 @@ const OrderWhatIfView: React.FC = () => {
             {[
               { l: 'GMV', a: r.base.gmv, b: r.scenario.gmv, f: (x: number | null) => fmtMoneyCompact(x, lang) },
               { l: vi ? 'Lợi nhuận' : 'Profit', a: r.base.profit, b: r.scenario.profit, f: (x: number | null) => fmtMoneyCompact(x, lang) },
-              { l: 'Margin', a: r.base.margin, b: r.scenario.margin, f: (x: number | null) => fmtRate(x, lang) },
+              { l: vi ? 'Biên lợi nhuận' : 'Margin', a: r.base.margin, b: r.scenario.margin, f: (x: number | null) => fmtRate(x, lang) },
               { l: vi ? 'ROAS hòa vốn' : 'Break-even ROAS', a: r.base.breakEvenRoas, b: r.scenario.breakEvenRoas, f: (x: number | null) => fmtMultiple(x, lang), inverse: true },
             ].map((x) => {
               const d = delta(x.a, x.b);

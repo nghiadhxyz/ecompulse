@@ -46,7 +46,7 @@ export const CampaignCalendar: React.FC = () => {
 
   if (dataset.orders.length === 0 && dataset.dailyMetrics.length === 0) {
     return (
-      <Section title="Campaign & Calendar">
+      <Section title={vi ? 'Chiến dịch & lịch sale' : 'Campaign & Calendar'}>
         <NotEnoughData lang={lang} reason={vi ? 'Cần file xuất đơn hàng để phân tích theo ngày.' : 'Needs an order export.'} />
       </Section>
     );
@@ -80,7 +80,7 @@ export const CampaignCalendar: React.FC = () => {
         { label: vi ? 'Tỷ lệ hủy' : 'Cancel rate', get: (r) => fmtRate(r.kpis.metrics.cancelRate.value, lang), change: cmp.changes.cancelRate, rate: true, goodWhenUp: false },
         { label: vi ? 'Tỷ lệ trả/hoàn' : 'Refund rate', get: (r) => fmtRate(r.kpis.metrics.refundRate.value, lang), change: cmp.changes.refundRate, rate: true, goodWhenUp: false },
         { label: vi ? 'Lợi nhuận đóng góp' : 'Contribution profit', get: (r) => fmtMoneyCompact(r.kpis.metrics.profit.value, lang), change: cmp.changes.profit },
-        { label: 'Margin', get: (r) => fmtRate(r.kpis.metrics.margin.value, lang), change: cmp.changes.margin, rate: true },
+        { label: vi ? 'Biên lợi nhuận' : 'Margin', get: (r) => fmtRate(r.kpis.metrics.margin.value, lang), change: cmp.changes.margin, rate: true },
         { label: vi ? 'Chi phí Ads' : 'Ad spend', get: (r) => fmtMoneyCompact(r.adSpend, lang), change: cmp.changes.adSpend, goodWhenUp: false },
       ]
     : [];
@@ -107,8 +107,8 @@ export const CampaignCalendar: React.FC = () => {
                   <li key={s.date} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm">
                     <b className="w-14 font-semibold tabular text-fg">{fmtDay(s.date)}</b>
                     <span className="min-w-0 flex-1 text-small text-muted">
-                      {s.reasons.map((r) => tr(lang, r)).join(' · ')}
-                      {s.autoDoubleDay ? (vi ? ' · đang được tự nhận là ngày đôi' : ' · auto double day') : ''}
+                      {s.reasons.map((r) => tr(lang, r)).join(', ')}
+                      {s.autoDoubleDay ? (vi ? ', đang được tự nhận là ngày đôi' : ', auto double day') : ''}
                     </span>
                     {updateSettings && <Button onClick={() => setConfirmed([...confirmedDays, s.date])}>{vi ? 'Xác nhận là ngày sale' : 'Confirm sale day'}</Button>}
                   </li>
@@ -150,7 +150,7 @@ export const CampaignCalendar: React.FC = () => {
 
       <SectionCard
         title={vi ? 'Hiệu quả theo loại ngày' : 'Performance by day type'}
-        description={vi ? `${formatRangeVi(range)} · ${perf.analyzedDays} ngày · cột "Ngày" là cỡ mẫu · mức tăng so với ngày thường cả kỳ` : `${formatRangeVi(range)} · ${perf.analyzedDays} days · uplift vs weekdays of the whole period`}
+        description={vi ? `${formatRangeVi(range)}, ${perf.analyzedDays} ngày, cột "Ngày" là cỡ mẫu, mức tăng so với ngày thường cả kỳ` : `${formatRangeVi(range)}, ${perf.analyzedDays} days, uplift vs weekdays of the whole period`}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[!hasProfit ? (vi ? 'Chưa có giá vốn nên chưa tính lợi nhuận theo ngày.' : 'No COGS yet, so no profit per day.') : null]}
       >
@@ -173,7 +173,7 @@ export const CampaignCalendar: React.FC = () => {
               <tr className="border-t border-line bg-surface-2">
                 <td className="px-3 py-2.5 text-sm text-fg" colSpan={hasProfit ? 8 : 7}>
                   <span className="font-semibold">{vi ? 'Ngày sale so với ngày thường: ' : 'Sale vs normal days: '}</span>
-                  <b className="font-semibold text-primary">{fmtMoneyCompact(perf.saleVsNormal.sale.gmvPerDay, lang)}</b> {vi ? 'so với' : 'vs'} <b className="font-semibold">{fmtMoneyCompact(perf.saleVsNormal.normal.gmvPerDay, lang)}</b> / {vi ? 'ngày' : 'day'} ({fmtChange(perf.saleVsNormal.uplift, lang)}) · {vi ? 'hủy' : 'cancel'}{' '}
+                  <b className="font-semibold text-primary">{fmtMoneyCompact(perf.saleVsNormal.sale.gmvPerDay, lang)}</b> {vi ? 'so với' : 'vs'} <b className="font-semibold">{fmtMoneyCompact(perf.saleVsNormal.normal.gmvPerDay, lang)}</b> / {vi ? 'ngày' : 'day'} ({fmtChange(perf.saleVsNormal.uplift, lang)}), {vi ? 'hủy' : 'cancel'}{' '}
                   {fmtRate(perf.saleVsNormal.sale.cancelRate, lang)} {vi ? 'so với' : 'vs'} {fmtRate(perf.saleVsNormal.normal.cancelRate, lang)}
                 </td>
               </tr>
@@ -188,7 +188,7 @@ export const CampaignCalendar: React.FC = () => {
           title={vi ? 'Theo thứ trong tuần' : 'By day of week'}
           description={
             vi
-              ? `Chỉ ngày không sale${perf.byWeekday.some((w) => w.days > 0 && w.days <= REFERENCE_MAX_SAMPLES) ? ` · mỗi thứ chỉ có ${Math.min(...perf.byWeekday.filter((w) => w.days > 0).map((w) => w.days))}–${Math.max(...perf.byWeekday.map((w) => w.days))} ngày: tham khảo` : ''}`
+              ? `Chỉ ngày không sale${perf.byWeekday.some((w) => w.days > 0 && w.days <= REFERENCE_MAX_SAMPLES) ? `, mỗi thứ chỉ có ${Math.min(...perf.byWeekday.filter((w) => w.days > 0).map((w) => w.days))}–${Math.max(...perf.byWeekday.map((w) => w.days))} ngày: tham khảo` : ''}`
               : 'Non-sale days only'
           }
         >
@@ -261,7 +261,7 @@ export const CampaignCalendar: React.FC = () => {
                   <select value={s.value} onChange={(e) => s.set(e.target.value)} className={field}>
                     {all.map((c) => (
                       <option key={c.campaignId} value={c.campaignId}>
-                        {c.name} · {formatRangeVi(c.range)}
+                        {c.name}, {formatRangeVi(c.range)}
                       </option>
                     ))}
                   </select>
@@ -275,8 +275,8 @@ export const CampaignCalendar: React.FC = () => {
                     <thead className={TABLE.thead}>
                       <tr>
                         <Th left>{vi ? 'Chỉ số' : 'Metric'}</Th>
-                        <Th>A · {cmp.a.entry.name}</Th>
-                        <Th>B · {cmp.b.entry.name}</Th>
+                        <Th>A: {cmp.a.entry.name}</Th>
+                        <Th>B: {cmp.b.entry.name}</Th>
                         <Th>{vi ? 'B so với A' : 'B vs A'}</Th>
                       </tr>
                     </thead>
@@ -297,12 +297,12 @@ export const CampaignCalendar: React.FC = () => {
                     <div key={i} className="rounded-control border border-line bg-surface-2 p-3">
                       <div className="flex items-center justify-between gap-2">
                         <b className="text-sm font-semibold text-fg">
-                          {i === 0 ? 'A' : 'B'} · {r.entry.name}
+                          {i === 0 ? 'A' : 'B'}: {r.entry.name}
                         </b>
                         <EvidenceButton compact lang={lang} onClick={() => openEvidence({ title: r.entry.name, filter: { range: r.entry.range, platforms: baseFilter.platforms } })} />
                       </div>
                       <div className="mt-1 text-muted">
-                        {vi ? 'Top SKU:' : 'Top SKUs:'} {r.topSkus.slice(0, 3).map((s) => `${s.label} (${fmtMoneyCompact(s.current.gmv, lang)})`).join(', ')}
+                        {vi ? 'SKU dẫn đầu:' : 'Top SKUs:'} {r.topSkus.slice(0, 3).map((s) => `${s.label} (${fmtMoneyCompact(s.current.gmv, lang)})`).join(', ')}
                       </div>
                       {r.cancelReasons.length > 0 && (
                         <div className="mt-1 text-muted">

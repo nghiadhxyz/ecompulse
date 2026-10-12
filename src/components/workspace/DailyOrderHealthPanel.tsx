@@ -7,7 +7,7 @@ import { computeKpis, MIN_DAY_ORDERS, MIN_RATE_ORDERS, SMALL_RATE_NOTE, fmtCount
 import { useWorkspace } from '../seller/SellerContext';
 import { tr } from '../seller/ui';
 import { Th } from '../analyst/ui';
-import { TABLE } from '../ui/data';
+import { TABLE, StatStrip } from '../ui/data';
 import { Button, SectionCard } from '../ui/primitives';
 
 export const DailyOrderHealthPanel: React.FC = () => {
@@ -33,7 +33,7 @@ export const DailyOrderHealthPanel: React.FC = () => {
     <div className="space-y-4">
       <SectionCard
         title={vi ? 'Sức khỏe đơn hàng' : 'Order health'}
-        description={`${formatRangeVi(range)} · ${vi ? 'theo báo cáo tổng hợp của sàn' : 'from the platform summary report'}`}
+        description={`${formatRangeVi(range)}, ${vi ? 'theo báo cáo tổng hợp của sàn' : 'from the platform summary report'}`}
         tools={<Button onClick={() => goTo('dataHub')}>{vi ? 'Nhập file đơn hàng' : 'Import orders'}</Button>}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[
@@ -47,8 +47,8 @@ export const DailyOrderHealthPanel: React.FC = () => {
             : null,
         ]}
       >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          {[
+        <StatStrip
+          items={[
             { l: basis[lang], v: fmtCount(k.orders.value, lang) },
             { l: vi ? 'Đơn thanh toán trong kỳ' : 'Paid in period', v: fmtCount(k.paidOrders.value, lang), sub: vi ? 'Tính theo ngày tiền về — không phải tập con của đơn đặt' : 'Counted on payment day' },
             { l: vi ? 'Đơn hủy' : 'Cancelled', v: fmtCount(k.cancelledOrders.value, lang), sub: `${vi ? 'Tỷ lệ hủy' : 'Cancel rate'} ${fmtRate(k.cancelRate.value, lang)} (${fmtCount(k.cancelledOrders.value, lang)}/${fmtCount(k.orders.value, lang)})` },
@@ -62,18 +62,17 @@ export const DailyOrderHealthPanel: React.FC = () => {
               v: fmtCount(k.refundedOrders.value, lang),
               sub: `${vi ? 'Tỷ lệ' : 'Rate'} ${fmtRate(k.refundRate.value, lang)} (${fmtCount(k.refundedOrders.value, lang)}/${fmtCount(k.orders.value, lang)})${
                 (stage ?? 'placed') !== 'paid' && kPaid.refundRate.value !== null
-                  ? ` · ${vi ? 'đơn thanh toán' : 'paid'}: ${fmtRate(kPaid.refundRate.value, lang)} (${fmtCount(kPaid.refundedOrders.value, lang)}/${fmtCount(kPaid.orders.value, lang)})`
+                  ? `, ${vi ? 'đơn thanh toán' : 'paid'}: ${fmtRate(kPaid.refundRate.value, lang)} (${fmtCount(kPaid.refundedOrders.value, lang)}/${fmtCount(kPaid.orders.value, lang)})`
                   : ''
               }`,
             },
-          ].map((x) => (
-            <div key={x.l} className="min-w-0 rounded-control border border-line bg-surface-2 p-3">
-              <div className="truncate text-small text-muted">{x.l}</div>
-              <div className="mt-0.5 text-xl font-bold tabular text-fg">{x.v}</div>
-              {x.sub && <div className="text-small text-muted">{x.sub}</div>}
-            </div>
-          ))}
-        </div>
+          ].map((x: { l: string; v: string; sub?: string; tone?: string }) => ({
+            label: x.l,
+            value: x.v,
+            sub: x.sub,
+            tone: x.tone === 'text-up' ? ('up' as const) : x.tone === 'text-down' ? ('down' as const) : undefined,
+          }))}
+        />
 
         {hasStageCancels && (
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-fg">
@@ -91,7 +90,7 @@ export const DailyOrderHealthPanel: React.FC = () => {
           {avgRate !== null && (
             <span className="text-small font-normal text-muted">
               {' '}
-              · {vi ? `so với trung bình kỳ ${fmtRate(avgRate, lang)} (↑ cao hơn 20%, ↓ thấp hơn 20%)` : `vs period average ${fmtRate(avgRate, lang)} (↑ 20% higher, ↓ 20% lower)`}
+             , {vi ? `so với trung bình kỳ ${fmtRate(avgRate, lang)} (↑ cao hơn 20%, ↓ thấp hơn 20%)` : `vs period average ${fmtRate(avgRate, lang)} (↑ 20% higher, ↓ 20% lower)`}
             </span>
           )}
         </h3>
@@ -132,7 +131,7 @@ export const DailyOrderHealthPanel: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {h.byPlatform.length > 1 && <p className="mt-2 text-small text-muted">{h.byPlatform.map((p) => `${PLATFORM_LABELS[p.key as Platform] ?? p.key}: ${fmtRate(p.cancelRate, lang)} hủy`).join(' · ')}</p>}
+        {h.byPlatform.length > 1 && <p className="mt-2 text-small text-muted">{h.byPlatform.map((p) => `${PLATFORM_LABELS[p.key as Platform] ?? p.key}: ${fmtRate(p.cancelRate, lang)} hủy`).join(', ')}</p>}
       </SectionCard>
     </div>
   );
