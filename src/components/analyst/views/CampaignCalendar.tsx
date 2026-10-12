@@ -46,7 +46,7 @@ export const CampaignCalendar: React.FC = () => {
 
   if (dataset.orders.length === 0 && dataset.dailyMetrics.length === 0) {
     return (
-      <Section title="Campaign & Calendar">
+      <Section title={vi ? 'Chiến dịch & lịch sale' : 'Campaign & Calendar'}>
         <NotEnoughData lang={lang} reason={vi ? 'Cần file xuất đơn hàng để phân tích theo ngày.' : 'Needs an order export.'} />
       </Section>
     );

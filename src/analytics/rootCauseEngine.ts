@@ -32,7 +32,7 @@ export const ROOT_CAUSE_METRICS: Record<RootCauseMetric, { label: Bilingual; uni
   cancelRate: { label: { vi: 'Tỷ lệ hủy', en: 'Cancel rate' }, unit: 'ratio', goodWhenUp: false },
   refundRate: { label: { vi: 'Tỷ lệ trả/hoàn', en: 'Refund rate' }, unit: 'ratio', goodWhenUp: false },
   aov: { label: { vi: 'AOV', en: 'AOV' }, unit: 'vnd', goodWhenUp: true },
-  margin: { label: { vi: 'Margin', en: 'Margin' }, unit: 'ratio', goodWhenUp: true },
+  margin: { label: { vi: 'Biên lợi nhuận', en: 'Margin' }, unit: 'ratio', goodWhenUp: true },
   cvr: { label: { vi: 'CVR', en: 'CVR' }, unit: 'ratio', goodWhenUp: true },
 };
 

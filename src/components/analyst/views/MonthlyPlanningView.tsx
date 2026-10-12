@@ -77,7 +77,7 @@ export const MonthlyPlanningView: React.FC = () => {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Monthly Planning"
+        title={vi ? 'Kế hoạch tháng' : 'Monthly Planning'}
         description={vi ? 'Đặt mục tiêu GMV tháng, chia theo ngày dựa trên lịch sử của shop và theo dõi tiến độ.' : 'Set a monthly GMV target, spread by the shop history, and track progress.'}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[

@@ -37,7 +37,7 @@ export const VideoAffiliateView: React.FC = () => {
 
   if (!va.available) {
     return (
-      <Section title="Video & Affiliate">
+      <Section title={vi ? 'Video & Affiliate' : 'Video & Affiliate'}>
         <NotEnoughData
           lang={lang}
           reason={vi ? 'Chưa có báo cáo affiliate / video. Nhập báo cáo Affiliate của Shopee hoặc Creators/Videos của TikTok Shop ở trang Nhập dữ liệu.' : 'No affiliate/video report. Import one in the Data Hub.'}

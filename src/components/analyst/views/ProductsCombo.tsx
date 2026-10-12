@@ -99,7 +99,7 @@ export const ProductsCombo: React.FC = () => {
             title={vi ? 'Phân loại & ABC' : 'Classification & ABC'}
             description={
               vi
-                ? `${formatRangeVi(range)}, ABC: A ${pi.abcCounts.A}, B ${pi.abcCounts.B}, C ${pi.abcCounts.C} SKU, biên lợi nhuận shop ${fmtRate(pi.shopMargin, lang)}${pi.trafficAvailable ? '' : ', Zombie: cần dữ liệu traffic'}`
+                ? `${formatRangeVi(range)}, ABC: A ${pi.abcCounts.A}, B ${pi.abcCounts.B}, C ${pi.abcCounts.C} SKU, biên lợi nhuận shop ${fmtRate(pi.shopMargin, lang)}${pi.trafficAvailable ? '' : ', mục "xem nhiều, không bán" cần dữ liệu lượt nhấp'}`
                 : `${formatRangeVi(range)}, ABC: A ${pi.abcCounts.A}, B ${pi.abcCounts.B}, C ${pi.abcCounts.C}`
             }
             notesLabel={vi ? 'Ghi chú' : 'Notes'}

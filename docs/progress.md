@@ -17,7 +17,14 @@ tên biến, cấu trúc dữ liệu hay luồng chức năng.
 | Thanh trên cùng trong workspace (Gói, hướng dẫn, bảo mật chuyển vào menu tài khoản) | Đã duyệt |
 | Tổng quan điều hành (Executive Overview) | Đã duyệt |
 | Tổng quan của Chủ shop, thanh tab và bộ lọc Chủ shop | Đã làm |
-| Các trang Analyst còn lại | Chưa làm (màu và chữ đã theo biến mới, bố cục chưa) |
+| Chủ shop: Sản phẩm, Đơn hàng, Quảng cáo & Live, Dolphin AI, Dữ liệu, Cài đặt | Đã làm |
+| Phân tích: mọi trang — bỏ "·", Việt hóa nhãn, ô KPI → `FigureStrip` / `StatStrip`, kiểm tra 1440px và 390px | Đã làm |
+
+### Còn để ý
+
+- Một số bảng nhiều cột (Ngành hàng, Quảng cáo, Từ khóa) vẫn cuộn ngang trong khung bảng ở 1440px — đúng quy ước (trên 10 cột).
+- Giữ các viết tắt ngành quen thuộc: GMV, ROAS, AOV, CVR, SKU, KOC; "Ads" trong câu giải thích.
+- Kết quả What-If (so sánh trước/sau) và danh sách khả năng ở Chất lượng dữ liệu vẫn dùng ô có khung — có chủ ý, vì mỗi ô là một cặp so sánh / một trạng thái.
 
 ## Cần đồng bộ sau (ngoài phạm vi lần này)
 

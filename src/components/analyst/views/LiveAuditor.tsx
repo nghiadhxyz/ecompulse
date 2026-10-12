@@ -38,7 +38,7 @@ export const LiveAuditor: React.FC = () => {
   if (la.sessions.length === 0) {
     return (
       <div className="space-y-4">
-        <Section title="Live Session Auditor">
+        <Section title={vi ? 'Livestream' : 'Live Session Auditor'}>
           <NotEnoughData
             lang={lang}
             reason={vi ? 'Chưa có dữ liệu phiên live trong khoảng này (phiên live của báo cáo Phân tích bán hàng chỉ có tổng cả kỳ — chọn trọn kỳ). Nhập báo cáo Livestream của Shopee / TikTok ở Data Hub.' : 'No live sessions in this range. Import a live report in the Data Hub.'}

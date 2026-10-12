@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { StatStrip } from '../ui/data';
 import { ShieldCheck, AlertTriangle, XCircle, Info, CheckCircle2, CircleDashed, ChevronDown } from 'lucide-react';
 import { assessDataQuality, dataNotices, datasetDateBounds, formatRangeVi, PLATFORM_LABELS, type CanonicalDataset, type Capability, type DataIssue } from '../../analytics';
 import { formatNumber } from '../../utils/formatters';
@@ -74,18 +75,13 @@ export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ dataset, lan
       {expanded && (
         <div className="mt-5 space-y-5">
           {report.grain === 'order' && (
-            <div className="grid grid-cols-3 gap-3 text-center">
-              {[
-                { label: vi ? 'Đơn hàng' : 'Orders', value: report.counts.orders },
-                { label: vi ? 'Dòng sản phẩm' : 'Line items', value: report.counts.orderLines },
-                { label: 'SKU', value: report.counts.skus },
-              ].map((c) => (
-                <div key={c.label} className="rounded-control border border-line bg-surface-2 py-2.5">
-                  <div className="text-xl font-bold tabular text-fg">{formatNumber(c.value)}</div>
-                  <div className="text-small text-muted">{c.label}</div>
-                </div>
-              ))}
-            </div>
+            <StatStrip
+              items={[
+                { label: vi ? 'Đơn hàng' : 'Orders', value: formatNumber(report.counts.orders) },
+                { label: vi ? 'Dòng sản phẩm' : 'Line items', value: formatNumber(report.counts.orderLines) },
+                { label: 'SKU', value: formatNumber(report.counts.skus) },
+              ]}
+            />
           )}
 
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">

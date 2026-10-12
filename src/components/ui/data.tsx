@@ -291,7 +291,7 @@ export interface StatItem {
  * unframed, a hairline over each row — at the KPI size.
  */
 export const StatStrip: React.FC<{ items: StatItem[]; className?: string }> = ({ items, className = '' }) => (
-  <dl className={`grid grid-cols-2 gap-x-6 border-b border-line sm:grid-cols-3 ${items.length >= 5 ? 'lg:grid-cols-5' : items.length === 4 ? 'lg:grid-cols-4' : ''} ${items.length >= 7 ? 'xl:grid-cols-7' : ''} ${className}`}>
+  <dl className={`grid grid-cols-2 gap-x-6 border-b border-line sm:grid-cols-3 ${items.length >= 7 ? 'lg:grid-cols-4 xl:grid-cols-7' : items.length === 6 ? 'lg:grid-cols-6' : items.length === 5 ? 'lg:grid-cols-5' : items.length === 4 ? 'lg:grid-cols-4' : ''} ${className}`}>
     {items.map((x) => (
       <div key={x.label} className="min-w-0 border-t border-line py-3" title={x.title}>
         <dt className="line-clamp-2 min-h-9 text-small text-muted" title={x.label}>{x.label}</dt>
