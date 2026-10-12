@@ -42,7 +42,7 @@ export const LiveAuditor: React.FC = () => {
           <NotEnoughData
             lang={lang}
             reason={vi ? 'Chưa có dữ liệu phiên live trong khoảng này (phiên live của báo cáo Phân tích bán hàng chỉ có tổng cả kỳ — chọn trọn kỳ). Nhập báo cáo Livestream của Shopee / TikTok ở Data Hub.' : 'No live sessions in this range. Import a live report in the Data Hub.'}
-            action={<GhostButton onClick={() => goTo('dataHub')}>Data Hub</GhostButton>}
+            action={<GhostButton onClick={() => goTo('dataHub')}>{vi ? 'Nhập dữ liệu' : 'Import data'}</GhostButton>}
           />
         </Section>
         <ChannelWeekdayPanel channel="live" />

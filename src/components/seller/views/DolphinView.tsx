@@ -187,7 +187,7 @@ export const DolphinView: React.FC = () => {
                       className="inline-flex min-h-10 items-center gap-1 rounded-control border border-line px-3 text-small font-semibold text-fg hover:bg-hover disabled:opacity-60"
                     >
                       <ListPlus className="h-4 w-4" aria-hidden />
-                      {added.has(a.id) ? (vi ? 'Đã thêm vào Action Center' : 'Added') : vi ? 'Thêm vào Action Center' : 'Add to Action Center'}
+                      {added.has(a.id) ? (vi ? 'Đã thêm vào Việc cần làm' : 'Added') : vi ? 'Thêm vào Việc cần làm' : 'Add to Action Center'}
                     </button>
                   )}
                 </div>

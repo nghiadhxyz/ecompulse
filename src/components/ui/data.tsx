@@ -194,6 +194,112 @@ export const KpiGrid: React.FC<{ items: KpiItem[]; lang: Lang; compareLabel?: st
   );
 };
 
+// ------------------------------------------------------------------ figure strip + metric ledger (v2)
+
+/** Label line shared by the strip and the ledger: name, ⓘ definition, order stage, data flag. */
+const MetricLabel: React.FC<{ item: KpiItem; lang: Lang }> = ({ item, lang }) => {
+  const { metric, definition } = item;
+  const notes = (metric.notes ?? []).map((n) => n[lang]);
+  const stage = metric.basis ? SHORT_STAGE[metric.basis.vi] : undefined;
+  const flag: FlagLevel | null = metric.mismatch ? 'mismatch' : metric.warning ? 'warn' : metric.status === 'partial' ? 'note' : null;
+  const tip = [definition, ...notes].filter(Boolean).join('\n');
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 text-small text-muted">
+      <span className="truncate">{metric.label ? metric.label[lang] : item.label}</span>
+      {tip && (
+        <span title={tip} className="inline-flex shrink-0 cursor-help" aria-label={tip}>
+          <Info className="h-3.5 w-3.5" aria-hidden />
+        </span>
+      )}
+      {stage && <span className="shrink-0 rounded-full bg-note-soft px-1.5 text-[11px] font-medium text-muted">{stage[lang]}</span>}
+      {flag && (
+        <DataFlag level={flag} lang={lang}>
+          {metric.warning ? metric.warning[lang] : notes.join(' ')}
+        </DataFlag>
+      )}
+    </div>
+  );
+};
+
+/** "Chưa đủ dữ liệu: Lợi nhuận, Biên lợi nhuận — Nhập giá vốn" (metrics without a value are not shown as figures). */
+const MissingLine: React.FC<{ items: KpiItem[]; lang: Lang }> = ({ items, lang }) => {
+  const missing = items.filter((i) => i.metric.value === null);
+  if (missing.length === 0) return null;
+  const action = missing.find((m) => m.missingAction)?.missingAction;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-muted">
+      <span>{lang === 'vi' ? 'Chưa đủ dữ liệu:' : 'Not enough data:'}</span>
+      <span className="text-fg" title={missing.map((m) => `${m.label}: ${m.metric.notes?.[0]?.[lang] ?? ''}`).join('\n')}>
+        {missing.map((m) => m.label).join(', ')}
+      </span>
+      {action && (
+        <button type="button" onClick={action.onClick} className="inline-flex min-h-10 items-center font-semibold text-primary hover:underline">
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
+};
+
+/**
+ * The page's headline figures, set like ledger columns on the page ground (no cards): label,
+ * a large narrow figure, the change. `accentFirst` paints the first figure in the accent —
+ * the one highlight of the page.
+ */
+export const FigureStrip: React.FC<{ items: KpiItem[]; lang: Lang; compareLabel?: string; accentFirst?: boolean }> = ({ items, lang, compareLabel, accentFirst }) => {
+  const shown = items.filter((i) => i.metric.value !== null);
+  return (
+    <div className="space-y-2">
+      <dl className="grid grid-cols-2 gap-y-6 border-y border-line py-5 lg:grid-cols-4">
+        {shown.map((i, n) => (
+          <div key={i.key} className={`min-w-0 border-line ${n % 2 === 1 ? 'border-l pl-4' : 'pr-4'} lg:border-l lg:px-6 lg:first:border-l-0 lg:first:pl-0`}>
+            <dt>
+              <MetricLabel item={i} lang={lang} />
+            </dt>
+            <dd className={`mt-1 text-kpi lg:text-figure ${accentFirst && n === 0 ? 'text-accent' : 'text-fg'}`}>{fmtByUnit(i.metric.value, i.metric.unit, lang, true)}</dd>
+            {i.cmp && (
+              <dd className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <DeltaBadge cmp={i.cmp} lang={lang} goodWhenUp={i.goodWhenUp} />
+                {compareLabel && i.cmp.direction !== 'unknown' && <span className="text-small text-muted">{compareLabel}</span>}
+              </dd>
+            )}
+          </div>
+        ))}
+      </dl>
+      <MissingLine items={items} lang={lang} />
+    </div>
+  );
+};
+
+/** Secondary metrics as ledger rows (name left, figure and change right), two columns from md. */
+export const MetricLedger: React.FC<{ items: KpiItem[]; lang: Lang; title?: string }> = ({ items, lang, title }) => {
+  const shown = items.filter((i) => i.metric.value !== null);
+  return (
+    <div className="space-y-2">
+      {title && <h2 className="text-card-title text-fg">{title}</h2>}
+      <dl className="grid grid-cols-1 gap-x-10 md:grid-cols-2">
+        {shown.map((i) => (
+          <div key={i.key} className="flex min-h-12 items-center justify-between gap-3 border-b border-line py-2">
+            <dt className="min-w-0">
+              <MetricLabel item={i} lang={lang} />
+            </dt>
+            <dd className="flex shrink-0 items-center gap-2">
+              <span className="font-figure text-xl font-semibold tabular text-fg font-stretch-85%">{fmtByUnit(i.metric.value, i.metric.unit, lang, true)}</span>
+              {i.cmp &&
+                (i.cmp.direction === 'unknown' ? (
+                  <span className="text-small text-muted" title={lang === 'vi' ? 'Không có kỳ so sánh' : 'No comparison period'}>—</span>
+                ) : (
+                  <DeltaBadge cmp={i.cmp} lang={lang} goodWhenUp={i.goodWhenUp} />
+                ))}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <MissingLine items={items} lang={lang} />
+    </div>
+  );
+};
+
 // ------------------------------------------------------------------ alert stack
 
 export interface StackItem {

@@ -40,7 +40,7 @@ export const ReportCenterView: React.FC = () => {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Report Center"
+        title={vi ? 'Xuất báo cáo' : 'Report Center'}
         description={vi ? 'Báo cáo tạo trên máy từ cùng engine với các màn hình — xuất CSV, Excel, PDF.' : 'Reports built locally from the same engine as the screens.'}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={[

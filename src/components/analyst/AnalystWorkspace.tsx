@@ -14,6 +14,7 @@ import {
   LayoutGrid,
   Loader2,
   Megaphone,
+  Menu,
   PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
@@ -30,6 +31,7 @@ import {
   Users,
   Video,
   Wallet,
+  X,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
@@ -109,7 +111,7 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
     vi: 'Hôm nay',
     en: 'Today',
     items: [
-      { key: 'overview', vi: 'Executive Overview', en: 'Executive Overview', icon: Gauge, descVi: 'Điều gì đã thay đổi, ở sàn và ngành hàng nào' },
+      { key: 'overview', vi: 'Tổng quan điều hành', en: 'Executive Overview', icon: Gauge, descVi: 'Điều gì đã thay đổi, ở sàn và ngành hàng nào' },
       { key: 'alerts', vi: 'Cảnh báo & Dolphin AI', en: 'Alerts & Dolphin AI', icon: Bell, descVi: 'Bản tin hôm nay và các cảnh báo cần xem' },
     ],
   },
@@ -117,7 +119,7 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
     vi: 'Hiệu quả',
     en: 'Performance',
     items: [
-      { key: 'category', vi: 'Category Intelligence', en: 'Category Intelligence', icon: LayoutGrid, descVi: 'Ngành, nhóm hàng và SKU đóng góp thế nào' },
+      { key: 'category', vi: 'Ngành hàng', en: 'Category Intelligence', icon: LayoutGrid, descVi: 'Ngành, nhóm hàng và SKU đóng góp thế nào' },
       { key: 'productsCombo', vi: 'Sản phẩm & Combo', en: 'Products & Combo', icon: PackageSearch, descVi: 'Sản phẩm bán chạy, combo và hiệu quả từng kênh' },
       { key: 'revenueProfit', vi: 'Doanh thu & Lợi nhuận', en: 'Revenue & Profit', icon: Wallet, descVi: 'Từ doanh số tới lợi nhuận đóng góp' },
       { key: 'orderHealth', vi: 'Sức khỏe đơn hàng', en: 'Order Health', icon: HeartPulse, descVi: 'Hủy, hoàn và lý do' },
@@ -128,10 +130,10 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
     vi: 'Tăng trưởng',
     en: 'Growth',
     items: [
-      { key: 'funnel', vi: 'Traffic & Funnel', en: 'Traffic & Funnel', icon: Workflow, descVi: 'Doanh thu theo kênh, nguồn truy cập và phễu' },
-      { key: 'campaign', vi: 'Campaign & Calendar', en: 'Campaign & Calendar', icon: CalendarRange, descVi: 'Ngày sale, ngày thường và so sánh chiến dịch' },
-      { key: 'ads', vi: 'Ads Intelligence', en: 'Ads Intelligence', icon: Megaphone, descVi: 'Chi phí, doanh thu quy đổi và ROAS' },
-      { key: 'keywords', vi: 'Keyword Explorer', en: 'Keyword Explorer', icon: Search, descVi: 'Từ khóa nào hiệu quả, từ khóa nào lãng phí và cơ hội từ khóa mới' },
+      { key: 'funnel', vi: 'Lưu lượng & phễu', en: 'Traffic & Funnel', icon: Workflow, descVi: 'Doanh thu theo kênh, nguồn truy cập và phễu' },
+      { key: 'campaign', vi: 'Chiến dịch & lịch sale', en: 'Campaign & Calendar', icon: CalendarRange, descVi: 'Ngày sale, ngày thường và so sánh chiến dịch' },
+      { key: 'ads', vi: 'Quảng cáo', en: 'Ads Intelligence', icon: Megaphone, descVi: 'Chi phí, doanh thu quy đổi và ROAS' },
+      { key: 'keywords', vi: 'Từ khóa quảng cáo', en: 'Keyword Explorer', icon: Search, descVi: 'Từ khóa nào hiệu quả, từ khóa nào lãng phí và cơ hội từ khóa mới' },
       { key: 'live', vi: 'Livestream', en: 'Livestream', icon: Radio, descVi: 'Phiên live, người xem và phễu live' },
       { key: 'video', vi: 'Video & Affiliate', en: 'Video & Affiliate', icon: Video, descVi: 'Video của shop và KOC' },
     ],
@@ -140,29 +142,29 @@ const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
     vi: 'Phân tích sâu',
     en: 'Intelligence',
     items: [
-      { key: 'rootCause', vi: 'Root Cause', en: 'Root Cause', icon: GitBranch, descVi: 'Tách thay đổi doanh số thành từng nguyên nhân' },
-      { key: 'anomaly', vi: 'Anomaly & Opportunity', en: 'Anomaly & Opportunity', icon: Activity, descVi: 'Ngày bất thường và cơ hội' },
-      { key: 'whatIf', vi: 'What-If', en: 'What-If', icon: FlaskConical, descVi: 'Mô phỏng khi đổi giá, Ads, tỷ lệ hủy' },
+      { key: 'rootCause', vi: 'Nguyên nhân thay đổi', en: 'Root Cause', icon: GitBranch, descVi: 'Tách thay đổi doanh số thành từng nguyên nhân' },
+      { key: 'anomaly', vi: 'Bất thường & cơ hội', en: 'Anomaly & Opportunity', icon: Activity, descVi: 'Ngày bất thường và cơ hội' },
+      { key: 'whatIf', vi: 'Mô phỏng What-If', en: 'What-If', icon: FlaskConical, descVi: 'Mô phỏng khi đổi giá, Ads, tỷ lệ hủy' },
       { key: 'stats', vi: 'Thống kê nâng cao', en: 'Advanced statistics', icon: Sigma, descVi: 'Kiểm định, tương quan và chỉ số theo thứ' },
-      { key: 'changeImpact', vi: 'Change Impact', en: 'Change Impact', icon: TrendingUp, descVi: 'Tác động của một thay đổi bạn đã làm' },
+      { key: 'changeImpact', vi: 'Tác động thay đổi', en: 'Change Impact', icon: TrendingUp, descVi: 'Tác động của một thay đổi bạn đã làm' },
     ],
   },
   {
     vi: 'Kế hoạch',
     en: 'Planning',
     items: [
-      { key: 'planning', vi: 'Monthly Planning', en: 'Monthly Planning', icon: Target, descVi: 'Mục tiêu tháng và tiến độ' },
-      { key: 'actions', vi: 'Action Center', en: 'Action Center', icon: ClipboardList, descVi: 'Việc cần làm từ các phân tích' },
-      { key: 'reports', vi: 'Report Center', en: 'Report Center', icon: FileText, descVi: 'Xuất báo cáo' },
+      { key: 'planning', vi: 'Kế hoạch tháng', en: 'Monthly Planning', icon: Target, descVi: 'Mục tiêu tháng và tiến độ' },
+      { key: 'actions', vi: 'Việc cần làm', en: 'Action Center', icon: ClipboardList, descVi: 'Việc cần làm từ các phân tích' },
+      { key: 'reports', vi: 'Xuất báo cáo', en: 'Report Center', icon: FileText, descVi: 'Xuất báo cáo' },
     ],
   },
 ];
 
 /** Data pages, at the foot of the sidebar next to the data status. */
 const DATA_ITEMS: NavItem[] = [
-  { key: 'dataHub', vi: 'Data Hub', en: 'Data Hub', icon: UploadCloud, descVi: 'Nhập file và quản lý dữ liệu trên máy' },
+  { key: 'dataHub', vi: 'Nhập dữ liệu', en: 'Data Hub', icon: UploadCloud, descVi: 'Nhập file và quản lý dữ liệu trên máy' },
   { key: 'dataQuality', vi: 'Chất lượng dữ liệu', en: 'Data Quality', icon: ShieldCheck, descVi: 'Dữ liệu đủ cho phân tích nào, chỗ nào lệch' },
-  { key: 'mapping', vi: 'Data Mapping', en: 'Data Mapping', icon: Tags, descVi: 'Cột nào trong file được đọc thành chỉ số nào' },
+  { key: 'mapping', vi: 'Ánh xạ cột', en: 'Data Mapping', icon: Tags, descVi: 'Cột nào trong file được đọc thành chỉ số nào' },
   { key: 'settings', vi: 'Giá vốn, phí & cài đặt', en: 'COGS, fees & settings', icon: Settings2, descVi: 'Giá vốn, phí và ước tính cho cả shop' },
 ];
 const ALL_ITEMS = [...GROUPS.flatMap((g) => g.items), ...DATA_ITEMS];
@@ -183,6 +185,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
   const [stage, setStage] = useState<SummaryStage>(DEFAULT_STAGE);
   const [categories, setCategories] = useState<string[]>([]);
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('ecompulse-sidebar') === 'collapsed';
@@ -253,12 +256,12 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
     }
     if (!dataset || !bounds || !resolved || !baseFilter) {
       return (
-        <div className="bg-surface border border-line shadow-card rounded-2xl p-6 sm:p-10 text-center">
-          <h2 className="text-lg font-black text-fg">{vi ? 'Chưa có dữ liệu để phân tích' : 'No data to analyze yet'}</h2>
-          <p className="text-sm text-muted mt-1.5">{vi ? 'Nhập file xuất đơn hàng ở Data Hub, hoặc dùng dữ liệu demo 3 tháng.' : 'Import order exports in the Data Hub, or use the 3-month demo.'}</p>
+        <div className="rounded-card border border-line bg-surface p-6 text-center sm:p-10">
+          <h2 className="text-card-title text-fg">{vi ? 'Chưa có dữ liệu để phân tích' : 'No data to analyze yet'}</h2>
+          <p className="text-sm text-muted mt-1.5">{vi ? 'Nhập file xuất đơn hàng hoặc báo cáo của sàn, hoặc xem thử bằng dữ liệu demo 3 tháng.' : 'Import order exports in the Data Hub, or use the 3-month demo.'}</p>
           <div className="flex flex-wrap justify-center gap-2 mt-4">
-            <PrimaryButton onClick={() => setView('dataHub')}><UploadCloud className="w-4 h-4" /> Data Hub</PrimaryButton>
-            <GhostButton onClick={ws.loadDemo}><PlayCircle className="w-4 h-4" /> {vi ? 'Dữ liệu demo' : 'Demo data'}</GhostButton>
+            <PrimaryButton onClick={() => setView('dataHub')}><UploadCloud className="w-4 h-4" /> {vi ? 'Nhập dữ liệu' : 'Import data'}</PrimaryButton>
+            <GhostButton onClick={ws.loadDemo}><PlayCircle className="w-4 h-4" /> {vi ? 'Xem dữ liệu demo' : 'Demo data'}</GhostButton>
           </div>
         </div>
       );
@@ -365,9 +368,9 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
         type="button"
         onClick={() => (item.classic ? onOpenClassic() : goTo(item.key as AnalystView))}
         aria-current={active ? 'page' : undefined}
-        title={collapsed ? label : undefined}
-        className={`flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-sm font-medium transition-colors ${
-          active ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-hover hover:text-fg'
+        title={collapsed ? label : vi && item.en !== item.vi ? item.en : undefined}
+        className={`flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-sm transition-colors ${
+          active ? 'bg-primary-soft font-semibold text-primary' : 'font-medium text-fg/80 hover:bg-hover hover:text-fg'
         } ${collapsed ? 'justify-center px-0' : ''}`}
       >
         <Icon className="h-4 w-4 shrink-0" aria-hidden />
@@ -387,16 +390,16 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
         className={`hidden shrink-0 transition-[width] lg:block ${collapsed ? 'w-[72px]' : 'w-[248px]'}`}
         aria-label={vi ? 'Điều hướng Analyst' : 'Analyst navigation'}
       >
-        <nav className="sticky top-20 flex max-h-[calc(100vh-6rem)] flex-col rounded-card border border-line bg-surface p-3 shadow-card">
+        <nav className="sticky top-20 flex max-h-[calc(100vh-6rem)] flex-col border-r border-line pr-3">
           <div className="flex-1 space-y-4 overflow-y-auto">
             {GROUPS.map((g) => (
               <div key={g.en}>
-                {!collapsed && <div className="px-3 pb-1 text-small text-muted">{vi ? g.vi : g.en}</div>}
+                {!collapsed && <h2 className="px-3 pb-1 text-small text-muted">{vi ? g.vi : g.en}</h2>}
                 <div className="space-y-0.5">{g.items.map(navButton)}</div>
               </div>
             ))}
             <div>
-              {!collapsed && <div className="px-3 pb-1 text-small text-muted">{vi ? 'Dữ liệu' : 'Data'}</div>}
+              {!collapsed && <h2 className="px-3 pb-1 text-small text-muted">{vi ? 'Dữ liệu' : 'Data'}</h2>}
               <div className="space-y-0.5">{DATA_ITEMS.map(navButton)}</div>
             </div>
           </div>
@@ -411,7 +414,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
                 <Database className="h-4 w-4 shrink-0" aria-hidden />
                 {!collapsed && (
                   <span className="truncate">
-                    {ready}/{quality.capabilities.length} {vi ? 'nhóm phân tích' : 'analysis groups'}
+                    {vi ? `Đủ dữ liệu: ${ready}/${quality.capabilities.length} nhóm` : `${ready}/${quality.capabilities.length} analysis groups`}
                   </span>
                 )}
               </button>
@@ -440,29 +443,52 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
       </aside>
 
       <div className="mx-auto w-full min-w-0 max-w-[1440px]">
-        {/* Mobile / tablet navigation */}
-        <div className="mb-3 lg:hidden">
-          <label className="sr-only" htmlFor="analyst-nav">{vi ? 'Chọn module' : 'Module'}</label>
-          <select
-            id="analyst-nav"
-            value={view}
-            onChange={(e) => (e.target.value === '__classic' ? onOpenClassic() : goTo(e.target.value as AnalystView))}
-            className="min-h-10 w-full rounded-control border border-line bg-surface px-3 text-sm text-fg"
+        {/* Mobile / tablet navigation: one button that opens the full menu */}
+        <div className="mb-4 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={menuOpen}
+            className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-control border border-line bg-surface px-3 text-sm font-semibold text-fg"
           >
-            {[...GROUPS, { vi: 'Dữ liệu', en: 'Data', items: DATA_ITEMS }].map((g) => (
-              <optgroup key={g.en} label={vi ? g.vi : g.en}>
-                {g.items.map((i) => (
-                  <option key={i.key} value={i.classic ? '__classic' : i.key} disabled={!!i.phase}>
-                    {vi ? i.vi : i.en}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-            <option value="__classic">{vi ? 'Dashboard cổ điển' : 'Classic dashboard'}</option>
-          </select>
+            <Menu className="h-4 w-4 shrink-0" aria-hidden />
+            Menu
+            {current && <span className="truncate font-normal text-muted">{vi ? current.vi : current.en}</span>}
+          </button>
         </div>
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={vi ? 'Menu phân tích' : 'Analyst menu'}>
+            <button type="button" className="absolute inset-0 bg-overlay" aria-label={vi ? 'Đóng menu' : 'Close menu'} onClick={() => setMenuOpen(false)} />
+            <nav className="absolute inset-y-0 left-0 flex w-[min(320px,88vw)] flex-col bg-bg p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-card-title text-fg">{vi ? 'Phân tích' : 'Analyst'}</span>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(false)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-control text-muted hover:bg-hover hover:text-fg"
+                  aria-label={vi ? 'Đóng menu' : 'Close menu'}
+                >
+                  <X className="h-5 w-5" aria-hidden />
+                </button>
+              </div>
+              <div className="flex-1 space-y-4 overflow-y-auto" onClick={(e) => (e.target as HTMLElement).closest('button') && setMenuOpen(false)}>
+                {[...GROUPS, { vi: 'Dữ liệu', en: 'Data', items: DATA_ITEMS }].map((g) => (
+                  <div key={g.en}>
+                    <h2 className="px-3 pb-1 text-small text-muted">{vi ? g.vi : g.en}</h2>
+                    <div className="space-y-0.5">{g.items.map(navButton)}</div>
+                  </div>
+                ))}
+                <button type="button" onClick={onOpenClassic} className="flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-small text-muted hover:bg-hover hover:text-fg">
+                  <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden />
+                  {vi ? 'Dashboard cổ điển' : 'Classic dashboard'}
+                </button>
+              </div>
+            </nav>
+          </div>
+        )}
         {current && (
-          <div className="mb-4">
+          <div className="mb-6">
             <PageTitle title={vi ? current.vi : current.en} description={vi ? current.descVi : undefined} />
           </div>
         )}

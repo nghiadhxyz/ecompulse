@@ -40,8 +40,8 @@ export const VideoAffiliateView: React.FC = () => {
       <Section title="Video & Affiliate">
         <NotEnoughData
           lang={lang}
-          reason={vi ? 'Chưa có báo cáo affiliate / video. Nhập báo cáo Affiliate của Shopee hoặc Creators/Videos của TikTok Shop ở Data Hub.' : 'No affiliate/video report. Import one in the Data Hub.'}
-          action={<GhostButton onClick={() => goTo('dataHub')}>Data Hub</GhostButton>}
+          reason={vi ? 'Chưa có báo cáo affiliate / video. Nhập báo cáo Affiliate của Shopee hoặc Creators/Videos của TikTok Shop ở trang Nhập dữ liệu.' : 'No affiliate/video report. Import one in the Data Hub.'}
+          action={<GhostButton onClick={() => goTo('dataHub')}>{vi ? 'Nhập dữ liệu' : 'Import data'}</GhostButton>}
         />
       </Section>
     );

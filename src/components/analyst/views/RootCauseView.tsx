@@ -98,7 +98,7 @@ export const RootCauseView: React.FC = () => {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Root Cause"
+        title={vi ? 'Nguyên nhân thay đổi' : 'Root Cause'}
         description={vi ? `Thay đổi nằm ở đâu: ${formatRangeVi(range)} so với ${formatRangeVi(previousRange)}` : `Where the change sits: ${formatRangeVi(range)} vs ${formatRangeVi(previousRange)}`}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
         notes={r.unavailable ? [] : r.notes.map((n) => tr(lang, n))}

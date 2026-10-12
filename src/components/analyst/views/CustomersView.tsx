@@ -17,7 +17,7 @@ export const CustomersView: React.FC = () => {
       <div className="space-y-4">
         <CustomerTrendPanel />
         <Section title={vi ? 'Phân nhóm RFM, cohort (cần mã người mua)' : 'RFM & cohorts (need buyer IDs)'}>
-          <NotEnoughData lang={lang} reason={tr(lang, ci.unavailable!)} action={<Button onClick={() => goTo('dataHub')}>Data Hub</Button>} />
+          <NotEnoughData lang={lang} reason={tr(lang, ci.unavailable!)} action={<Button onClick={() => goTo('dataHub')}>{lang === 'vi' ? 'Nhập dữ liệu' : 'Import data'}</Button>} />
         </Section>
       </div>
     );

@@ -25,11 +25,11 @@ export const AdsIntelligenceView: React.FC = () => {
 
   if (!ai.available) {
     return (
-      <Section title="Ads Intelligence">
+      <Section title={vi ? 'Quảng cáo' : 'Ads Intelligence'}>
         <NotEnoughData
           lang={lang}
-          reason={vi ? 'Chưa có báo cáo quảng cáo. Nhập báo cáo Ads của Shopee / TikTok / Lazada ở Data Hub.' : 'No ads report. Import one in the Data Hub.'}
-          action={<GhostButton onClick={() => goTo('dataHub')}>Data Hub</GhostButton>}
+          reason={vi ? 'Chưa có báo cáo quảng cáo. Nhập báo cáo quảng cáo của Shopee, TikTok hoặc Lazada ở trang Nhập dữ liệu.' : 'No ads report. Import one in the Data Hub.'}
+          action={<GhostButton onClick={() => goTo('dataHub')}>{vi ? 'Nhập dữ liệu' : 'Import data'}</GhostButton>}
         />
       </Section>
     );
@@ -40,7 +40,7 @@ export const AdsIntelligenceView: React.FC = () => {
       return formatRangeVi({ start, end });
     });
     return (
-      <Section title="Ads Intelligence">
+      <Section title={vi ? 'Quảng cáo' : 'Ads Intelligence'}>
         <NotEnoughData
           lang={lang}
           reason={

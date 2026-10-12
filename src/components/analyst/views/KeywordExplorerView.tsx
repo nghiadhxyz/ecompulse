@@ -59,15 +59,15 @@ export const KeywordExplorerView: React.FC = () => {
 
   if (!ki.available) {
     return (
-      <Section title="Keyword Explorer">
+      <Section title={vi ? 'Từ khóa quảng cáo' : 'Keyword Explorer'}>
         <NotEnoughData
           lang={lang}
           reason={
             vi
-              ? 'Chưa có báo cáo từ khóa. Xuất báo cáo "Từ khóa" của Quảng cáo Tìm kiếm Sản phẩm (Shopee Ads) và nhập ở Data Hub — có thể kèm sheet "Gợi ý từ khóa" (lượt tìm kiếm, giá thầu đề xuất) để xem cơ hội mới.'
+              ? 'Chưa có báo cáo từ khóa. Xuất báo cáo "Từ khóa" của Quảng cáo Tìm kiếm Sản phẩm (Shopee Ads) và nhập ở trang Nhập dữ liệu. Có thể kèm sheet "Gợi ý từ khóa" (lượt tìm kiếm, giá thầu đề xuất) để xem cơ hội mới.'
               : 'No keyword report. Export the Shopee Ads keyword report and import it in the Data Hub.'
           }
-          action={<GhostButton onClick={() => goTo('dataHub')}>Data Hub</GhostButton>}
+          action={<GhostButton onClick={() => goTo('dataHub')}>{vi ? 'Nhập dữ liệu' : 'Import data'}</GhostButton>}
         />
       </Section>
     );

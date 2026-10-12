@@ -135,7 +135,7 @@ export const ActionCenterView: React.FC = () => {
   const [filter, setFilter] = useState<ActionStatus | 'open' | 'all'>('open');
   const platforms = useMemo(() => [...new Set(dataset.orders.map((o) => o.platform))], [dataset]);
 
-  if (!planning) return <NotEnoughData lang={lang} reason={vi ? 'Action Center chỉ có trong Analyst workspace.' : 'Action Center is in the Analyst workspace.'} />;
+  if (!planning) return <NotEnoughData lang={lang} reason={vi ? 'Việc cần làm chỉ có trong chế độ Phân tích.' : 'Action Center is in the Analyst workspace.'} />;
   const list = planning.actions.filter((a) => (filter === 'all' ? true : filter === 'open' ? a.status === 'todo' || a.status === 'doing' : a.status === filter));
   const overdue = planning.actions.filter((a) => isOverdue(a, asOf)).length;
 
@@ -157,10 +157,10 @@ export const ActionCenterView: React.FC = () => {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="Action Center"
+        title={vi ? 'Việc cần làm' : 'Action Center'}
         description={vi ? 'Nhận định → bằng chứng → hành động → người phụ trách → hạn → trạng thái → đo kết quả.' : 'Insight → evidence → action → owner → deadline → status → result.'}
         notesLabel={vi ? 'Ghi chú' : 'Notes'}
-        notes={[vi ? 'Mẹo: bấm "Thêm vào Action Center" ở các cảnh báo để tạo hành động kèm bằng chứng.' : 'Tip: use "Add to Action Center" on alerts to carry the evidence.']}
+        notes={[vi ? 'Mẹo: bấm "Thêm vào Việc cần làm" ở các cảnh báo để tạo việc kèm bằng chứng.' : 'Tip: use "Add to Action Center" on alerts to carry the evidence.']}
         tools={
           <GhostButton onClick={() => downloadIcs(null, planning.actions, 'EcomPulse_han_hanh_dong')} disabled={!planning.actions.some((a) => a.deadline)}>
             <CalendarPlus className="w-4 h-4" aria-hidden /> {vi ? 'Xuất hạn (.ics)' : 'Deadlines (.ics)'}
