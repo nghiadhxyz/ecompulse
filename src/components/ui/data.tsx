@@ -265,6 +265,7 @@ export const FigureStrip: React.FC<{ items: KpiItem[]; lang: Lang; compareLabel?
                 {compareLabel && i.cmp.direction !== 'unknown' && <span className="text-small text-muted">{compareLabel}</span>}
               </dd>
             )}
+            {i.sub && <dd className="mt-0.5 text-small text-muted">{i.sub}</dd>}
           </div>
         ))}
       </dl>
@@ -272,6 +273,34 @@ export const FigureStrip: React.FC<{ items: KpiItem[]; lang: Lang; compareLabel?
     </div>
   );
 };
+
+export interface StatItem {
+  label: string;
+  /** Already formatted ("5,2 triệu", "12,28x"). */
+  value: string;
+  /** down = orange (a loss or a bad value); up = green. */
+  tone?: 'up' | 'down';
+  /** Value is a sentence like "Không đủ dữ liệu", not a figure. */
+  missing?: boolean;
+  sub?: string;
+  title?: string;
+}
+
+/**
+ * Page-level figures given as formatted strings (ads, live, keywords…): the FigureStrip look —
+ * unframed, a hairline over each row — at the KPI size.
+ */
+export const StatStrip: React.FC<{ items: StatItem[]; className?: string }> = ({ items, className = '' }) => (
+  <dl className={`grid grid-cols-2 gap-x-6 border-b border-line sm:grid-cols-3 ${items.length >= 5 ? 'lg:grid-cols-5' : items.length === 4 ? 'lg:grid-cols-4' : ''} ${items.length >= 7 ? 'xl:grid-cols-7' : ''} ${className}`}>
+    {items.map((x) => (
+      <div key={x.label} className="min-w-0 border-t border-line py-3" title={x.title}>
+        <dt className="text-small text-muted">{x.label}</dt>
+        <dd className={`mt-1 ${x.missing ? 'text-sm font-semibold text-muted' : `text-kpi ${x.tone === 'down' ? 'text-down' : x.tone === 'up' ? 'text-up' : 'text-fg'}`}`}>{x.value}</dd>
+        {x.sub && <dd className="mt-0.5 text-small text-muted">{x.sub}</dd>}
+      </div>
+    ))}
+  </dl>
+);
 
 /** Secondary metrics as ledger rows (name left, figure and change right), two columns from md. */
 export const MetricLedger: React.FC<{ items: KpiItem[]; lang: Lang; title?: string }> = ({ items, lang, title }) => {

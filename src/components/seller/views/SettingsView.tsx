@@ -125,7 +125,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
           <>
             <p className="mb-3 text-small text-muted">
               {vi
-                ? 'Mẹo: nhập nhanh bằng file Excel có cột "SKU" cùng "Giá vốn", "Ngành hàng", "Nhóm hàng" ở trang Dữ liệu. Ngành hàng cần cho phân tích Category Intelligence.'
+                ? 'Mẹo: nhập nhanh bằng file Excel có cột "SKU" cùng "Giá vốn", "Ngành hàng", "Nhóm hàng" ở trang Dữ liệu. Ngành hàng cần cho trang Ngành hàng ở chế độ Phân tích.'
                 : 'Tip: import an Excel file with "SKU" plus "COGS", "Category", "Niche" columns on the Data page.'}
             </p>
             <datalist id="category-options">{categoryOptions.map((c) => <option key={c} value={c} />)}</datalist>
@@ -149,7 +149,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ lang, dataset, setti
                         <div className="truncate font-medium text-fg">{r.name}</div>
                         <div className="text-small text-muted">
                           {r.sku}
-                          {r.missing && <span className="font-medium text-warn"> · {vi ? 'thiếu giá vốn' : 'missing'}</span>}
+                          {r.missing && <span className="font-medium text-warn">, {vi ? 'thiếu giá vốn' : 'missing'}</span>}
                         </div>
                       </td>
                       <td className={`${TABLE.td} text-right text-fg`}>{r.units.toLocaleString('vi-VN')}</td>
