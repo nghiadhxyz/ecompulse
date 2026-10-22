@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { Header } from './components/Header';
 import { DualTrackSelector, AnalysisTrack } from './components/DualTrackSelector';
 import { UploadModal } from './components/UploadModal';
@@ -281,6 +282,9 @@ export default function App() {
         onDataLoaded={handleDataLoaded}
         onSelectSample={() => {}}
       />
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
