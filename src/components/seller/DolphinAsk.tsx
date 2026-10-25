@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Send, Sparkles, Loader2, Lock, Cpu, Cloud } from 'lucide-react';
-import { askDolphin, answerToAiPayload, fmtByUnit, formatRangeVi, questionUnavailable, SUGGESTED_QUESTIONS, type Bilingual, type DolphinAnswer } from '../../analytics';
-import { aiRephrase, type AiReply } from '../../utils/aiClient';
+import Markdown from 'react-markdown';
+import { askDolphin, answerToAiPayload, compareRanges, fmtByUnit, formatRangeVi, questionUnavailable, SUGGESTED_QUESTIONS, type Bilingual, type DolphinAnswer } from '../../analytics';
+import { aiChat, aiRephrase, type AiReply } from '../../utils/aiClient';
 import { PRIVACY_MODE_INFO } from '../../utils/aiPrivacy';
 import { useAiPrivacyMode } from '../workspace/AiPrivacySettings';
 import { useWorkspace } from './SellerContext';
@@ -23,6 +24,7 @@ export const DolphinAsk: React.FC = () => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const ctx = useMemo(() => ({ range, previousRange, platforms }), [range, previousRange, platforms]);
   const ModeIcon = MODE_ICON[mode];
+
   // Questions the loaded data cannot answer (no order export / COGS) are dimmed, with the reason.
   const blocked = useMemo(() => {
     const out = new Map<string, Bilingual>();
@@ -32,6 +34,7 @@ export const DolphinAsk: React.FC = () => {
     }
     return out;
   }, [dataset, ctx]);
+
   const chip = (q: string, className: string) => {
     const reason = blocked.get(q);
     return (
@@ -48,11 +51,101 @@ export const DolphinAsk: React.FC = () => {
     );
   };
 
-  const ask = (q: string) => {
+  const ask = async (q: string) => {
     const question = q.trim();
     if (!question) return;
-    setTurns((t) => [{ answer: askDolphin(dataset, question, ctx) }, ...t].slice(0, 8));
+
+    const localAnswer = askDolphin(dataset, question, ctx);
+    const newTurn: Turn = {
+      answer: localAnswer,
+      ai: mode !== 'local_only' ? 'loading' : undefined,
+    };
+
+    setTurns((t) => [newTurn, ...t].slice(0, 8));
     setInput('');
+
+    if (mode !== 'local_only') {
+      try {
+        let comparison: any = null;
+        try {
+          comparison = compareRanges(dataset, { range, platforms }, previousRange);
+        } catch {
+          comparison = null;
+        }
+
+        const analyticsData = {
+          question,
+          period: `${formatRangeVi(range)} so với ${formatRangeVi(previousRange)}`,
+          platforms: platforms?.join(', ') || 'Tất cả các sàn',
+          kpis: comparison?.metrics
+            ? {
+                paidRevenue: comparison.metrics.gmv.current,
+                previousPaidRevenue: comparison.metrics.gmv.previous,
+                revenueGrowthRate: comparison.metrics.gmv.percentageDelta,
+                placedRevenue: comparison.metrics.placedGmv.current,
+                paidOrders: comparison.metrics.orders.current,
+                previousPaidOrders: comparison.metrics.orders.previous,
+                cancelRate: comparison.metrics.cancelRate.current,
+                adSpend: comparison.metrics.adSpend.current,
+                roas: comparison.metrics.roas.current,
+                aov: comparison.metrics.aov?.current,
+              }
+            : null,
+          localInsight: tr(lang, localAnswer.insight),
+          localInterpretation: tr(lang, localAnswer.interpretation),
+          evidence: localAnswer.evidence?.map((e) => ({
+            label: tr(lang, e.label),
+            current: e.current,
+            baseline: e.baseline,
+          })),
+          dailyMetricsTrends: dataset.dailyMetrics.slice(-20).map((d) => ({
+            date: d.date,
+            placedRevenue: d.placedGmv,
+            paidRevenue: d.paidGmv,
+            placedOrders: d.placedOrders,
+            paidOrders: d.paidOrders,
+            cancelledOrders: d.cancelledOrders,
+          })),
+          topProducts: dataset.products.slice(0, 8).map((p) => ({
+            name: p.name,
+            sku: p.sku,
+            category: p.category,
+            price: p.listPrice,
+          })),
+        };
+
+        const res = await aiChat({
+          message: question,
+          history: turns.slice(0, 3).map((t) => ({
+            role: 'assistant',
+            content: typeof t.ai === 'object' && t.ai?.text ? t.ai.text : tr(lang, t.answer.insight),
+          })),
+          analyticsData,
+          language: lang,
+        });
+
+        setTurns((prev) =>
+          prev.map((item) => (item.answer === localAnswer ? { ...item, ai: res } : item))
+        );
+      } catch {
+        setTurns((prev) =>
+          prev.map((item) =>
+            item.answer === localAnswer
+              ? {
+                  ...item,
+                  ai: {
+                    text:
+                      lang === 'vi'
+                        ? 'Không thể kết nối với mô hình AI lúc này. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại.'
+                        : 'Could not connect to AI model.',
+                    source: 'unavailable',
+                  },
+                }
+              : item
+          )
+        );
+      }
+    }
   };
 
   const rephrase = async (i: number) => {
@@ -108,20 +201,68 @@ export const DolphinAsk: React.FC = () => {
       <div className="space-y-3 mt-4">
         {turns.map((t, i) => {
           const a = t.answer;
+          const aiReply: AiReply | null = typeof t.ai === 'object' && t.ai !== null ? t.ai : null;
+          const hasAi = aiReply !== null;
+          const isAiLoading = t.ai === 'loading';
+
           return (
-            <article key={`${a.question}-${turns.length - i}`} className="rounded-xl border border-line bg-surface-2 p-3">
-              <p className="text-xs text-muted mb-2">
+            <article key={`${a.question}-${turns.length - i}`} className="rounded-xl border border-line bg-surface-2 p-3 sm:p-4 space-y-3">
+              <p className="text-xs text-muted">
                 <b className="text-fg">{vi ? 'Bạn hỏi: ' : 'You asked: '}</b>
-                {a.question}
+                <span className="text-fg font-medium">{a.question}</span>
               </p>
-              <div className="space-y-2.5">
+
+              {/* 1. Gemini AI Analysis (shown when mode !== 'local_only') */}
+              {isAiLoading && (
+                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-primary/10 border border-primary/20 text-primary">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  <span className="text-xs font-semibold">
+                    {vi ? 'Dolphin Gemini AI đang phân tích dữ liệu cửa hàng...' : 'Dolphin Gemini AI is analyzing store data...'}
+                  </span>
+                </div>
+              )}
+
+              {aiReply && (
+                <div className="p-3.5 sm:p-4 rounded-xl bg-surface border border-primary/30 shadow-sm space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 border-b border-line pb-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>{vi ? 'Dolphin Gemini AI Trả Lời:' : 'Dolphin Gemini AI Answer:'}</span>
+                    </div>
+                    <span className="text-[10px] text-muted font-medium bg-surface-2 px-2 py-0.5 rounded-full border border-line">
+                      {aiReply.source === 'cloud' ? 'Cloud AI (Gemini)' : 'AI Model'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-fg leading-relaxed">
+                    <Markdown
+                      components={{
+                        h1: ({ children }) => <h1 className="text-base font-bold text-fg mb-2">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-sm font-bold text-primary mt-3 mb-1.5">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-xs font-bold text-fg uppercase tracking-wider mt-3 mb-1">{children}</h3>,
+                        p: ({ children }) => <p className="text-xs sm:text-sm text-fg leading-relaxed mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 text-xs sm:text-sm text-fg my-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 text-xs sm:text-sm text-fg my-2">{children}</ol>,
+                        li: ({ children }) => <li className="leading-snug">{children}</li>,
+                        strong: ({ children }) => <strong className="font-bold text-primary bg-primary/10 px-1 py-0.5 rounded">{children}</strong>,
+                      }}
+                    >
+                      {aiReply.text}
+                    </Markdown>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Structured Local Evidence */}
+              <div className="pt-2 border-t border-line space-y-2.5">
                 <div>
-                  <h3 className="text-[10px] font-black uppercase tracking-wider text-primary">{vi ? 'Nhận định' : 'Insight'}</h3>
+                  <h3 className="text-[10px] font-black uppercase tracking-wider text-muted">
+                    {vi ? (hasAi ? 'Chi tiết số liệu tính toán (Evidence Mode)' : 'Nhận định') : (hasAi ? 'Calculated numbers (Evidence Mode)' : 'Insight')}
+                  </h3>
                   <p className="text-sm text-fg leading-relaxed">{tr(lang, a.insight)}</p>
                 </div>
                 {a.evidence.length > 0 && (
                   <div>
-                    <h3 className="text-[10px] font-black uppercase tracking-wider text-primary">{vi ? 'Bằng chứng' : 'Evidence'}</h3>
+                    <h3 className="text-[10px] font-black uppercase tracking-wider text-muted">{vi ? 'Bằng chứng' : 'Evidence'}</h3>
                     <ul className="mt-1 space-y-1">
                       {a.evidence.map((e, k) => (
                         <li key={k} className="flex flex-wrap items-center justify-between gap-2 text-xs text-fg border-b border-line pb-1">
@@ -142,13 +283,15 @@ export const DolphinAsk: React.FC = () => {
                     </ul>
                   </div>
                 )}
-                <div>
-                  <h3 className="text-[10px] font-black uppercase tracking-wider text-primary">{vi ? 'Diễn giải' : 'Interpretation'}</h3>
-                  <p className="text-sm text-fg leading-relaxed">{tr(lang, a.interpretation)}</p>
-                </div>
-                {a.nextChecks.length > 0 && (
+                {a.interpretation && (
                   <div>
-                    <h3 className="text-[10px] font-black uppercase tracking-wider text-primary">{vi ? 'Nên kiểm tra tiếp' : 'Next check'}</h3>
+                    <h3 className="text-[10px] font-black uppercase tracking-wider text-muted">{vi ? 'Diễn giải' : 'Interpretation'}</h3>
+                    <p className="text-sm text-fg leading-relaxed">{tr(lang, a.interpretation)}</p>
+                  </div>
+                )}
+                {a.nextChecks && a.nextChecks.length > 0 && (
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase tracking-wider text-muted">{vi ? 'Nên kiểm tra tiếp' : 'Next check'}</h3>
                     <ul className="list-disc pl-4 text-sm text-fg space-y-0.5">
                       {a.nextChecks.map((c, k) => (
                         <li key={k}>{tr(lang, c)}</li>
@@ -158,29 +301,15 @@ export const DolphinAsk: React.FC = () => {
                 )}
               </div>
 
-              {a.intent !== 'unknown' && !a.unavailable && mode !== 'local_only' && (
-                <div className="mt-3 border-t border-line pt-2">
-                  {t.ai === undefined && (
-                    <button onClick={() => rephrase(i)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary">
-                      <Sparkles className="w-3.5 h-3.5" aria-hidden />
-                      {vi ? `Diễn đạt lại bằng ${PRIVACY_MODE_INFO[mode].vi}` : `Rephrase with ${PRIVACY_MODE_INFO[mode].en}`}
-                    </button>
-                  )}
-                  {t.ai === 'loading' && (
-                    <p className="text-xs text-muted flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> {vi ? 'Đang diễn đạt lại…' : 'Rephrasing…'}</p>
-                  )}
-                  {t.ai && t.ai !== 'loading' && (
-                    <div className="text-sm text-fg whitespace-pre-wrap leading-relaxed">
-                      <p className="text-[10px] text-muted mb-1">
-                        {t.ai.source === 'cloud' || t.ai.source === 'local_llm'
-                          ? vi ? 'AI diễn đạt lại từ số liệu ở trên — không tính số mới. Luôn đối chiếu phần Bằng chứng.' : 'AI rephrasing of the numbers above — no new calculations.'
-                          : ''}
-                      </p>
-                      {t.ai.text}
-                    </div>
-                  )}
+              {a.intent !== 'unknown' && !a.unavailable && mode !== 'local_only' && !hasAi && (
+                <div className="mt-2 pt-2 border-t border-line">
+                  <button onClick={() => rephrase(i)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary">
+                    <Sparkles className="w-3.5 h-3.5" aria-hidden />
+                    {vi ? `Diễn đạt lại bằng ${PRIVACY_MODE_INFO[mode].vi}` : `Rephrase with ${PRIVACY_MODE_INFO[mode].en}`}
+                  </button>
                 </div>
               )}
+
               {a.followUps.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {a.followUps.filter((q) => !blocked.has(q)).map((q) => chip(q, 'text-[11px] px-2 py-0.5 rounded-lg border border-line text-muted hover:text-fg'))}
