@@ -29,9 +29,9 @@ function setToCache(key: string, data: any, ttlMs: number = 10 * 60 * 1000) {
 function getGeminiClient(customApiKey?: string): GoogleGenAI | null {
   let apiKey = '';
   
-  if (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10 && !customApiKey.startsWith('AQ.')) {
+  if (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10) {
     apiKey = customApiKey.trim();
-  } else if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5 && !process.env.GEMINI_API_KEY.startsWith('AQ.')) {
+  } else if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5) {
     apiKey = process.env.GEMINI_API_KEY.trim();
   }
 
@@ -46,6 +46,34 @@ function getGeminiClient(customApiKey?: string): GoogleGenAI | null {
       },
     },
   });
+}
+
+async function generateWithFallback(ai: GoogleGenAI, params: { model?: string; contents: any; config?: any }) {
+  const preferred = params.model || 'gemini-3.5-flash';
+  const candidateModels = [preferred, 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-flash-latest'].filter((m, i, arr) => arr.indexOf(m) === i);
+  let lastError: any = null;
+  for (const m of candidateModels) {
+    try {
+      console.log(`[generateWithFallback] Trying model: ${m}`);
+      const res = await ai.models.generateContent({
+        model: m,
+        contents: params.contents,
+        ...(params.config ? { config: params.config } : {}),
+      });
+      console.log(`[generateWithFallback] Model ${m} SUCCESS!`);
+      return res;
+    } catch (err: any) {
+      lastError = err;
+      const status = err?.status || err?.code;
+      const msg = err?.message || String(err);
+      console.log(`[generateWithFallback] Model ${m} failed: ${msg}`);
+      if (status === 503 || status === 404 || msg.includes('503') || msg.includes('404') || msg.includes('high demand') || msg.includes('not found') || msg.includes('UNAVAILABLE')) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
 }
 
 // Health check
@@ -66,8 +94,8 @@ app.post('/api/ai/test-key', async (req, res) => {
     if (!ai) {
       return res.status(400).json({ ok: false, error: 'Chưa cung cấp API Key' });
     }
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+    const response = await generateWithFallback(ai, {
+      model: 'gemini-3.5-flash',
       contents: 'Xin chào',
     });
     return res.json({ ok: true, message: 'Kết nối API Key thành công!', sample: response.text });
@@ -135,8 +163,8 @@ YÊU CẦU:
 4. Đưa ra 1 quyết định hành động chiến lược cấp thiết nhất cho chủ shop.
 Phong cách: Chuyên nghiệp, trực diện, không dùng từ sáo rỗng, dẫn chứng bằng số liệu cụ thể.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+    const response = await generateWithFallback(ai, {
+      model: 'gemini-3.5-flash',
       contents: prompt,
     });
 
@@ -259,8 +287,8 @@ Trả về định dạng JSON thuần túy (không kèm markdown \`\`\`json) th
   ]
 }`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+    const response = await generateWithFallback(ai, {
+      model: 'gemini-3.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -718,26 +746,48 @@ DỮ LIỆU CỬA HÀNG HIỆN TẠI:
 ================================================================================
 ${hasData ? JSON.stringify(analyticsData, null, 2) : 'CHƯA CÓ DỮ LIỆU BÁN HÀNG'}`;
 
-    const validModel = model && (model.startsWith('gemini-') || model.startsWith('models/')) ? model : 'gemini-3.7-flash';
-    const chat = ai.chats.create({
-      model: validModel,
-      config: {
-        systemInstruction,
-      },
-    });
+    const candidateModels = [
+      model && (model.startsWith('gemini-') || model.startsWith('models/')) ? model : 'gemini-3.5-flash',
+      'gemini-3.5-flash',
+      'gemini-3.8-flash',
+      'gemini-3.7-flash',
+      'gemini-flash-latest',
+    ].filter((m, i, arr) => arr.indexOf(m) === i);
 
-    for (const h of conversationHistory.slice(-6)) {
-      if (h.role === 'user') {
-        await chat.sendMessage({ message: h.content });
+    let chatResponse: any = null;
+    let usedModel = candidateModels[0];
+
+    for (const curModel of candidateModels) {
+      try {
+        const chat = ai.chats.create({
+          model: curModel,
+          config: {
+            systemInstruction,
+          },
+        });
+
+        for (const h of conversationHistory.slice(-6)) {
+          if (h.role === 'user') {
+            await chat.sendMessage({ message: h.content });
+          }
+        }
+
+        chatResponse = await chat.sendMessage({ message });
+        usedModel = curModel;
+        break;
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        if (msg.includes('503') || msg.includes('404') || msg.includes('high demand') || msg.includes('UNAVAILABLE') || msg.includes('not found')) {
+          continue;
+        }
+        throw err;
       }
     }
 
-    const response = await chat.sendMessage({ message });
-
     res.json({
-      reply: response.text || getFallbackChatReply(),
+      reply: chatResponse?.text || getFallbackChatReply(),
       isFallback: false,
-      modelUsed: validModel,
+      modelUsed: usedModel,
     });
   } catch (error: any) {
     const errorMsg = error?.message || String(error);
@@ -777,8 +827,8 @@ app.post('/api/ai/rephrase-evidence', async (req, res) => {
     'Keep four parts: Insight, Evidence, Interpretation, Next check.',
   ].join('\n');
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+    const response = await generateWithFallback(ai, {
+      model: 'gemini-3.5-flash',
       contents: JSON.stringify(answer),
       config: { systemInstruction, temperature: 0.2 },
     });
@@ -837,8 +887,8 @@ Hãy đánh giá:
 3. Lời khuyên cụ thể về việc áp dụng voucher và phân bổ ngân sách.
 Trả lời bằng ${language === 'vi' ? 'Tiếng Việt' : 'English'}.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+    const response = await generateWithFallback(ai, {
+      model: 'gemini-3.5-flash',
       contents: prompt,
     });
 
@@ -1087,8 +1137,8 @@ ${rawPayload.slice(0, 45000)}
 
 Hãy thực hiện làm sạch dữ liệu, loại bỏ PII, mapping vào 7 sheets chuẩn và trả về JSON chuẩn xác.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+    const response = await generateWithFallback(ai, {
+      model: 'gemini-3.5-flash',
       contents: `${systemPrompt}\n\n${prompt}`,
       config: {
         responseMimeType: 'application/json',

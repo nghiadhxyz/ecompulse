@@ -113,13 +113,7 @@ export const AiActionCenterTab: React.FC<AiActionCenterTabProps> = ({
 
   // Custom Gemini API Key Management
   const [apiKey, setApiKey] = useState<string>(() => {
-    const saved = localStorage.getItem('gemini_custom_api_key') || '';
-    // Filter out old invalid test string if present
-    if (saved.startsWith('AQ.')) {
-      localStorage.removeItem('gemini_custom_api_key');
-      return '';
-    }
-    return saved;
+    return localStorage.getItem('gemini_custom_api_key') || '';
   });
   const [tempApiKey, setTempApiKey] = useState<string>(apiKey);
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
