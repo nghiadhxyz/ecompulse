@@ -42,6 +42,7 @@ import ecompulseAvatar from '../assets/images/ecompulse_avatar_1787721096722.jpg
 import ecompulseDolphinLogo from '../assets/images/ecompulse_dolphin_logo.png';
 import { SAMPLE_DATASETS } from '../data/sampleDatasets';
 import { PricingPlansModal } from './pricing/PricingPlansModal';
+import { PricingView } from './pricing/PricingView';
 import { FeaturesView } from './FeaturesView';
 import { DolphinChatModal } from './chat/DolphinChatModal';
 import { DolphinOnboardingTourModal } from './onboarding/DolphinOnboardingTourModal';
@@ -91,6 +92,7 @@ export const DualTrackSelector: React.FC<DualTrackSelectorProps> = ({
   const [showTourModal, setShowTourModal] = useState<boolean>(false);
   const [chatPrompt, setChatPrompt] = useState<string | undefined>(undefined);
   const [activeNav, setActiveNav] = useState<'home' | 'features' | 'pricing' | 'support'>('home');
+  const isPricingActive = (activeNav as string) === 'pricing';
 
   const handleOpenChatWithPrompt = (prompt: string) => {
     setChatPrompt(prompt);
@@ -120,104 +122,113 @@ export const DualTrackSelector: React.FC<DualTrackSelectorProps> = ({
       {/* =========================================================================
           1. TOP NAVIGATION BAR
       ========================================================================= */}
-      <header className="relative z-30 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => setActiveNav('home')}>
-          <div className="relative w-11 h-11 rounded-2xl overflow-hidden shadow-lg shadow-cyan-500/25 ring-2 ring-cyan-400/50 bg-[#080d24] flex items-center justify-center group-hover:scale-105 transition-transform">
-            <img
-              src={ecompulseDolphinLogo}
-              alt="EcomPulse AI Logo"
-              className="w-full h-full object-contain p-0.5"
-            />
-          </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="text-xl font-black text-white tracking-tight font-sans">EcomPulse</span>
-            <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 font-sans">AI</span>
-          </div>
-        </div>
-
-        {/* Center Nav Links */}
-        <nav className="hidden md:flex items-center space-x-8">
-          <button
-            onClick={() => setActiveNav('home')}
-            className={`text-xs font-bold transition-all relative py-1 ${
-              activeNav === 'home'
-                ? 'text-white'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            Trang chủ
-            {activeNav === 'home' && (
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full shadow-sm shadow-cyan-400" />
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveNav('features')}
-            className={`text-xs font-bold transition-all relative py-1 ${
-              activeNav === 'features'
-                ? 'text-white'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            Tính năng
-            {activeNav === 'features' && (
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full shadow-sm shadow-cyan-400" />
-            )}
-          </button>
-
-          <button
-            onClick={() => setShowTourModal(true)}
-            className="text-xs font-semibold text-cyan-300 hover:text-white transition-colors flex items-center space-x-1"
-          >
-            <Sparkles className="w-3 h-3 text-cyan-400" />
-            <span>Tour 1 phút</span>
-          </button>
-
-          <button
-            onClick={() => setShowPricingModal(true)}
-            className="text-xs font-semibold text-slate-300 hover:text-white transition-colors"
-          >
-            Gói dịch vụ
-          </button>
-
-          <button
-            onClick={() => setShowDolphinChat(true)}
-            className="text-xs font-semibold text-slate-300 hover:text-white transition-colors flex items-center space-x-1"
-          >
-            <span>Hỗ trợ AI</span>
-            <Bot className="w-3.5 h-3.5 text-purple-400" />
-          </button>
-        </nav>
-
-        {/* Right Action Buttons */}
-        <div className="flex items-center space-x-3">
-          {currentUser ? (
-            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/10 text-xs text-slate-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="font-semibold max-w-[120px] truncate">{currentUser.name}</span>
+      {activeNav !== 'pricing' && (
+        <header className="relative z-30 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => setActiveNav('home')}>
+            <div className="relative w-11 h-11 rounded-2xl overflow-hidden shadow-lg shadow-cyan-500/25 ring-2 ring-cyan-400/50 bg-[#080d24] flex items-center justify-center group-hover:scale-105 transition-transform">
+              <img
+                src={ecompulseDolphinLogo}
+                alt="EcomPulse AI Logo"
+                className="w-full h-full object-contain p-0.5"
+              />
             </div>
-          ) : (
-            <button
-              onClick={onOpenLogin || handleStartClick}
-              className="px-5 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white text-xs font-semibold backdrop-blur-md transition-all active:scale-95"
-            >
-              Đăng nhập
-            </button>
-          )}
+            <div className="flex items-center space-x-1.5">
+              <span className="text-xl font-black text-white tracking-tight font-sans">EcomPulse</span>
+              <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 font-sans">AI</span>
+            </div>
+          </div>
 
-          <button
-            onClick={handleStartClick}
-            className="px-5 py-2 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/30 transition-all flex items-center space-x-1.5 active:scale-95"
-          >
-            <span>Bắt đầu ngay</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </header>
+          {/* Center Nav Links */}
+          <nav className="hidden md:flex items-center space-x-8">
+            <button
+              onClick={() => setActiveNav('home')}
+              className={`text-xs font-bold transition-all relative py-1 ${
+                activeNav === 'home'
+                  ? 'text-white'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Trang chủ
+              {activeNav === 'home' && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full shadow-sm shadow-cyan-400" />
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveNav('features')}
+              className={`text-xs font-bold transition-all relative py-1 ${
+                activeNav === 'features'
+                  ? 'text-white'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Tính năng
+              {activeNav === 'features' && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full shadow-sm shadow-cyan-400" />
+              )}
+            </button>
+
+            <button
+              onClick={() => setShowTourModal(true)}
+              className="text-xs font-semibold text-cyan-300 hover:text-white transition-colors flex items-center space-x-1"
+            >
+              <Sparkles className="w-3 h-3 text-cyan-400" />
+              <span>Tour 1 phút</span>
+            </button>
+
+            <button
+              onClick={() => setActiveNav('pricing')}
+              className={`text-xs font-bold transition-all relative py-1 ${
+                isPricingActive
+                  ? 'text-white'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Bảng giá
+              {isPricingActive && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full shadow-sm shadow-cyan-400" />
+              )}
+            </button>
+
+            <button
+              onClick={() => setShowDolphinChat(true)}
+              className="text-xs font-semibold text-slate-300 hover:text-white transition-colors flex items-center space-x-1"
+            >
+              <span>Hỗ trợ AI</span>
+              <Bot className="w-3.5 h-3.5 text-purple-400" />
+            </button>
+          </nav>
+
+          {/* Right Action Buttons */}
+          <div className="flex items-center space-x-3">
+            {currentUser ? (
+              <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/10 text-xs text-slate-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-semibold max-w-[120px] truncate">{currentUser.name}</span>
+              </div>
+            ) : (
+              <button
+                onClick={onOpenLogin || handleStartClick}
+                className="px-5 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white text-xs font-semibold backdrop-blur-md transition-all active:scale-95"
+              >
+                Đăng nhập
+              </button>
+            )}
+
+            <button
+              onClick={handleStartClick}
+              className="px-5 py-2 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/30 transition-all flex items-center space-x-1.5 active:scale-95"
+            >
+              <span>Bắt đầu ngay</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* =========================================================================
-          2. MAIN BODY: EITHER FEATURES VIEW OR HERO SECTION
+          2. MAIN BODY: EITHER FEATURES VIEW, PRICING VIEW, OR HERO SECTION
       ========================================================================= */}
       {activeNav === 'features' ? (
         <main className="relative z-20 w-full flex-1 flex flex-col justify-center animate-in fade-in duration-300">
@@ -229,6 +240,15 @@ export const DualTrackSelector: React.FC<DualTrackSelectorProps> = ({
             currentUser={currentUser}
             language={language}
             onBackToHome={() => setActiveNav('home')}
+          />
+        </main>
+      ) : activeNav === 'pricing' ? (
+        <main className="relative z-20 w-full flex-1 flex flex-col justify-center animate-in fade-in duration-300">
+          <PricingView
+            onBackToHome={() => setActiveNav('home')}
+            onOpenLogin={onOpenLogin || handleStartClick}
+            onStartTrial={handleStartClick}
+            language={language}
           />
         </main>
       ) : (
