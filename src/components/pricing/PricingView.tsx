@@ -939,3 +939,4 @@ export const PricingView: React.FC<PricingViewProps> = ({
     </div>
   );
 };
+

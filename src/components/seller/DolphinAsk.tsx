@@ -124,25 +124,23 @@ export const DolphinAsk: React.FC = () => {
           language: lang,
         });
 
+        // Hide unavailable/blocked/error fallback responses from Dolphin Ask box
+        const validAi =
+          res &&
+          res.source !== 'unavailable' &&
+          res.source !== 'blocked' &&
+          !res.text?.includes('Cloud AI chưa khả dụng') &&
+          !res.text?.includes('Cloud AI is unavailable') &&
+          !res.text?.includes('Không thể kết nối')
+            ? res
+            : null;
+
         setTurns((prev) =>
-          prev.map((item) => (item.answer === localAnswer ? { ...item, ai: res } : item))
+          prev.map((item) => (item.answer === localAnswer ? { ...item, ai: validAi } : item))
         );
       } catch {
         setTurns((prev) =>
-          prev.map((item) =>
-            item.answer === localAnswer
-              ? {
-                  ...item,
-                  ai: {
-                    text:
-                      lang === 'vi'
-                        ? 'Không thể kết nối với mô hình AI lúc này. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại.'
-                        : 'Could not connect to AI model.',
-                    source: 'unavailable',
-                  },
-                }
-              : item
-          )
+          prev.map((item) => (item.answer === localAnswer ? { ...item, ai: null } : item))
         );
       }
     }
@@ -152,7 +150,16 @@ export const DolphinAsk: React.FC = () => {
     const turn = turns[i];
     setTurns((t) => t.map((x, k) => (k === i ? { ...x, ai: 'loading' } : x)));
     const ai = await aiRephrase(answerToAiPayload(turn.answer, lang), lang);
-    setTurns((t) => t.map((x) => (x.answer === turn.answer ? { ...x, ai } : x)));
+    const validAi =
+      ai &&
+      ai.source !== 'unavailable' &&
+      ai.source !== 'blocked' &&
+      !ai.text?.includes('Cloud AI chưa khả dụng') &&
+      !ai.text?.includes('Cloud AI is unavailable') &&
+      !ai.text?.includes('Không thể kết nối')
+        ? ai
+        : null;
+    setTurns((t) => t.map((x) => (x.answer === turn.answer ? { ...x, ai: validAi } : x)));
   };
 
   return (
@@ -201,7 +208,15 @@ export const DolphinAsk: React.FC = () => {
       <div className="space-y-3 mt-4">
         {turns.map((t, i) => {
           const a = t.answer;
-          const aiReply: AiReply | null = typeof t.ai === 'object' && t.ai !== null ? t.ai : null;
+          const isRealAiReply =
+            typeof t.ai === 'object' &&
+            t.ai !== null &&
+            t.ai.source !== 'unavailable' &&
+            t.ai.source !== 'blocked' &&
+            !t.ai.text?.includes('Cloud AI chưa khả dụng') &&
+            !t.ai.text?.includes('Cloud AI is unavailable') &&
+            !t.ai.text?.includes('Không thể kết nối');
+          const aiReply: AiReply | null = isRealAiReply ? t.ai : null;
           const hasAi = aiReply !== null;
           const isAiLoading = t.ai === 'loading';
 

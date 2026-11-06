@@ -30,21 +30,29 @@ function setToCache(key: string, data: any, ttlMs: number = 10 * 60 * 1000) {
   aiCache.set(key, { data, expiresAt: Date.now() + ttlMs });
 }
 
+// Candidate API keys generator
+function getCandidateApiKeys(customApiKey?: string): string[] {
+  const keys: string[] = [];
+  if (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10) {
+    keys.push(customApiKey.trim());
+  }
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5) {
+    keys.push(process.env.GEMINI_API_KEY.trim());
+  }
+  if (process.env.GEMINI_FALLBACK_KEY && process.env.GEMINI_FALLBACK_KEY.trim().length > 5) {
+    keys.push(process.env.GEMINI_FALLBACK_KEY.trim());
+  }
+  return keys.filter((k, i, arr) => arr.indexOf(k) === i);
+}
+
 // Lazy initialize Gemini client
 function getGeminiClient(customApiKey?: string): GoogleGenAI | null {
-  let apiKey = '';
-  
-  if (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 10) {
-    apiKey = customApiKey.trim();
-  } else if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5) {
-    apiKey = process.env.GEMINI_API_KEY.trim();
-  }
-
-  if (!apiKey) {
+  const keys = getCandidateApiKeys(customApiKey);
+  if (keys.length === 0) {
     return null;
   }
   return new GoogleGenAI({
-    apiKey,
+    apiKey: keys[0],
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -53,25 +61,47 @@ function getGeminiClient(customApiKey?: string): GoogleGenAI | null {
   });
 }
 
-async function generateWithFallback(ai: GoogleGenAI, params: { model?: string; contents: any; config?: any }) {
+async function generateWithFallback(ai: GoogleGenAI, params: { model?: string; contents: any; config?: any }, customApiKey?: string) {
+  const candidateKeys = getCandidateApiKeys(customApiKey);
   const preferred = params.model || 'gemini-3.5-flash';
-  const candidateModels = [preferred, 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-flash-latest'].filter((m, i, arr) => arr.indexOf(m) === i);
+  const candidateModels = [
+    preferred,
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-lite-latest',
+    'gemini-3.6-flash',
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-flash-latest'
+  ].filter((m, i, arr) => arr.indexOf(m) === i);
   let lastError: any = null;
-  for (const m of candidateModels) {
-    try {
-      return await ai.models.generateContent({
-        model: m,
-        contents: params.contents,
-        ...(params.config ? { config: params.config } : {}),
-      });
-    } catch (err: any) {
-      lastError = err;
-      const status = err?.status || err?.code;
-      const msg = err?.message || String(err);
-      if (status === 503 || status === 404 || msg.includes('503') || msg.includes('404') || msg.includes('high demand') || msg.includes('not found') || msg.includes('UNAVAILABLE')) {
+
+  for (let kIdx = 0; kIdx < candidateKeys.length; kIdx++) {
+    const key = candidateKeys[kIdx];
+    const client = kIdx === 0 ? ai : new GoogleGenAI({
+      apiKey: key,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+    });
+
+    for (const m of candidateModels) {
+      try {
+        return await client.models.generateContent({
+          model: m,
+          contents: params.contents,
+          ...(params.config ? { config: params.config } : {}),
+        });
+      } catch (err: any) {
+        lastError = err;
+        const status = err?.status || err?.code;
+        const msg = err?.message || String(err);
+
+        // If this key encounters 403, break out to try the next key immediately
+        if (status === 403 || msg.includes('403') || msg.includes('PERMISSION_DENIED') || msg.includes('free tier is not available') || msg.includes('API_KEY_INVALID')) {
+          break;
+        }
+
         continue;
       }
-      throw err;
     }
   }
   throw lastError;
