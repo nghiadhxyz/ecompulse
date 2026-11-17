@@ -3,24 +3,46 @@ import { PricingPlan } from '../types/pricing';
 export const PRICING_PLANS_VI: PricingPlan[] = [
   {
     id: 'experience',
-    name: 'GÓI EXPERIENCE',
-    subtitle: 'FREE TASTE',
-    targetAudience: 'Shop mới, cá nhân muốn trải nghiệm thử công cụ.',
+    name: 'GÓI FREE (TRẢI NGHIỆM)',
+    subtitle: 'FREE 0Đ',
+    targetAudience: 'Thu hút người dùng, giúp bạn có kết quả phân tích đầu tiên ngay tức thì.',
     price: 0,
     originalPrice: 0,
-    billingText: 'Miễn phí trọn đời',
-    badge: 'Khởi Đầu Miễn Phí',
+    billingText: 'Miễn phí lâu dài (Hạn mức làm mới hằng tháng)',
+    discountNote: 'Trải nghiệm giá trị thật, nâng cấp khi cần phân tích thường xuyên hơn',
+    badge: 'Khởi Đầu Miễn Phí (0đ)',
     badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
     accentColor: 'from-slate-800 to-slate-900 border-slate-700/60 hover:border-emerald-500/50',
-    ctaText: 'Đang Sử Dụng (Miễn Phí)',
+    ctaText: 'Đang Sử Dụng (0đ)',
     features: [
       {
-        text: 'Upload file Excel thủ công (tối đa 3 lần/tháng)',
+        text: '8 lần nhập file Excel/CSV mỗi tháng',
         isIncluded: true,
-        tag: 'Tối đa 3 lần',
+        tag: '8 lần/tháng',
       },
       {
-        text: 'Xem Dashboard Net Cash Flow & phễu rò rỉ cơ bản',
+        text: 'Dashboard doanh thu, chi phí và lợi nhuận cơ bản',
+        isIncluded: true,
+      },
+      {
+        text: 'Trải nghiệm Profit Waterfall và phân tích các khoản chi phí',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Profit Waterfall',
+      },
+      {
+        text: '10 câu hỏi Dolphin AI mỗi tháng',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: '10 câu/tháng',
+      },
+      {
+        text: '2 lần mô phỏng What-If mỗi tháng',
+        isIncluded: true,
+        tag: '2 lần/tháng',
+      },
+      {
+        text: 'Dùng miễn phí lâu dài, hạn mức làm mới hằng tháng',
         isIncluded: true,
       },
       {
@@ -32,19 +54,11 @@ export const PRICING_PLANS_VI: PricingPlan[] = [
         isIncluded: true,
       },
       {
-        text: 'Dolphin AI RAG Chatbot (Hỏi đáp dữ liệu shop)',
+        text: 'Tự động cào file qua Email & Partner Open API',
         isIncluded: false,
       },
       {
-        text: 'AI Priority Action Cards & Simulator "What-If"',
-        isIncluded: false,
-      },
-      {
-        text: 'Gmail Critical Alert (Đơn hủy COD > 15%, Ads lỗ)',
-        isIncluded: false,
-      },
-      {
-        text: 'Partner Open API (Shopee, TikTok Shop)',
+        text: 'Dự báo tồn kho & Cảnh báo SKU Zombie',
         isIncluded: false,
       },
       {
@@ -257,24 +271,46 @@ export const PRICING_PLANS_VI: PricingPlan[] = [
 export const PRICING_PLANS_EN: PricingPlan[] = [
   {
     id: 'experience',
-    name: 'EXPERIENCE PLAN',
-    subtitle: 'FREE TASTE',
-    targetAudience: 'New stores and individuals exploring the tool.',
+    name: 'FREE PLAN (EXPERIENCE)',
+    subtitle: 'FREE 0VND',
+    targetAudience: 'Attract users and deliver immediate first analysis results.',
     price: 0,
     originalPrice: 0,
-    billingText: 'Free Lifetime',
-    badge: 'Free Starter',
+    billingText: 'Free Lifetime (Monthly auto-reset quotas)',
+    discountNote: 'Experience real value, upgrade when ready for full scale',
+    badge: 'Free Forever (0đ)',
     badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
     accentColor: 'from-slate-800 to-slate-900 border-slate-700/60 hover:border-emerald-500/50',
     ctaText: 'Current Plan (Free)',
     features: [
       {
-        text: 'Manual Excel file upload (Max 3 uploads / month)',
+        text: '8 Excel/CSV imports per month',
         isIncluded: true,
-        tag: 'Max 3/mo',
+        tag: '8 imports/mo',
       },
       {
-        text: 'Net Cash Flow dashboard & basic leakage funnel',
+        text: 'Basic Revenue, Cost & Profit Dashboard',
+        isIncluded: true,
+      },
+      {
+        text: 'Experience Profit Waterfall & detailed cost breakdown',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: 'Profit Waterfall',
+      },
+      {
+        text: '10 Dolphin AI inquiries per month',
+        isIncluded: true,
+        isHighlighted: true,
+        tag: '10 questions/mo',
+      },
+      {
+        text: '2 What-If scenario simulations per month',
+        isIncluded: true,
+        tag: '2 sims/mo',
+      },
+      {
+        text: 'Free long-term use with monthly refreshed quotas',
         isIncluded: true,
       },
       {
@@ -286,11 +322,11 @@ export const PRICING_PLANS_EN: PricingPlan[] = [
         isIncluded: true,
       },
       {
-        text: 'Dolphin AI RAG Chatbot (Shop data Q&A)',
+        text: 'Auto-fetch via Email & Partner Open API',
         isIncluded: false,
       },
       {
-        text: 'Partner Open API (Shopee, TikTok Shop)',
+        text: 'Predictive Inventory & Zombie SKU Alerts',
         isIncluded: false,
       },
       {
@@ -496,7 +532,7 @@ export const COMPARISON_FEATURES_MATRIX = [
       {
         name: 'Giới hạn số lần Upload Excel',
         nameEn: 'Excel Upload Frequency',
-        experience: '3 lần / tháng',
+        experience: '8 lần / tháng',
         proMonthly: 'Không giới hạn',
         proSemiAnnual: 'Không giới hạn',
         enterprise: 'Không giới hạn (Bulk)',
@@ -542,7 +578,7 @@ export const COMPARISON_FEATURES_MATRIX = [
       {
         name: 'Dashboard Net Cash Flow & Phễu rò rỉ',
         nameEn: 'Net Cash Flow Dashboard & Funnel',
-        experience: 'Cơ bản',
+        experience: 'Cơ bản (Profit Waterfall)',
         proMonthly: 'Chuyên sâu đa chiều',
         proSemiAnnual: 'Chuyên sâu đa chiều',
         enterprise: 'Tùy biến Dashboard theo yêu cầu',
@@ -588,7 +624,7 @@ export const COMPARISON_FEATURES_MATRIX = [
       {
         name: 'Dolphin AI RAG Chatbot (Hỏi đáp dữ liệu)',
         nameEn: 'Dolphin AI RAG Shop Chatbot',
-        experience: '❌',
+        experience: '10 câu hỏi / tháng',
         proMonthly: '✅ Không giới hạn',
         proSemiAnnual: '✅ Không giới hạn',
         enterprise: '✅ Custom Model Fine-tuning',
@@ -596,7 +632,7 @@ export const COMPARISON_FEATURES_MATRIX = [
       {
         name: 'AI Action Cards & Simulator "What-If"',
         nameEn: 'AI Action Cards & Simulator',
-        experience: '❌',
+        experience: '2 lần mô phỏng / tháng',
         proMonthly: '✅',
         proSemiAnnual: '✅',
         enterprise: '✅ Kịch bản đa thương hiệu',

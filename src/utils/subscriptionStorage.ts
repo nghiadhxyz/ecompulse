@@ -27,7 +27,7 @@ export function getCurrentSubscription(): UserSubscription {
   // Default initial free subscription
   return {
     planId: 'experience',
-    planName: 'Gói Experience (Free)',
+    planName: 'Gói Free (0đ)',
     status: 'active',
     activatedAt: new Date().toISOString(),
     expiresAt: '',
@@ -35,7 +35,7 @@ export function getCurrentSubscription(): UserSubscription {
 }
 
 export function saveSubscription(planId: PlanId, durationMonths: number = 1): UserSubscription {
-  let planName = 'Gói Experience (Free)';
+  let planName = 'Gói Free (0đ)';
   let expiresAt = '';
 
   if (planId === 'pro_monthly') {

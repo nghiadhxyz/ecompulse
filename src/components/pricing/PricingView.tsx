@@ -513,27 +513,27 @@ export const PricingView: React.FC<PricingViewProps> = ({
             {/* 4 Cards Grid - desktop: repeat(4, minmax(0, 1fr)), gap: 16-18px */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-[18px] items-stretch">
               {/* =================================================================
-                  CARD 1 — GÓI EXPERIENCE
+                  CARD 1 — GÓI FREE (TRẢI NGHIỆM)
               ================================================================= */}
               <div className="relative rounded-[24px] p-6 bg-gradient-to-b from-[#21133F] to-[#15102D] border border-[rgba(168,85,247,0.3)] flex flex-col justify-between transition-all duration-200 hover:border-[#A855F7]/60">
                 <div>
                   {/* Badge xanh lá: KHỞI ĐẦU MIỄN PHÍ */}
                   <div className="mb-4">
                     <span className="inline-block px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase bg-[#34F5AC]/15 text-[#34F5AC] border border-[#34F5AC]/40">
-                      KHỞI ĐẦU MIỄN PHÍ
+                      GÓI FREE (0 ĐỒNG)
                     </span>
                   </div>
 
                   {/* Tên & Mô tả */}
-                  <h3 className="text-[24px] font-bold text-[#F8F7FF] leading-snug">Gói Experience</h3>
+                  <h3 className="text-[24px] font-bold text-[#F8F7FF] leading-snug">Gói Free</h3>
                   <p className="text-[13.5px] text-[#C5BDD9] mt-2 min-h-[42px] leading-relaxed">
-                    Shop mới, cá nhân muốn trải nghiệm thử công cụ.
+                    Thu hút người dùng, giúp bạn có kết quả phân tích đầu tiên ngay tức thì.
                   </p>
 
                   {/* Giá & Đơn vị */}
                   <div className="mt-4 pt-3 border-t border-[rgba(168,85,247,0.25)]">
                     <div className="text-[30px] font-extrabold text-[#F8F7FF] tracking-tight">0 VNĐ</div>
-                    <div className="text-[13.5px] text-[#C5BDD9] mt-0.5">Miễn phí trọn đời</div>
+                    <div className="text-[13.5px] text-[#C5BDD9] mt-0.5">Dùng miễn phí lâu dài, hạn mức làm mới hằng tháng</div>
                   </div>
 
                   {/* Divider */}
@@ -547,21 +547,34 @@ export const PricingView: React.FC<PricingViewProps> = ({
                     <ul className="space-y-2.5 text-[14px]">
                       <li className="flex items-start gap-2.5 text-[#F8F7FF]">
                         <Check className="w-4 h-4 shrink-0 mt-0.5 text-[#34F5AC]" />
-                        <span>Upload file Excel thủ công (tối đa 3 lần/tháng).</span>
+                        <span><strong>8 lần nhập Excel/CSV</strong> mỗi tháng.</span>
                       </li>
                       <li className="flex items-start gap-2.5 text-[#F8F7FF]">
                         <Check className="w-4 h-4 shrink-0 mt-0.5 text-[#34F5AC]" />
-                        <span>Xem Dashboard Net Cash Flow & phân rủi ro cơ bản.</span>
+                        <span>Dashboard doanh thu, chi phí và lợi nhuận cơ bản.</span>
                       </li>
                       <li className="flex items-start gap-2.5 text-[#F8F7FF]">
                         <Check className="w-4 h-4 shrink-0 mt-0.5 text-[#34F5AC]" />
-                        <span>Xuất báo cáo 3 Tab ra Google Sheets.</span>
+                        <span>Trải nghiệm <strong>Profit Waterfall</strong> và phân tích các khoản chi phí.</span>
                       </li>
                       <li className="flex items-start gap-2.5 text-[#F8F7FF]">
                         <Check className="w-4 h-4 shrink-0 mt-0.5 text-[#34F5AC]" />
-                        <span>Hỗ trợ qua tài liệu hướng dẫn và cộng đồng.</span>
+                        <span><strong>10 câu hỏi Dolphin AI</strong> mỗi tháng.</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-[#F8F7FF]">
+                        <Check className="w-4 h-4 shrink-0 mt-0.5 text-[#34F5AC]" />
+                        <span><strong>2 lần mô phỏng What-If</strong> mỗi tháng.</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-[#F8F7FF]">
+                        <Check className="w-4 h-4 shrink-0 mt-0.5 text-[#34F5AC]" />
+                        <span>Dùng miễn phí lâu dài, hạn mức làm mới hằng tháng.</span>
                       </li>
                     </ul>
+
+                    {/* Ghi chú chiến lược trải nghiệm */}
+                    <div className="pt-2 text-[12px] text-[#A855F7] italic bg-[#7C3AED]/10 p-2.5 rounded-xl border border-[#A855F7]/20 leading-relaxed">
+                      💡 Trải nghiệm giá trị thật và sử dụng lại, dễ dàng nâng cấp khi cần phân tích chuyên sâu hơn.
+                    </div>
                   </div>
                 </div>
 
@@ -572,7 +585,7 @@ export const PricingView: React.FC<PricingViewProps> = ({
                     className="w-full py-3.5 px-4 rounded-xl border-2 border-[#34F5AC]/70 text-[#34F5AC] bg-[#34F5AC]/10 font-bold text-sm flex items-center justify-center gap-2 cursor-default transition-all"
                   >
                     <Check className="w-4 h-4 text-[#34F5AC]" />
-                    <span>Gói Bạn Đang Dùng</span>
+                    <span>Gói Bạn Đang Dùng (0đ)</span>
                   </button>
                 </div>
               </div>
