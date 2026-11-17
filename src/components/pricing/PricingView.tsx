@@ -495,9 +495,9 @@ export const PricingView: React.FC<PricingViewProps> = ({
                       : 'text-[#C5BDD9] hover:text-white'
                   }`}
                 >
-                  <span>6 Tháng</span>
+                  <span>3 Tháng</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#34F5AC]/20 text-[#34F5AC] font-black border border-[#34F5AC]/40">
-                    -67%
+                    -25%
                   </span>
                 </button>
               </div>
@@ -597,7 +597,7 @@ export const PricingView: React.FC<PricingViewProps> = ({
 
                   {/* Giá & Đơn vị */}
                   <div className="mt-4 pt-3 border-t border-[rgba(168,85,247,0.25)]">
-                    <div className="text-[30px] font-extrabold text-[#F8F7FF] tracking-tight">299.000 đ</div>
+                    <div className="text-[30px] font-extrabold text-[#F8F7FF] tracking-tight">199.000 đ</div>
                     <div className="text-[13.5px] text-[#C5BDD9] mt-0.5">VNĐ / tháng</div>
                   </div>
 
@@ -647,13 +647,13 @@ export const PricingView: React.FC<PricingViewProps> = ({
                       background: 'linear-gradient(110deg, #5035F5 0%, #8735F5 50%, #C026F2 100%)',
                     }}
                   >
-                    <span>Đăng Ký Gói Tháng (299.000đ)</span>
+                    <span>Đăng Ký Gói Tháng (199.000đ)</span>
                   </button>
                 </div>
               </div>
 
               {/* =================================================================
-                  CARD 3 — GÓI PRO SEMI-ANNUAL (NỔI BẬT NHẤT TRANG)
+                  CARD 3 — GÓI PRO 3 THÁNG (NỔI BẬT NHẤT TRANG)
               ================================================================= */}
               <div className="relative rounded-[24px] p-[1.5px] bg-gradient-to-b from-[#22D3EE] via-[#A855F7] to-[#D946EF] shadow-[0_0_35px_rgba(168,85,247,0.32)] flex flex-col">
                 <div className="rounded-[22.5px] p-6 bg-gradient-to-b from-[#21133F] to-[#15102D] flex-1 flex flex-col justify-between">
@@ -667,19 +667,19 @@ export const PricingView: React.FC<PricingViewProps> = ({
                     </div>
 
                     {/* Tên & Mô tả */}
-                    <h3 className="text-[24px] font-bold text-[#F8F7FF] leading-snug">Gói Pro Semi-Annual</h3>
+                    <h3 className="text-[24px] font-bold text-[#F8F7FF] leading-snug">Gói Pro 3 Tháng</h3>
                     <p className="text-[13.5px] text-[#C5BDD9] mt-2 min-h-[42px] leading-relaxed">
                       Nhà bán hàng chiến lược, gian hàng lớn muốn cam kết đồng hành dài hạn và tự động hóa.
                     </p>
 
                     {/* Giá cũ gạch ngang & Giá mới & Đơn vị */}
                     <div className="mt-4 pt-3 border-t border-[rgba(168,85,247,0.25)] space-y-1">
-                      <div className="text-xs sm:text-sm text-slate-400 line-through">1.794.000 đ</div>
-                      <div className="text-[30px] font-extrabold text-[#22D3EE] tracking-tight">599.000 đ</div>
-                      <div className="text-[13.5px] text-[#C5BDD9]">VNĐ / 6 tháng (= 99.800đ/tháng)</div>
+                      <div className="text-xs sm:text-sm text-slate-400 line-through">597.000 đ</div>
+                      <div className="text-[30px] font-extrabold text-[#22D3EE] tracking-tight">449.000 đ</div>
+                      <div className="text-[13.5px] text-[#C5BDD9]">VNĐ / 3 tháng (= 149.600đ/tháng)</div>
                       <div className="pt-1">
                         <span className="inline-block text-xs font-bold text-[#34F5AC] bg-[#34F5AC]/15 border border-[#34F5AC]/30 px-2 py-0.5 rounded-full">
-                          Tiết kiệm ~67% so với gói tháng
+                          Tiết kiệm ~25% so với gói tháng
                         </span>
                       </div>
                     </div>
@@ -734,7 +734,7 @@ export const PricingView: React.FC<PricingViewProps> = ({
                         background: 'linear-gradient(110deg, #5035F5 0%, #8735F5 50%, #C026F2 100%)',
                       }}
                     >
-                      <span>Nâng Cấp Gói 6 Tháng (599.000đ)</span>
+                      <span>Nâng Cấp Gói 3 Tháng (449.000đ)</span>
                     </button>
                   </div>
                 </div>
@@ -775,7 +775,7 @@ export const PricingView: React.FC<PricingViewProps> = ({
                     <ul className="space-y-2.5 text-[14px]">
                       <li className="flex items-start gap-2.5 text-[#F8F7FF] font-semibold">
                         <Check className="w-4 h-4 shrink-0 mt-0.5 text-[#34F5AC]" />
-                        <span>Bao gồm toàn bộ tính năng của Gói Pro Semi-Annual.</span>
+                        <span>Bao gồm toàn bộ tính năng của Gói Pro 3 Tháng.</span>
                       </li>
                       <li className="flex items-start gap-2.5 text-[#F8F7FF]">
                         <Check className="w-4 h-4 shrink-0 mt-0.5 text-[#34F5AC]" />

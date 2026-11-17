@@ -44,9 +44,9 @@ export function saveSubscription(planId: PlanId, durationMonths: number = 1): Us
     exp.setMonth(exp.getMonth() + durationMonths);
     expiresAt = exp.toISOString();
   } else if (planId === 'pro_semi_annual') {
-    planName = 'Gói Pro Semi-Annual (6 Tháng)';
+    planName = 'Gói Pro (3 Tháng)';
     const exp = new Date();
-    exp.setMonth(exp.getMonth() + 6);
+    exp.setMonth(exp.getMonth() + 3);
     expiresAt = exp.toISOString();
   } else if (planId === 'enterprise') {
     planName = 'Gói Enterprise (Custom SLA)';
@@ -105,15 +105,15 @@ export function validatePromoCode(code: string, planId: PlanId, language: 'vi' |
       return {
         valid: true,
         code: normalized,
-        discountAmount: 180000, // 299k -> 119k
+        discountAmount: 80000, // 199k -> 119k
         message: language === 'vi' ? 'Áp dụng thành công: Ưu đãi tháng đầu tiên chỉ 119.000 VNĐ!' : 'Applied: First month only 119,000 VND!',
       };
     } else {
       return {
         valid: true,
         code: normalized,
-        discountAmount: 180000,
-        message: language === 'vi' ? 'Áp dụng mã ưu đãi: Giảm ngay 180.000 VNĐ!' : 'Promo code applied: Discount 180,000 VND!',
+        discountAmount: 80000,
+        message: language === 'vi' ? 'Áp dụng mã ưu đãi: Giảm ngay 80.000 VNĐ!' : 'Promo code applied: Discount 80,000 VND!',
       };
     }
   }
@@ -123,7 +123,7 @@ export function validatePromoCode(code: string, planId: PlanId, language: 'vi' |
       valid: true,
       code: normalized,
       discountPercent: 20,
-      discountAmount: planId === 'pro_semi_annual' ? 119800 : 59800,
+      discountAmount: planId === 'pro_semi_annual' ? 89800 : 39800,
       message: language === 'vi' ? 'Mã đối tác AI Riser 2026: Giảm thêm 20%!' : 'AI Riser 2026 Partner Code: Extra 20% Off!',
     };
   }

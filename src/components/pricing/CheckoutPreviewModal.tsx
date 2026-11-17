@@ -55,7 +55,7 @@ export const CheckoutPreviewModal: React.FC<CheckoutPreviewModalProps> = ({
       : null
   );
   const [discountAmount, setDiscountAmount] = useState<number>(
-    plan?.id === 'pro_monthly' ? 180000 : 0
+    plan?.id === 'pro_monthly' ? 80000 : 0
   );
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
     'vietqr' | 'momo' | 'card' | 'bank'
@@ -103,7 +103,7 @@ export const CheckoutPreviewModal: React.FC<CheckoutPreviewModalProps> = ({
     setTimeout(() => {
       const newSub = saveSubscription(
         plan.id,
-        plan.id === 'pro_semi_annual' ? 6 : plan.id === 'enterprise' ? 12 : 1
+        plan.id === 'pro_semi_annual' ? 3 : plan.id === 'enterprise' ? 12 : 1
       );
       setIsActivating(false);
       setIsSuccess(true);
