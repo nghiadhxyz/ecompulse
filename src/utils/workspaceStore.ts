@@ -25,7 +25,11 @@ function openDb(): Promise<IDBDatabase> {
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
   });
 }

@@ -447,6 +447,8 @@ export interface CanonicalDataset {
   ads: AdPerformance[];
   liveSessions: LiveSession[];
   affiliates: AffiliatePerformance[];
+  /** Creator-side commission reports. Never included in seller sales or affiliate-channel KPIs. */
+  tiktokAffiliateOrders?: import('./importers/tiktokAffiliate').AffiliateOrder[];
   traffic: TrafficDaily[];
   /** Search-ad keyword rows (optional). */
   keywords?: KeywordPerformance[];

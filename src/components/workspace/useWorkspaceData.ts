@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   canonicalFromParsedStoreData,
   datasetDateBounds,
+  emptyDataset,
   mergeIntoWorkspace,
   withCostSettings,
   type CanonicalDataset,
@@ -18,6 +19,7 @@ import { parseShopeeExcelFile } from '../../utils/excelParser';
 import { buildDemoCanonicalDataset } from '../../data/demoCanonicalDataset';
 import { clearWorkspace, loadCostSettings, loadWorkspace, saveCostSettings, saveWorkspace } from '../../utils/workspaceStore';
 import type { ImportOutcome } from '../seller/importClient';
+import { mergeAffiliateOrders } from '../../analytics/importers/tiktokAffiliate';
 import type { ImportLogEntry } from '../seller/views/DataView';
 
 export type SourceKind = 'demo' | 'imported' | 'legacy';
@@ -92,6 +94,9 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
 
   const source = useMemo((): { dataset: CanonicalDataset; kind: SourceKind } | null => {
     if (demo) return { dataset: buildDemoCanonicalDataset(), kind: 'demo' };
+    if (legacyData && imported?.tiktokAffiliateOrders?.length && imported.sources.length === 0) {
+      return { dataset: { ...canonicalFromParsedStoreData(legacyData, legacyPlatform), tiktokAffiliateOrders: imported.tiktokAffiliateOrders }, kind: 'imported' };
+    }
     if (imported) return { dataset: imported, kind: 'imported' };
     if (legacyData) return { dataset: canonicalFromParsedStoreData(legacyData, legacyPlatform), kind: 'legacy' };
     return null;
@@ -113,6 +118,12 @@ export function useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, on
   };
 
   const applyImport = async (file: File, outcome: ImportOutcome): Promise<ImportLogEntry['outcome']> => {
+    if (outcome.type === 'tiktok_affiliate_orders') {
+      const base = importedRef.current ?? emptyDataset('workspace', 'Dữ liệu của shop');
+      const { rows, conflicts } = mergeAffiliateOrders(base.tiktokAffiliateOrders ?? [], outcome.result.rows);
+      await storeImported({ ...base, tiktokAffiliateOrders: rows });
+      return { ...outcome, mergeConflicts: conflicts };
+    }
     if (outcome.type === 'orders') {
       await storeImported(mergeIntoWorkspace(importedRef.current, outcome.result.dataset));
       return outcome;

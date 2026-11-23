@@ -1,3 +1,5 @@
+import { WORKSPACE_DB_NAME } from './workspaceStore';
+
 /**
  * EcomPulse On-Premise Local Database Service
  * 
@@ -77,7 +79,11 @@ function openDatabase(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -467,14 +473,19 @@ export async function importOnPremiseBackup(
  * Completely wipe all local EcomPulse data from this browser (Zero-Trace)
  */
 export async function wipeAllLocalData(): Promise<boolean> {
+  let cleared = true;
   try {
-    // Delete IndexedDB
     if (typeof window !== 'undefined' && window.indexedDB) {
-      window.indexedDB.deleteDatabase(DB_NAME);
-      // Seller/Analyst workspace (order-level data and cost settings)
-      window.indexedDB.deleteDatabase('EcomPulse_Workspace_DB');
+      await Promise.all([DB_NAME, WORKSPACE_DB_NAME].map((name) => new Promise<void>((resolve, reject) => {
+        const request = window.indexedDB.deleteDatabase(name);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => reject(new Error('Local database is open elsewhere'));
+      })));
     }
-  } catch (_) {}
+  } catch {
+    cleared = false;
+  }
 
   try {
     // Clear all EcomPulse related items from LocalStorage
@@ -485,13 +496,14 @@ export async function wipeAllLocalData(): Promise<boolean> {
         key &&
         (key.startsWith('ecompulse_') ||
           key.startsWith('google_user_') ||
-          key.startsWith('custom_gemini_api_key'))
+          key.startsWith('custom_gemini_api_key') ||
+          key === 'gemini_custom_api_key')
       ) {
         keysToRemove.push(key);
       }
     }
     keysToRemove.forEach((k) => localStorage.removeItem(k));
-    return true;
+    return cleared;
   } catch {
     return false;
   }

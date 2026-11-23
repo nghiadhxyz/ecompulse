@@ -21,6 +21,8 @@ export const SERIES = [v('chart-1'), v('chart-2'), v('chart-3'), v('chart-4'), v
 
 export const CHART = {
   primary: v('chart-1'),
+  bar: 'var(--chart-bar, var(--chart-1))',
+  barSecondary: 'var(--chart-bar-secondary, var(--text-muted))',
   grid: v('chart-grid'),
   axis: v('chart-axis'),
   anomaly: v('chart-anomaly'),

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Home, Package, ShoppingBag, Megaphone, Bot, Database, Settings, Loader2, UploadCloud, PlayCircle } from 'lucide-react';
 import {
   comparableRange,
@@ -25,6 +25,7 @@ import { SettingsView } from './views/SettingsView';
 import { useWorkspaceData } from '../workspace/useWorkspaceData';
 import { DEFAULT_STAGE, type SummaryStage } from '../../analytics';
 import { ViewErrorBoundary } from '../workspace/ViewErrorBoundary';
+import { AffiliateDolphin, TikTokAffiliatePanel } from '../workspace/TikTokAffiliatePanel';
 
 interface SellerWorkspaceProps {
   language: Lang;
@@ -37,6 +38,7 @@ interface SellerWorkspaceProps {
   /** Load the demo on entry (user clicked "Xem demo"). */
   startWithDemo?: boolean;
   onDemoStarted?: () => void;
+  openUploadOnMount?: boolean;
 }
 
 const NAV: { key: SellerView; icon: typeof Home; vi: string; en: string; short: string }[] = [
@@ -49,16 +51,23 @@ const NAV: { key: SellerView; icon: typeof Home; vi: string; en: string; short: 
   { key: 'settings', icon: Settings, vi: 'Cài đặt', en: 'Settings', short: 'Cài đặt' },
 ];
 
-export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang, setLanguage, workspaceMode, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted }) => {
+export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang, setLanguage, workspaceMode, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted, openUploadOnMount }) => {
   const vi = lang === 'vi';
   const ws = useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, onDemoStarted });
   const { loading, dataset, bounds, persisted, costSettings } = ws;
-  const [view, setView] = useState<SellerView>('home');
+  const [view, setView] = useState<SellerView>(openUploadOnMount ? 'data' : 'home');
+  const orderFileInput = useRef<HTMLInputElement>(null);
+  const [quickImportFiles, setQuickImportFiles] = useState<File[] | null>(null);
   const [preset, setPreset] = useState<PeriodPreset>('last30');
   const [custom, setCustom] = useState<DateRange | null>(null);
   const [platform, setPlatform] = useState<Platform | 'all'>('all');
   const [stage, setStage] = useState<SummaryStage>(DEFAULT_STAGE);
   const [evidence, setEvidence] = useState<EvidenceRequest | null>(null);
+  const affiliateRows = dataset?.tiktokAffiliateOrders;
+  const affiliateView = view === 'home' ? 'overview' : view === 'products' || view === 'adsLive' ? view : null;
+  const affiliatePanel = affiliateView && affiliateRows?.length
+    ? <TikTokAffiliatePanel key={affiliateView} rows={affiliateRows} lang={lang} view={affiliateView} /> : null;
+  const returnToOverview = () => setView((current) => current === 'data' ? 'home' : current);
   const loadDemo = () => {
     ws.loadDemo();
     setView('home');
@@ -85,9 +94,23 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
                 : 'Import order exports from Shopee, TikTok Shop or Lazada. Files are processed on your device.'}
             </p>
             <div className="flex flex-wrap justify-center gap-2 mt-4">
-              <PrimaryButton onClick={() => setView('data')}>
+              <PrimaryButton onClick={() => orderFileInput.current?.click()}>
                 <UploadCloud className="w-4 h-4" /> {vi ? 'Nhập file đơn hàng' : 'Import orders'}
               </PrimaryButton>
+              <input
+                ref={orderFileInput}
+                type="file"
+                multiple
+                accept=".xlsx,.xls,.csv"
+                hidden
+                onChange={(e) => {
+                  const files = Array.from(e.currentTarget.files ?? []);
+                  e.currentTarget.value = '';
+                  if (!files.length) return;
+                  setQuickImportFiles(files);
+                  setView('data');
+                }}
+              />
               <GhostButton onClick={loadDemo}>
                 <PlayCircle className="w-4 h-4" /> {vi ? 'Xem với dữ liệu demo 3 tháng' : 'Try the 3-month demo'}
               </GhostButton>
@@ -97,7 +120,21 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
       }
     }
     if (view === 'data') {
-      return <DataView lang={lang} dataset={dataset} sourceKind={ws.sourceKind} onOutcome={ws.applyImport} onLoadDemo={loadDemo} onClear={ws.clear} persisted={persisted} />;
+      return (
+        <DataView
+          lang={lang}
+          dataset={dataset}
+          sourceKind={ws.sourceKind}
+          onOutcome={ws.applyImport}
+          onLoadDemo={loadDemo}
+          onClear={ws.clear}
+          persisted={persisted}
+          initialFiles={quickImportFiles}
+          onInitialFilesStarted={() => setQuickImportFiles(null)}
+          onImportComplete={returnToOverview}
+          onAffiliateComplete={returnToOverview}
+        />
+      );
     }
     if (view === 'settings') {
       return (
@@ -110,6 +147,19 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
           onChangeMode={onChangeMode}
           onChangeLanguage={setLanguage}
         />
+      );
+    }
+    if (!bounds && dataset?.tiktokAffiliateOrders?.length) {
+      if (affiliatePanel) return affiliatePanel;
+      if (view === 'dolphin') {
+        return <AffiliateDolphin rows={dataset.tiktokAffiliateOrders} lang={lang} context={{ vi: 'Toàn bộ dữ liệu TikTok Affiliate đã nhập', en: 'All imported TikTok Affiliate data' }} />;
+      }
+      return (
+        <div className="rounded-card border border-line bg-surface p-6">
+          <h2 className="text-card-title">TikTok Affiliate</h2>
+          <p className="my-2 text-sm text-muted">{vi ? 'Đã có dữ liệu hoa hồng Affiliate. Nhập file đơn hàng Seller để xem số liệu bán hàng.' : 'Affiliate commission data is available. Import a Seller order export for sales metrics.'}</p>
+          <PrimaryButton onClick={() => setView('data')}>{vi ? 'Xem báo cáo TikTok Affiliate' : 'View TikTok Affiliate report'}</PrimaryButton>
+        </div>
       );
     }
     return null;
@@ -172,6 +222,7 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
             />
           )}
           <ViewErrorBoundary lang={lang} key={view}>
+            {affiliatePanel && <div className="mb-4">{affiliatePanel}</div>}
             {view === 'home' && <HomeView />}
             {view === 'products' && <ProductsView />}
             {view === 'orders' && <OrdersView />}
@@ -186,7 +237,7 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
   return (
     <div className="mx-auto w-full max-w-[1440px] pb-20 md:pb-0">
       {/* Desktop / tablet navigation */}
-      <nav className="mb-6 hidden gap-1 overflow-x-auto border-b border-line pb-2 md:flex" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
+      <nav className="workspace-nav seller-nav mb-6 hidden gap-1 overflow-x-auto border-b border-line pb-2 md:flex" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
         {NAV.map((n) => (
           <button
             key={n.key}
@@ -202,7 +253,7 @@ export const SellerWorkspace: React.FC<SellerWorkspaceProps> = ({ language: lang
       {content ?? analytics}
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-line grid grid-cols-7" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
+      <nav className="workspace-nav seller-nav md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-line grid grid-cols-7" aria-label={vi ? 'Điều hướng người bán' : 'Seller navigation'}>
         {NAV.map((n) => (
           <button
             key={n.key}

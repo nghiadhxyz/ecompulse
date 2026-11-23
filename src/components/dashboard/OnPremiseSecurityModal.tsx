@@ -119,8 +119,12 @@ export const OnPremiseSecurityModal: React.FC<OnPremiseSecurityModalProps> = ({
 
     if (window.confirm(confirmMsg)) {
       setIsWiping(true);
-      await wipeAllLocalData();
+      const cleared = await wipeAllLocalData();
       setIsWiping(false);
+      if (!cleared) {
+        setStatusMsg({ type: 'error', text: language === 'vi' ? 'Chưa thể xác nhận đã xóa dữ liệu. Hãy đóng các tab EcomPulse khác rồi thử lại.' : 'Could not confirm deletion. Close other EcomPulse tabs and try again.' });
+        return;
+      }
       setStatusMsg({
         type: 'success',
         text: language === 'vi' ? 'Đã xóa sạch 100% dữ liệu trên máy trạm. Ứng dụng sẽ tự tải lại...' : 'Data wiped. Reloading...',

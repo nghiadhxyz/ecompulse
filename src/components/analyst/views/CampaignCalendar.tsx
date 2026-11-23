@@ -203,7 +203,7 @@ export const CampaignCalendar: React.FC = () => {
                   cursor={{ fill: 'var(--hover)' }}
                   formatter={(v: number, _n: string, p: { payload?: { days?: number } }) => [`${fmtMoney(v, lang)} (${p.payload?.days ?? 0} ${vi ? 'ngày mẫu' : 'days'})`, vi ? 'GMV/ngày' : 'GMV/day']}
                 />
-                <Bar isAnimationActive={false} dataKey="gmv" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                <Bar isAnimationActive={false} dataKey="gmv" fill={CHART.bar} radius={[4, 4, 0, 0]} maxBarSize={36} />
               </BarChart>
             </ResponsiveContainer>
           </div>

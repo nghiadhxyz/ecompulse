@@ -108,7 +108,7 @@ export interface AnomalyOptions {
 
 const SEVERITY_ORDER: Record<AlertSeverity, number> = { critical: 0, warning: 1, opportunity: 2, info: 3 };
 
-function median(values: number[]): number | null {
+export function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const s = [...values].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);

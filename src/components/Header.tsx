@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Upload,
   Download,
-  Layers,
   Sparkles,
-  BarChart3,
   FileSpreadsheet,
   Trash2,
   RefreshCw,
@@ -50,16 +48,15 @@ interface HeaderProps {
   onLogout?: () => void;
   onOpenLogin?: () => void;
   onResetData: () => void;
+  onWipeLocalData: () => Promise<boolean>;
   onChangePlatform?: () => void;
   onOpenUpload: () => void;
   onOpenPricing?: () => void;
-  activeTab: 'overview' | 'deep' | 'ai' | 'raw';
-  setActiveTab: (tab: 'overview' | 'deep' | 'ai' | 'raw') => void;
   language: 'vi' | 'en';
   setLanguage: (lang: 'vi' | 'en') => void;
   workspaceMode?: WorkspaceMode | null;
   onOpenWorkspaceMode?: () => void;
-  /** Seller Mode has its own Data page — hide the classic file/upload controls and tabs. */
+  /** Workspaces use their own Data page. */
   hideDataControls?: boolean;
   /** Workspace colour theme; the toggle shows only when both are given. */
   theme?: 'light' | 'dark';
@@ -75,11 +72,10 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onOpenLogin,
   onResetData,
+  onWipeLocalData,
   onChangePlatform,
   onOpenUpload,
   onOpenPricing,
-  activeTab,
-  setActiveTab,
   language,
   setLanguage,
   workspaceMode,
@@ -149,7 +145,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="text-fg sticky top-0 z-30 border-b border-line bg-surface">
+      <header className="workspace-header text-fg sticky top-0 z-30 border-b border-line bg-surface">
         <div className="w-full max-w-[1700px] mx-auto px-3 sm:px-5 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-3 sm:gap-6">
             
@@ -367,6 +363,20 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Light / dark (workspace only) */}
               {theme && onToggleTheme && <ThemeToggle theme={theme} onToggle={onToggleTheme} lang={language} />}
+              <button
+                id="btn-clear-local-data"
+                type="button"
+                onClick={() => {
+                  setShowUserMenu(false);
+                  setShowClearDataModal(true);
+                }}
+                aria-label={language === 'vi' ? 'Xóa dữ liệu trên máy' : 'Clear local data'}
+                title={language === 'vi' ? 'Xóa dữ liệu trên máy' : 'Clear local data'}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-control border border-line bg-surface px-2.5 text-sm font-semibold text-down hover:bg-down-soft"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+                <span className="hidden sm:inline">{language === 'vi' ? 'Xóa dữ liệu' : 'Clear data'}</span>
+              </button>
 
               {/* User Profile & Account Dropdown */}
               {currentUser ? (
@@ -485,18 +495,6 @@ export const Header: React.FC<HeaderProps> = ({
                             </button>
                           )}
 
-                          {/* Feature 3: Clear All Local Data button in Menu */}
-                          <button
-                            onClick={() => {
-                              setShowUserMenu(false);
-                              setShowClearDataModal(true);
-                            }}
-                            className="w-full text-left px-3 py-2 text-xs font-semibold text-down hover:text-fg hover:bg-down-soft rounded-xl transition-all flex items-center space-x-2"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-down" />
-                            <span>Xóa Sạch Dữ Liệu Local (1-Click)</span>
-                          </button>
-
                           {onLogout && (
                             <button
                               id="btn-logout"
@@ -523,65 +521,6 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Sub-Header (Tabs) */}
-          {currentData && !hideDataControls && (
-            <div className="flex border-t border-line overflow-x-auto no-scrollbar py-2.5 gap-2 sm:gap-3">
-              <button
-                id="nav-tab-overview"
-                onClick={() => setActiveTab('overview')}
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                  activeTab === 'overview'
-                    ? 'bg-primary-soft text-primary border border-primary/30 shadow-md'
-                    : 'text-fg hover:text-fg hover:bg-hover border border-transparent'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                <span>{language === 'vi' ? 'Tổng Quan KPI' : 'KPI Overview'}</span>
-              </button>
-
-              <button
-                id="nav-tab-deep"
-                onClick={() => setActiveTab('deep')}
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                  activeTab === 'deep'
-                    ? 'bg-primary-soft text-primary border border-primary/30 shadow-md'
-                    : 'text-fg hover:text-fg hover:bg-hover border border-transparent'
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-                <span>{language === 'vi' ? 'Phân Tích Đa Chiều' : 'Deep Analytics'}</span>
-              </button>
-
-              <button
-                id="nav-tab-ai"
-                onClick={() => setActiveTab('ai')}
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                  activeTab === 'ai'
-                    ? 'bg-primary-soft text-primary border border-primary/30'
-                    : 'text-fg hover:text-fg hover:bg-hover border border-transparent'
-                }`}
-              >
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span>{language === 'vi' ? 'Trung Tâm Quyết Định AI' : 'AI Decision Center'}</span>
-                <span className="px-1.5 py-0.2 rounded-full bg-primary-soft text-primary text-[10px] font-bold border border-primary/30 hidden sm:inline">
-                  Phase 2
-                </span>
-              </button>
-
-              <button
-                id="nav-tab-raw"
-                onClick={() => setActiveTab('raw')}
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                  activeTab === 'raw'
-                    ? 'bg-primary-soft text-primary border border-primary/30 shadow-md'
-                    : 'text-fg hover:text-fg hover:bg-hover border border-transparent'
-                }`}
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>{language === 'vi' ? 'Dữ Liệu Thô Chi Tiết' : 'Raw Sheet Data'}</span>
-              </button>
-            </div>
-          )}
         </div>
       </header>
 
@@ -597,9 +536,7 @@ export const Header: React.FC<HeaderProps> = ({
       <ClearLocalDataModal
         isOpen={showClearDataModal}
         onClose={() => setShowClearDataModal(false)}
-        onCleared={() => {
-          onResetData();
-        }}
+        wipe={onWipeLocalData}
         language={language}
       />
 

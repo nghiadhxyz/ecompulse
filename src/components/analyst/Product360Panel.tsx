@@ -53,7 +53,7 @@ export const Product360Panel: React.FC<{ sku: string; insight?: ProductInsight }
                 <XAxis dataKey="label" tick={axisProps.tick} tickLine={false} axisLine={{ stroke: CHART.grid }} minTickGap={16} />
                 <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} tick={axisProps.tick} tickLine={false} axisLine={false} width={68} />
                 <Tooltip {...tooltipProps} cursor={{ fill: 'var(--hover)' }} formatter={(v: number) => [fmtMoney(v, lang), 'GMV']} />
-                <Bar isAnimationActive={false} dataKey="gmv" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <Bar isAnimationActive={false} dataKey="gmv" fill={CHART.bar} radius={[4, 4, 0, 0]} maxBarSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>

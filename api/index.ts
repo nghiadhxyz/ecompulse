@@ -96,11 +96,14 @@ async function generateWithFallback(ai: GoogleGenAI, params: { model?: string; c
         const msg = err?.message || String(err);
 
         // If this key encounters 403, break out to try the next key immediately
-        if (status === 403 || msg.includes('403') || msg.includes('PERMISSION_DENIED') || msg.includes('free tier is not available') || msg.includes('API_KEY_INVALID')) {
+        if (status === 403 || msg.includes('403') || msg.includes('PERMISSION_DENIED') || msg.includes('free tier is not available')) {
           break;
         }
 
-        continue;
+        if (status === 503 || status === 404 || msg.includes('503') || msg.includes('404') || msg.includes('high demand') || msg.includes('not found') || msg.includes('UNAVAILABLE')) {
+          continue;
+        }
+        throw err;
       }
     }
   }

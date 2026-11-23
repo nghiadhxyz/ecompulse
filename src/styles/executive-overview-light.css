@@ -1,0 +1,274 @@
+/* Center the four Seller headline KPIs in both themes. */
+.ep-app[data-theme] .seller-overview .overview-metrics .workspace-figures > div {
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  gap: var(--space-2);
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  text-align: center;
+
+  > dt {
+    align-self: end;
+  }
+
+  > dt > div,
+  > dd {
+    justify-content: center;
+  }
+
+  > dt > div {
+    flex-wrap: wrap;
+  }
+
+  > dd:nth-child(2) {
+    margin: 0;
+  }
+
+  > dd:nth-child(3) {
+    align-self: start;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Seller and Analyst overview light palette. Other workspace views inherit the base theme. */
+.ep-app[data-theme='light']:has(:is([data-analyst-view='overview'], .seller-overview)) {
+  --bg: #f7f9fc;
+  --surface: #fff;
+  --surface-2: #f3f6fa;
+  --text: #101828;
+  --text-muted: #475467;
+  --border: #e4eaf2;
+  --primary: #08728f;
+  --primary-soft: #e2f7fc;
+  --accent: #7546bd;
+  --hover: #eef4fa;
+
+  --up: #047857;
+  --up-soft: #e8f7ef;
+  --down: #ba2535;
+  --down-soft: #fdebeb;
+  --warn: #9a4c08;
+  --warn-soft: #fff5e5;
+
+  --chart-1: #089fc7;
+  --chart-grid: var(--border);
+  --chart-axis: #667085;
+  --chart-tooltip-bg: var(--surface);
+  --overview-area-opacity: 0.16;
+  --overview-insight: #f6fbff;
+  --card-shadow: 0 2px 6px rgb(16 24 40 / 4%);
+  --font-text: 'Inter', system-ui, sans-serif;
+  --font-figure: var(--font-text);
+  --figure-stretch: normal;
+
+  .workspace-header,
+  .analyst-filter,
+  .workspace-filter {
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
+  }
+
+  .workspace-header :is(#nav-track-marketplace, #nav-track-internal-finance) > svg,
+  .workspace-nav-item:has(.truncate) > svg,
+  .analyst-filter :is(.lucide-calendar-days, .lucide-git-compare),
+  .workspace-filter .lucide-calendar-days,
+  .seller-nav button > svg,
+  .seller-overview .workspace-badge > svg[aria-hidden="true"],
+  :is(.executive-overview, .seller-overview) .workspace-empty-icon {
+    display: none;
+  }
+
+  .analyst-page-heading {
+    margin-bottom: var(--space-4);
+  }
+
+  .seller-overview-heading {
+    display: block;
+  }
+
+  :is(.analyst-page-heading, .seller-overview-heading) .text-page {
+    font-size: clamp(1.625rem, 2vw, 1.75rem);
+    line-height: 1.25;
+    font-weight: 700;
+  }
+
+  .analyst-filter {
+    margin-inline: 0;
+  }
+
+  .analyst-filter :is(select, input[type='date']) {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .analyst-compare {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .analyst-filter-popover {
+    max-height: min(50vh, 22rem);
+    overflow-y: auto;
+  }
+
+  :is(.executive-overview, .seller-overview),
+  :is(.executive-overview, .seller-overview) > section[aria-label] {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  :is(.executive-overview, .seller-overview) > *,
+  :is(.executive-overview, .seller-overview) > section[aria-label] > * {
+    min-width: 0;
+    margin-block: 0;
+  }
+
+  :is(.executive-overview, .seller-overview) .workspace-brief {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2) var(--space-4);
+    max-width: none;
+    padding: 20px;
+    border: 1px solid color-mix(in srgb, var(--chart-1) 28%, var(--border));
+    border-inline-start: 3px solid var(--chart-1);
+    border-radius: var(--radius-panel);
+    background: var(--overview-insight);
+  }
+
+  .workspace-brief h2 {
+    font-weight: 650;
+  }
+
+  .workspace-brief .text-lead {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .workspace-brief button {
+    justify-self: start;
+    margin: 0;
+    padding-inline: 0;
+    text-align: start;
+    white-space: normal;
+  }
+
+  :is(.executive-overview, .seller-overview) .workspace-figures {
+    gap: var(--space-4);
+    border: 0;
+    padding: 0;
+  }
+
+  .workspace-figures > div {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(0.75rem, 1.7vw, 1.5rem);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
+  }
+
+  .workspace-figures dt .truncate {
+    white-space: normal;
+  }
+
+  .workspace-figures .text-kpi {
+    color: var(--text);
+    font-size: clamp(1.875rem, 2.5vw, 2.25rem);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .workspace-figures > div > dd:nth-child(3) {
+    margin-top: auto;
+    padding-top: var(--space-2);
+  }
+
+  :is(.executive-overview, .seller-overview) :has(> .workspace-ledger) {
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
+  }
+
+  .workspace-ledger > div {
+    flex-wrap: wrap;
+  }
+
+  .workspace-ledger > div > dd {
+    flex-shrink: 1;
+    flex-wrap: wrap;
+    justify-content: end;
+    margin-inline-start: auto;
+    text-align: end;
+  }
+
+  .seller-overview .overview-charts > div {
+    min-width: 0;
+  }
+
+  .seller-overview .overview-charts > div > section {
+    height: 100%;
+  }
+
+  .overview-trend {
+    height: clamp(17rem, 28vw, 24rem);
+  }
+
+  .overview-source {
+    min-width: 0;
+  }
+
+  .overview-source > section,
+  .overview-source-empty,
+  .overview-source-empty > section {
+    height: 100%;
+  }
+}
+
+@media (max-width: 35rem) {
+  .ep-app[data-theme='light']:has(:is([data-analyst-view='overview'], .seller-overview)) .analyst-filter-popover {
+    min-width: min(14rem, calc(100vw - 3rem));
+    max-width: calc(100vw - 3rem);
+  }
+}
+
+@media (max-width: 24rem) {
+  .ep-app[data-theme='light']:has(:is([data-analyst-view='overview'], .seller-overview)) .workspace-figures {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 48rem) {
+  .ep-app[data-theme='light']:has(:is([data-analyst-view='overview'], .seller-overview)) .workspace-brief {
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    > :not(button) {
+      grid-column: 1;
+    }
+
+    > button {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
+  }
+}
+
+@media (min-width: 90rem) {
+  .ep-app[data-theme='light']:has([data-analyst-view='overview']) {
+    .overview-breakdown {
+      grid-column: span 4;
+    }
+
+    .overview-investigation {
+      order: 1;
+    }
+
+    .overview-subsidy {
+      order: 2;
+    }
+  }
+}

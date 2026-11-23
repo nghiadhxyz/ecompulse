@@ -12,7 +12,7 @@ export const BriefLead: React.FC<{ dataset: CanonicalDataset; asOf: string; plat
   const brief = useMemo(() => buildDailyBrief(dataset, day, platforms), [dataset, day, platforms]);
   if (!brief.summary[lang]) return null;
   return (
-    <section aria-labelledby="brief-title" className="max-w-[72ch]">
+    <section aria-labelledby="brief-title" className="workspace-brief max-w-[72ch]">
       <h2 id="brief-title" className="text-small text-muted">
         {vi ? `Bản tin Dolphin ngày ${fmtDay(day)}` : `Dolphin brief, ${fmtDay(day)}`}
       </h2>

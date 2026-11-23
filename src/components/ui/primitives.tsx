@@ -35,7 +35,7 @@ export const TONE_DOT: Record<Tone, string> = {
 
 /** Status badge: pill, 12/500, tone colours. */
 export const Badge: React.FC<{ tone?: Tone; children: React.ReactNode; title?: string; icon?: React.ReactNode; className?: string }> = ({ tone = 'neutral', children, title, icon, className = '' }) => (
-  <span title={title} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-small whitespace-nowrap tabular ${TONE_CLASS[tone]} ${className}`}>
+  <span title={title} className={`workspace-badge inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-small whitespace-nowrap tabular ${TONE_CLASS[tone]} ${className}`}>
     {icon}
     {children}
   </span>
@@ -162,7 +162,7 @@ export const PageTitle: React.FC<{ title: string; description?: React.ReactNode;
 /** Small icon + one line of reason + one action. At most 160px tall — never a big empty frame. */
 export const EmptyState: React.FC<{ reason: React.ReactNode; title?: React.ReactNode; action?: React.ReactNode; icon?: React.ReactNode }> = ({ reason, title, action, icon }) => (
   <div className="flex max-h-40 flex-wrap items-center gap-3 rounded-control bg-surface-2 px-4 py-3">
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-muted" aria-hidden>
+    <span className="workspace-empty-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-muted" aria-hidden>
       {icon ?? <Database className="h-4 w-4" />}
     </span>
     <div className="min-w-0 flex-1">

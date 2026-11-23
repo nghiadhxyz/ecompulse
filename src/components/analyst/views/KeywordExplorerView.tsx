@@ -237,7 +237,7 @@ export const KeywordExplorerView: React.FC = () => {
                       {series.filter((d) => d.saleDay).map((d) => (
                         <ReferenceLine key={d.date} yAxisId="i" x={fmtDay(d.date)} stroke={CHART.saleDay} strokeDasharray={CHART.compareDash} />
                       ))}
-                      <Bar yAxisId="i" isAnimationActive={false} dataKey="impressions" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={18} />
+                      <Bar yAxisId="i" isAnimationActive={false} dataKey="impressions" fill={CHART.bar} radius={[4, 4, 0, 0]} maxBarSize={18} />
                       <Line yAxisId="o" isAnimationActive={false} type="monotone" dataKey="orders" stroke={CHART.up} strokeWidth={2} dot={false} />
                     </ComposedChart>
                   </ResponsiveContainer>

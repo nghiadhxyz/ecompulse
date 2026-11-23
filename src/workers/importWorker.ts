@@ -8,14 +8,17 @@ import { detectReport, importOrderExport, type SheetInput } from '../analytics/i
 import { detectTableReport, importTableReport } from '../analytics/importers/reportImporters';
 import { detectKeywordReport, importKeywordReport } from '../analytics/importers/keywordReport';
 import { importShopeeSalesAnalysis } from '../analytics/importers/shopeeSalesAnalysis';
+import { applyAffiliateMapping, detectTikTokAffiliate, importTikTokAffiliate, type AffiliateColumnMapping } from '../analytics/importers/tiktokAffiliate';
 
-export type ImportWorkerRequest = { file: File };
+export type ImportWorkerRequest = { file: File; affiliateMapping?: AffiliateColumnMapping };
 
 export type ImportWorkerMessage =
   | { type: 'progress'; stage: 'reading' | 'parsing' | 'mapping'; fraction: number }
   | { type: 'orders'; result: ReturnType<typeof importOrderExport> }
   | { type: 'report'; result: ReturnType<typeof importTableReport> }
   | { type: 'shopee_summary'; extra: ReturnType<typeof importShopeeSalesAnalysis> }
+  | { type: 'tiktok_affiliate_orders'; result: ReturnType<typeof importTikTokAffiliate>; mergeConflicts?: number }
+  | { type: 'tiktok_affiliate_mapping'; headers: string[]; fields: NonNullable<ReturnType<typeof detectTikTokAffiliate>>['needsMapping']; used: number[] }
   | { type: 'error'; message: { vi: string; en: string } };
 
 // Minimal worker scope typing (the project compiles against DOM, not the webworker lib).
@@ -26,7 +29,7 @@ const ctx = self as unknown as {
 const post = (m: ImportWorkerMessage) => ctx.postMessage(m);
 
 ctx.onmessage = async (e: MessageEvent<ImportWorkerRequest>) => {
-  const { file } = e.data;
+  const { file, affiliateMapping } = e.data;
   try {
     post({ type: 'progress', stage: 'reading', fraction: 0 });
     const buf = await file.arrayBuffer();
@@ -39,6 +42,30 @@ ctx.onmessage = async (e: MessageEvent<ImportWorkerRequest>) => {
       rows: XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: true, defval: '' }),
     }));
     post({ type: 'progress', stage: 'parsing', fraction: 0.4 });
+
+    let affiliate = detectTikTokAffiliate(sheets);
+    if (affiliate) {
+      if (affiliate.needsMapping.length && !affiliateMapping) {
+        const { needsMapping: fields, columns } = affiliate;
+        post({
+          type: 'tiktok_affiliate_mapping', fields,
+          headers: affiliate.sheet.rows[affiliate.headerRow].map((cell) => String(cell ?? '')),
+          used: Object.entries(columns).flatMap(([field, index]) => index >= 0 && !fields.some((f) => f === field) ? [index] : []),
+        });
+        return;
+      }
+      if (affiliateMapping) affiliate = applyAffiliateMapping(affiliate, affiliateMapping);
+      if (affiliate) {
+        const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[affiliate.sheet.name], { header: 1, raw: true, defval: null });
+        const result = importTikTokAffiliate(affiliate, rows.slice(affiliate.headerRow + 1));
+        if (!result.rows.length) {
+          post({ type: 'error', message: { vi: 'Báo cáo TikTok Affiliate không có dòng VND hợp lệ.', en: 'No valid VND rows in the TikTok Affiliate report.' } });
+        } else {
+          post({ type: 'tiktok_affiliate_orders', result });
+        }
+      } else post({ type: 'error', message: { vi: 'Ánh xạ cột Affiliate không hợp lệ hoặc bị trùng.', en: 'Affiliate column mapping is invalid or duplicated.' } });
+      return;
+    }
 
     const detected = detectReport({ fileName: file.name, sheets });
     if (detected.kind === 'orders') {

@@ -83,7 +83,7 @@ const MultiSelect: React.FC<{ label: string; all: string; options: { key: string
         <ChevronDown className="h-4 w-4 text-muted" aria-hidden />
       </button>
       {open && (
-        <div role="group" aria-label={label} className="absolute left-0 top-11 z-40 min-w-56 rounded-control border border-line bg-surface p-1.5 shadow-card">
+        <div role="group" aria-label={label} className="analyst-filter-popover absolute left-0 top-11 z-40 min-w-56 rounded-control border border-line bg-surface p-1.5 shadow-card">
           {options.map((o) => (
             <label key={o.key} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-control px-2 text-sm text-fg hover:bg-hover">
               <input type="checkbox" className="h-4 w-4 accent-primary" checked={value.includes(o.key)} onChange={() => onChange(value.includes(o.key) ? value.filter((x) => x !== o.key) : [...value, o.key])} />
@@ -113,7 +113,7 @@ export const AnalystFilterBar: React.FC<Props & { disabled?: FilterDisabled }> =
   const [open, setOpen] = useState(false);
   const presetLabel = PRESETS.find((x) => x.key === p.preset);
   return (
-    <div className="sticky top-16 z-20 -mx-1 rounded-card border border-line bg-surface px-3 py-2">
+    <div className="analyst-filter sticky top-16 z-20 -mx-1 rounded-card border border-line bg-surface px-3 py-2">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -146,7 +146,7 @@ export const AnalystFilterBar: React.FC<Props & { disabled?: FilterDisabled }> =
           </span>
         )}
 
-        <div className={`flex items-center gap-1 ${dim(d.compare)}`} title={d.compare}>
+        <div className={`analyst-compare flex items-center gap-1 ${dim(d.compare)}`} title={d.compare}>
           <GitCompare className="h-4 w-4 text-muted" aria-hidden />
           <label className="sr-only" htmlFor="compare-mode">{vi ? 'So sánh với' : 'Compare with'}</label>
           <select id="compare-mode" value={p.compare} disabled={!!d.compare} onChange={(e) => p.onCompare(e.target.value as AnalystCompare)} className={field}>

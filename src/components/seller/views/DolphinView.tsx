@@ -10,6 +10,7 @@ import { PlacedOnlyNote } from '../../workspace/OrderStagePicker';
 import { SummaryNotes } from '../../workspace/SummaryPanels';
 import { Tabs } from '../../ui/primitives';
 import dolphinAvatar from '../../../assets/images/dolphin_ai_avatar_1787721342181.jpg';
+import { AffiliateDolphin } from '../../workspace/TikTokAffiliatePanel';
 
 const FILTERS: (AlertSeverity | 'all')[] = ['all', 'critical', 'warning', 'opportunity', 'info'];
 
@@ -18,6 +19,8 @@ export const DolphinView: React.FC = () => {
   const vi = lang === 'vi';
   const [day, setDay] = useState(addDays(asOf, -1));
   const [severity, setSeverity] = useState<AlertSeverity | 'all'>('all');
+  const [source, setSource] = useState<'seller' | 'affiliate'>('seller');
+  const affiliateRows = dataset.tiktokAffiliateOrders;
   const brief = useMemo(() => buildDailyBrief(dataset, day, platforms), [dataset, day, platforms]);
   const alerts = severity === 'all' ? brief.alerts : brief.alerts.filter((a) => a.severity === severity);
   // Only inside the Analyst workspace (Action Center); Seller mode has no planning context.
@@ -51,8 +54,21 @@ export const DolphinView: React.FC = () => {
   const h = brief.headline;
   const basis = brief.stage ?? undefined;
   const b = brief.revenueBaseline;
+  const sourcePicker = !!affiliateRows?.length && <Tabs<'seller' | 'affiliate'>
+    label={vi ? 'Nguồn dữ liệu Dolphin' : 'Dolphin data source'}
+    value={source}
+    onChange={setSource}
+    options={[{ key: 'seller', label: vi ? 'Bán hàng' : 'Seller sales' }, { key: 'affiliate', label: 'TikTok Affiliate' }]}
+  />;
+  if (source === 'affiliate' && affiliateRows?.length) {
+    return <div className="space-y-4">
+      {sourcePicker}
+      <AffiliateDolphin rows={affiliateRows} lang={lang} context={{ vi: 'Toàn bộ dữ liệu TikTok Affiliate đã nhập', en: 'All imported TikTok Affiliate data' }} />
+    </div>;
+  }
   return (
     <div className="space-y-4">
+      {sourcePicker}
       <PlacedOnlyNote lang={lang} show={dataset.orders.length === 0 && dataset.dailyMetrics.length > 0} />
       <DolphinAsk />
 
@@ -73,14 +89,14 @@ export const DolphinView: React.FC = () => {
         }
       >
         <div className="flex items-start gap-3 rounded-control bg-primary-soft p-3">
-          <img src={dolphinAvatar} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+          <img src={dolphinAvatar} alt="" className="dolphin-decoration w-9 h-9 rounded-full object-cover shrink-0" />
           <div className="min-w-0">
             <p className="text-sm text-fg leading-relaxed">{tr(lang, brief.summary) || (vi ? 'Chưa có dữ liệu cho ngày này.' : 'No data for this day.')}</p>
             {brief.limitations.map((l, i) => (
               <p key={i} className="mt-1 text-sm text-warn">{tr(lang, l)}</p>
             ))}
             <p className="mt-1.5 flex items-center gap-1 text-small text-muted">
-              <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+              <ShieldCheck className="dolphin-decoration h-3.5 w-3.5" aria-hidden />
               {vi ? 'Bản tin tạo từ số liệu đã tính trên máy của bạn. Không gửi dữ liệu ra ngoài, không đoán số.' : 'Built locally from computed numbers — no data sent out, nothing guessed.'}
             </p>
           </div>
@@ -112,15 +128,15 @@ export const DolphinView: React.FC = () => {
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="rounded-control border border-line p-4">
             <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-up">{vi ? 'Điểm tốt' : 'Going well'}</h3>
-            {itemList(brief.positives, <CheckCircle2 className="w-4 h-4 text-up" aria-hidden />, vi ? 'Chưa có điểm nổi bật.' : 'Nothing notable.')}
+            {itemList(brief.positives, <CheckCircle2 className="dolphin-decoration w-4 h-4 text-up" aria-hidden />, vi ? 'Chưa có điểm nổi bật.' : 'Nothing notable.')}
           </div>
           <div className="rounded-control border border-line p-4">
             <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-warn">{vi ? 'Cần chú ý' : 'Needs attention'}</h3>
-            {itemList(brief.concerns, <AlertTriangle className="w-4 h-4 text-warn" aria-hidden />, vi ? 'Không có vấn đề cần chú ý.' : 'No issues.')}
+            {itemList(brief.concerns, <AlertTriangle className="dolphin-decoration w-4 h-4 text-warn" aria-hidden />, vi ? 'Không có vấn đề cần chú ý.' : 'No issues.')}
           </div>
           <div className="rounded-control border border-line p-4">
             <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-primary">{vi ? 'Hôm nay nên kiểm tra' : 'Check today'}</h3>
-            {itemList(brief.checks, <ClipboardCheck className="w-4 h-4 text-primary" aria-hidden />, vi ? 'Không có việc cần kiểm tra.' : 'Nothing to check.')}
+            {itemList(brief.checks, <ClipboardCheck className="dolphin-decoration w-4 h-4 text-primary" aria-hidden />, vi ? 'Không có việc cần kiểm tra.' : 'Nothing to check.')}
           </div>
         </div>
         <SummaryNotes

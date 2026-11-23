@@ -2,7 +2,7 @@
  * Runs one file import in a Web Worker. Returns a handle with the result promise and a
  * cancel() that terminates the worker (the parse stops immediately).
  */
-import type { ImportWorkerMessage } from '../../workers/importWorker';
+import type { ImportWorkerMessage, ImportWorkerRequest } from '../../workers/importWorker';
 
 export type ImportOutcome = Exclude<ImportWorkerMessage, { type: 'progress' }>;
 
@@ -11,7 +11,7 @@ export interface ImportHandle {
   cancel: () => void;
 }
 
-export function startImport(file: File, onProgress: (stage: string, fraction: number) => void): ImportHandle {
+export function startImport(file: File, onProgress: (stage: string, fraction: number) => void, affiliateMapping?: ImportWorkerRequest['affiliateMapping']): ImportHandle {
   const worker = new Worker(new URL('../../workers/importWorker.ts', import.meta.url), { type: 'module' });
   let settle: (v: ImportOutcome | { type: 'cancelled' }) => void = () => {};
   const result = new Promise<ImportOutcome | { type: 'cancelled' }>((resolve) => {
@@ -30,7 +30,7 @@ export function startImport(file: File, onProgress: (stage: string, fraction: nu
     worker.terminate();
     settle({ type: 'error', message: { vi: `Lỗi xử lý file: ${e.message}`, en: `Import failed: ${e.message}` } });
   };
-  worker.postMessage({ file });
+  worker.postMessage({ file, affiliateMapping } satisfies ImportWorkerRequest);
   return {
     result,
     cancel: () => {

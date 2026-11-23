@@ -1,23 +1,18 @@
-import React, { Suspense, lazy, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Header } from './components/Header';
 import { DualTrackSelector, AnalysisTrack } from './components/DualTrackSelector';
 import { UploadModal } from './components/UploadModal';
-import { EmptyStateUpload } from './components/EmptyStateUpload';
-import { EcommercePlatformSelector, EcommercePlatform } from './components/EcommercePlatformSelector';
+import type { EcommercePlatform } from './components/EcommercePlatformSelector';
 import { ParsedStoreData, GoogleUserProfile } from './types';
 import { getSavedGoogleUser, clearGoogleSession } from './utils/googleSheetsService';
-import { ArrowLeft } from 'lucide-react';
 import { WorkspaceModeSelector } from './components/onboarding/WorkspaceModeSelector';
 import { getSavedWorkspaceMode, saveWorkspaceMode, WorkspaceMode } from './utils/workspacePreferences';
-import { canonicalFromParsedStoreData } from './analytics';
 import { useTheme } from './theme/useTheme';
-// Workspaces and the classic dashboards load on demand to keep the initial bundle small.
+import { wipeAllLocalData } from './utils/localDatabaseService';
+// Workspaces load on demand to keep the initial bundle small.
 const SellerWorkspace = lazy(() => import('./components/seller/SellerWorkspace').then((m) => ({ default: m.SellerWorkspace })));
 const InternalFinanceModule = lazy(() => import('./components/internal-finance/InternalFinanceModule').then((m) => ({ default: m.InternalFinanceModule })));
-const KpiOverviewTab = lazy(() => import('./components/KpiOverviewTab').then((m) => ({ default: m.KpiOverviewTab })));
-const DeepAnalyticsTab = lazy(() => import('./components/DeepAnalyticsTab').then((m) => ({ default: m.DeepAnalyticsTab })));
-const AiActionCenterTab = lazy(() => import('./components/AiActionCenterTab').then((m) => ({ default: m.AiActionCenterTab })));
-const RawDataTab = lazy(() => import('./components/RawDataTab').then((m) => ({ default: m.RawDataTab })));
 const AnalystWorkspace = lazy(() => import('./components/analyst/AnalystWorkspace').then((m) => ({ default: m.AnalystWorkspace })));
 
 export default function App() {
@@ -25,28 +20,26 @@ export default function App() {
   const [analysisTrack, setAnalysisTrack] = useState<AnalysisTrack>('portal');
   const [currentData, setCurrentData] = useState<ParsedStoreData | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<EcommercePlatform | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'deep' | 'ai' | 'raw'>('overview');
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [language, setLanguage] = useState<'vi' | 'en'>('vi');
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode | null>(() => getSavedWorkspaceMode());
   const [isModeSelectorOpen, setIsModeSelectorOpen] = useState<boolean>(false);
-  // "Xem demo" in Seller Mode opens the order-level 3-month demo instead of the classic one.
+  const [wiping, setWiping] = useState(false);
+  const [openUploadOnMount, setOpenUploadOnMount] = useState(false);
+  // The demo opens the order-level 3-month dataset.
   const [sellerDemoRequested, setSellerDemoRequested] = useState<boolean>(false);
   const sellerMode = analysisTrack === 'marketplace' && workspaceMode === 'seller';
-  // Analyst Mode opens the new workspace; the classic dashboard stays one click away.
-  const [analystClassic, setAnalystClassic] = useState<boolean>(false);
-  const analystMode = analysisTrack === 'marketplace' && workspaceMode === 'analyst' && !analystClassic;
-  // Seller / Analyst workspace: light by default, dark as an option. Landing and classic stay as they were.
+  const analystMode = analysisTrack === 'marketplace' && workspaceMode === 'analyst';
   const workspaceShell = sellerMode || analystMode;
   const [theme, setTheme] = useTheme();
 
-  // One canonical dataset per loaded file; every analytics view reads from it.
-  const canonicalData = useMemo(
-    () => (currentData ? canonicalFromParsedStoreData(currentData, selectedPlatform) : null),
-    [currentData, selectedPlatform],
-  );
+  const handleChangeTrack = (track: AnalysisTrack) => {
+    if (track !== 'marketplace') setOpenUploadOnMount(false);
+    setAnalysisTrack(track);
+  };
 
   const handleSelectWorkspaceMode = (mode: WorkspaceMode) => {
+    setOpenUploadOnMount(false);
     saveWorkspaceMode(mode);
     setWorkspaceMode(mode);
     setIsModeSelectorOpen(false);
@@ -56,36 +49,52 @@ export default function App() {
   const mustChooseMode = analysisTrack !== 'portal' && workspaceMode === null;
 
   const handleLogout = () => {
+    setOpenUploadOnMount(false);
     clearGoogleSession();
     setCurrentData(null);
     setSelectedPlatform(null);
     setAnalysisTrack('portal');
-    setActiveTab('overview');
     setCurrentUser(getSavedGoogleUser());
   };
 
   const handleDataLoaded = (customData: ParsedStoreData) => {
     setAnalysisTrack('marketplace');
     setCurrentData(customData);
-    setActiveTab('overview');
-  };
-
-  const handleSelectPlatform = (platform: EcommercePlatform) => {
-    setSelectedPlatform(platform);
   };
 
   const handleLoadSampleData = (platform: EcommercePlatform, data: ParsedStoreData) => {
+    setOpenUploadOnMount(false);
     setAnalysisTrack('marketplace');
     setSellerDemoRequested(true);
     setSelectedPlatform(platform);
     setCurrentData(data);
-    setActiveTab('overview');
   };
 
   const handleResetData = () => {
     setCurrentData(null);
     setSelectedPlatform(null);
-    setActiveTab('overview');
+  };
+
+  const handleWipeLocalData = async () => {
+    // Stop the active workspace and close its import UI before clearing persisted data.
+    flushSync(() => setWiping(true));
+    try {
+      if (!await wipeAllLocalData()) return false;
+      handleResetData();
+      setSellerDemoRequested(false);
+      setIsUploadOpen(false);
+      setIsModeSelectorOpen(false);
+      setCurrentUser(getSavedGoogleUser());
+      const mode = workspaceMode ?? 'seller';
+      saveWorkspaceMode(mode);
+      setWorkspaceMode(mode);
+      setOpenUploadOnMount(true);
+      setAnalysisTrack('marketplace');
+      window.scrollTo(0, 0);
+      return true;
+    } finally {
+      setWiping(false);
+    }
   };
 
   const handleChangePlatform = () => {
@@ -105,14 +114,13 @@ export default function App() {
           selectedPlatform={selectedPlatform}
           currentUser={currentUser}
           currentTrack={analysisTrack}
-          onChangeTrack={(track) => setAnalysisTrack(track)}
+          onChangeTrack={handleChangeTrack}
           onLogout={handleLogout}
           onOpenLogin={() => {}}
           onResetData={handleResetData}
+          onWipeLocalData={handleWipeLocalData}
           onChangePlatform={handleChangePlatform}
           onOpenUpload={() => setIsUploadOpen(true)}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
           language={language}
           setLanguage={setLanguage}
           workspaceMode={workspaceMode}
@@ -130,7 +138,7 @@ export default function App() {
         ========================================================================= */}
         {analysisTrack === 'portal' && (
           <DualTrackSelector
-            onSelectTrack={(track) => setAnalysisTrack(track)}
+            onSelectTrack={handleChangeTrack}
             onLoadDemoSample={(demoData) => handleLoadSampleData('shopee', demoData)}
             onOpenUpload={() => setIsUploadOpen(true)}
             data={currentData}
@@ -142,7 +150,7 @@ export default function App() {
         {/* =========================================================================
             TRACK 1: PHÂN TÍCH SÀN THƯƠNG MẠI ĐIỆN TỬ (3 SÀN TMĐT: SHOPEE, TIKTOK, LAZADA)
         ========================================================================= */}
-        {sellerMode && (
+        {sellerMode && !wiping && (
           <Suspense fallback={<div className="text-sm text-slate-400 p-8 text-center">{language === 'vi' ? 'Đang tải…' : 'Loading…'}</div>}>
           <SellerWorkspace
             language={language}
@@ -153,13 +161,15 @@ export default function App() {
             legacyPlatform={selectedPlatform}
             startWithDemo={sellerDemoRequested}
             onDemoStarted={() => setSellerDemoRequested(false)}
+            openUploadOnMount={openUploadOnMount}
           />
           </Suspense>
         )}
 
-        {analystMode && (
+        {analystMode && !wiping && (
           <Suspense fallback={<div className="text-sm text-slate-400 p-8 text-center">{language === 'vi' ? 'Đang tải…' : 'Loading…'}</div>}>
             <AnalystWorkspace
+              theme={theme}
               language={language}
               setLanguage={setLanguage}
               onChangeMode={handleSelectWorkspaceMode}
@@ -167,96 +177,15 @@ export default function App() {
               legacyPlatform={selectedPlatform}
               startWithDemo={sellerDemoRequested}
               onDemoStarted={() => setSellerDemoRequested(false)}
-              onOpenClassic={() => setAnalystClassic(true)}
+              openUploadOnMount={openUploadOnMount}
             />
           </Suspense>
-        )}
-
-        {analysisTrack === 'marketplace' && workspaceMode === 'analyst' && analystClassic && (
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-            <span>{language === 'vi' ? 'Bạn đang ở dashboard cổ điển (dữ liệu từ file tải lên ở màn hình này).' : 'You are in the classic dashboard.'}</span>
-            <button onClick={() => setAnalystClassic(false)} className="font-bold text-sky-300 underline underline-offset-2">
-              {language === 'vi' ? '← Quay lại Analyst Workspace' : '← Back to Analyst Workspace'}
-            </button>
-          </div>
-        )}
-
-        {analysisTrack === 'marketplace' && !sellerMode && !analystMode && (
-          <>
-            {!currentData ? (
-              !selectedPlatform ? (
-                /* Step 1: E-commerce Platform Selection Portal */
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="flex items-center justify-between pb-2">
-                    <button
-                      onClick={() => setAnalysisTrack('portal')}
-                      className="inline-flex items-center text-xs font-semibold text-slate-400 hover:text-white px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all group"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5 mr-1.5 transition-transform group-hover:-translate-x-1" />
-                      <span>{language === 'vi' ? 'Quay về Trang chủ' : 'Back to Home'}</span>
-                    </button>
-                    <span className="text-xs font-bold text-sky-400 bg-sky-500/10 px-2.5 py-1 rounded-lg border border-sky-400/20">
-                      🚀 Luồng 1 • Phân hệ Sàn TMĐT
-                    </span>
-                  </div>
-
-                  <EcommercePlatformSelector
-                    onSelectPlatform={handleSelectPlatform}
-                    onLoadSampleData={handleLoadSampleData}
-                    currentUser={currentUser}
-                    language={language}
-                  />
-                </div>
-              ) : (
-                /* Step 2: Drag & Drop / Upload Excel with Platform Context */
-                <EmptyStateUpload
-                  selectedPlatform={selectedPlatform}
-                  onBackToPlatformSelector={() => setSelectedPlatform(null)}
-                  onDataLoaded={handleDataLoaded}
-                  language={language}
-                />
-              )
-            ) : (
-              /* Step 3: Multi-Tab Analytics Dashboard */
-              <Suspense fallback={<div className="text-sm text-slate-400 p-8 text-center">{language === 'vi' ? 'Đang tải…' : 'Loading…'}</div>}>
-                {activeTab === 'overview' && (
-                  <KpiOverviewTab
-                    data={currentData}
-                    onNavigateToTab={setActiveTab}
-                    language={language}
-                  />
-                )}
-
-                {activeTab === 'deep' && (
-                  <DeepAnalyticsTab
-                    data={currentData}
-                    language={language}
-                  />
-                )}
-
-                {activeTab === 'ai' && (
-                  <AiActionCenterTab
-                    data={currentData}
-                    language={language}
-                  />
-                )}
-
-                {activeTab === 'raw' && (
-                  <RawDataTab
-                    data={currentData}
-                    canonical={canonicalData}
-                    language={language}
-                  />
-                )}
-              </Suspense>
-            )}
-          </>
         )}
 
         {/* =========================================================================
             TRACK 2: PHÂN TÍCH TÀI CHÍNH & VẬN HÀNH NỘI BỘ (P&L, COGS, PARETO SKU, TỪ ĐIỂN TMĐT)
         ========================================================================= */}
-        {analysisTrack === 'internal_finance' && (
+        {analysisTrack === 'internal_finance' && !wiping && (
           <Suspense fallback={<div className="text-sm text-slate-400 p-8 text-center">{language === 'vi' ? 'Đang tải…' : 'Loading…'}</div>}>
             <InternalFinanceModule
               onBackToPortal={() => setAnalysisTrack('portal')}

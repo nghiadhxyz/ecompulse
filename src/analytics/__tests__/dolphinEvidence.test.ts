@@ -17,6 +17,20 @@ describe('Dolphin intent routing', () => {
     ['Live nào có conversion thấp?', 'live_conversion'],
     ['Chi phí nào tăng mạnh?', 'cost_increase'],
     ['Sản phẩm nào đang lỗ?', 'losing_products'],
+    ['Shop dạo này bán hàng sao rồi?', 'overview'],
+    ['Doanh thu tụt do đâu vậy?', 'why_change'],
+    ['Sao lợi nhuận lại đi xuống?', 'why_change'],
+    ['Mat hang nao ban chay nhat?', 'best_product'],
+    ['Mặt hàng nào âm lợi nhuận?', 'losing_products'],
+    ['Mã hàng nào bán tốt hơn?', 'growing_skus'],
+    ['Phiên livestream nào ít đơn?', 'live_conversion'],
+    ['Phí sàn đội lên ở đâu?', 'cost_increase'],
+    ['Chạy QC có ổn không?', 'ads'],
+    ['Doanh thu bao nhiêu?', 'metric_summary'],
+    ['Cho mình xem số đơn, kỳ này được mấy đơn?', 'metric_summary'],
+    ['Sale 9 / 9 bị hủy bao nhiêu?', 'campaign_cancel'],
+    ['Tại sao trời mưa hôm qua?', 'unknown'],
+    ['Chào bạn, mình lo về thời tiết', 'unknown'],
     ['thời tiết?', 'unknown'],
   ])('%s → %s', (q, intent) => expect(detectIntent(q).intent).toBe(intent));
 
@@ -27,6 +41,16 @@ describe('Dolphin intent routing', () => {
 });
 
 describe('Dolphin evidence answers', () => {
+  it('answers a typed Vietnamese metric question with the four evidence sections', () => {
+    const question = 'Shop mình kỳ này bán được bao nhiêu tiền?';
+    const a = askDolphin(demo, question, ctx);
+    expect(a.question).toBe(question);
+    expect(a.intent).toBe('metric_summary');
+    expect(a.insight.vi).toContain('GMV');
+    expect(a.evidence[0]).toMatchObject({ current: expect.any(Number), filter: { range: ctx.range } });
+    expect(a.interpretation.vi).toContain('Kỳ so sánh');
+    expect(a.nextChecks[0].vi).toContain('thay đổi');
+  });
   it('explains GMV with the root-cause path and no causal claim', () => {
     const a = askDolphin(demo, 'Tại sao GMV tăng?', ctx);
     expect(a.insight.vi).toContain('GMV');

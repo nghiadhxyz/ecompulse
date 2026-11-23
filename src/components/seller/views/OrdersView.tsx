@@ -84,9 +84,9 @@ export const OrdersView: React.FC = () => {
   return (
     <div className="space-y-4">
       <Section title={vi ? 'Tình trạng đơn hàng' : 'Order lifecycle'} subtitle={`${formatRangeVi(range)}, ${fmtCount(L.total, lang)} ${vi ? 'đơn' : 'orders'}`}>
-        <ol className="grid grid-cols-2 border-y border-line sm:grid-cols-3 lg:grid-cols-5" aria-label={vi ? 'Các bước của đơn hàng' : 'Order steps'}>
+        <ol className="seller-order-status grid grid-cols-2 border-y border-line sm:grid-cols-3 lg:grid-cols-5" aria-label={vi ? 'Các bước của đơn hàng' : 'Order steps'}>
           {flow.map((s, i) => (
-            <li key={s.key} className="relative border-line max-lg:border-b max-lg:[&:nth-last-child(-n+1)]:border-b-0 lg:border-l lg:first:border-l-0">
+            <li key={s.key} data-status={s.key} className="relative border-line max-lg:border-b max-lg:[&:nth-last-child(-n+1)]:border-b-0 lg:border-l lg:first:border-l-0">
               <button
                 type="button"
                 onClick={() => openEvidence({ title: vi ? s.vi : s.en, filter: { range, platforms, statuses: [...s.statuses] } })}
@@ -100,7 +100,7 @@ export const OrdersView: React.FC = () => {
             </li>
           ))}
         </ol>
-        <ul className="mt-4 grid grid-cols-3 border-y border-line" aria-label={vi ? 'Đơn không hoàn tất' : 'Exits'}>
+        <ul className="seller-order-status seller-order-exits mt-4 grid grid-cols-3 border-y border-line" aria-label={vi ? 'Đơn không hoàn tất' : 'Exits'}>
           {exits.map((s) => (
             <li key={s.key} className="border-l border-line first:border-l-0">
               <button
@@ -118,7 +118,7 @@ export const OrdersView: React.FC = () => {
             </li>
           ))}
         </ul>
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
+        <div className="seller-order-rates mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
           <span>
             {vi ? 'Tỷ lệ hủy' : 'Cancel rate'}: <b className="font-semibold tabular text-fg">{fmtRate(health.cancelRate, lang)}</b>
           </span>

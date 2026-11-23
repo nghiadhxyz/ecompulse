@@ -119,11 +119,19 @@ export const SubsidyPanel: React.FC = () => {
 
 // ------------------------------------------------------------------ B2
 
-export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange; title?: string; excludeDates?: Set<string> }> = ({ before, after, title, excludeDates }) => {
+export const SourceDriversPanel: React.FC<{ before: DateRange; after: DateRange; title?: string; excludeDates?: Set<string>; showEmpty?: boolean }> = ({ before, after, title, excludeDates, showEmpty }) => {
   const { lang, dataset, platforms } = useWorkspace();
   const vi = lang === 'vi';
   const d = useMemo(() => sourceDrivers(dataset, before, after, { platforms, excludeDates }), [dataset, before, after, platforms, excludeDates]);
-  if (!(dataset.salesSummaries ?? []).some((r) => r.dimension === 'source' && r.periodStart === undefined)) return null;
+  if (!(dataset.salesSummaries ?? []).some((r) => r.dimension === 'source' && r.periodStart === undefined)) {
+    return showEmpty ? (
+      <div className="overview-source-empty">
+        <Section title={title ?? (vi ? 'Nguồn doanh số' : 'Sales sources')}>
+          <NotEnoughData lang={lang} reason={vi ? 'Cần báo cáo theo nguồn để so sánh doanh số.' : 'A source breakdown report is needed to compare sales.'} />
+        </Section>
+      </div>
+    ) : null;
+  }
   const top = d.sources.filter((s) => Math.abs(s.delta) >= 1).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 8);
   // A share of a small total change is noise: the column shows only when the total moved ≥ 20% (9.2).
   const totalChange = d.available ? d.after.gmvPerDay - d.before.gmvPerDay : 0;
@@ -368,8 +376,8 @@ export const CustomerTrendPanel: React.FC = () => {
                 <YAxis tick={axisProps.tick} width={32} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip {...tooltipProps} formatter={(v: number, n: string) => [fmtCount(v, lang), `${n === 'newBuyers' ? (vi ? 'Mới' : 'New') : vi ? 'Hiện tại' : 'Existing'}${summed}`]} />
                 <Legend formatter={(n: string) => `${n === 'newBuyers' ? (vi ? 'Người mua mới' : 'New') : vi ? 'Người mua hiện tại' : 'Existing'}${summed}`} wrapperStyle={{ fontSize: 11 }} />
-                <Bar isAnimationActive={false} dataKey="newBuyers" stackId="b" fill={CHART.primary} maxBarSize={20} />
-                <Bar isAnimationActive={false} dataKey="existingBuyers" stackId="b" fill={CHART.muted} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <Bar isAnimationActive={false} dataKey="newBuyers" stackId="b" fill={CHART.bar} maxBarSize={20} />
+                <Bar isAnimationActive={false} dataKey="existingBuyers" stackId="b" fill={CHART.barSecondary} radius={[4, 4, 0, 0]} maxBarSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -10,7 +10,6 @@ import {
   Gauge,
   GitBranch,
   HeartPulse,
-  LayoutDashboard,
   LayoutGrid,
   Loader2,
   Megaphone,
@@ -54,6 +53,7 @@ import { EvidenceDrawer } from '../seller/EvidenceDrawer';
 import { GhostButton, PrimaryButton } from '../seller/ui';
 import { DolphinView } from '../seller/views/DolphinView';
 import { DataView } from '../seller/views/DataView';
+import { AffiliateDolphin, TikTokAffiliatePanel } from '../workspace/TikTokAffiliatePanel';
 import { SettingsView } from '../seller/views/SettingsView';
 import { DataQualityPanel } from '../data/DataQualityPanel';
 import { AnalystFilterBar, type AnalystCompare } from './AnalystFilterBar';
@@ -83,6 +83,7 @@ import { PageTitle } from '../ui/primitives';
 import { PlanningProvider, usePlanningState } from '../workspace/usePlanning';
 
 interface Props {
+  theme: 'light' | 'dark';
   language: Lang;
   setLanguage: (l: Lang) => void;
   onChangeMode: (m: WorkspaceMode) => void;
@@ -90,12 +91,11 @@ interface Props {
   legacyPlatform: string | null;
   startWithDemo?: boolean;
   onDemoStarted?: () => void;
-  /** Opens the classic dashboard (legacy tabs, What-If, roadmap). */
-  onOpenClassic: () => void;
+  openUploadOnMount?: boolean;
 }
 
 interface NavItem {
-  key: AnalystView | string;
+  key: AnalystView;
   vi: string;
   en: string;
   icon: LucideIcon;
@@ -103,7 +103,6 @@ interface NavItem {
   descVi?: string;
   /** Planned in a later phase — shown but not clickable. */
   phase?: number;
-  classic?: boolean;
 }
 
 const GROUPS: { vi: string; en: string; items: NavItem[] }[] = [
@@ -171,11 +170,11 @@ const ALL_ITEMS = [...GROUPS.flatMap((g) => g.items), ...DATA_ITEMS];
 
 const ANALYTICS_VIEWS: AnalystView[] = ['overview', 'alerts', 'category', 'productsCombo', 'revenueProfit', 'orderHealth', 'funnel', 'campaign', 'ads', 'keywords', 'live', 'video', 'rootCause', 'anomaly', 'changeImpact', 'planning', 'actions', 'reports', 'customers', 'whatIf', 'stats', 'mapping', 'dataQuality'];
 
-export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted, onOpenClassic }) => {
+export const AnalystWorkspace: React.FC<Props> = ({ theme, language: lang, setLanguage, onChangeMode, legacyData, legacyPlatform, startWithDemo, onDemoStarted, openUploadOnMount }) => {
   const vi = lang === 'vi';
   const ws = useWorkspaceData({ legacyData, legacyPlatform, startWithDemo, onDemoStarted });
   const { loading, dataset, bounds } = ws;
-  const [view, setView] = useState<AnalystView>('overview');
+  const [view, setView] = useState<AnalystView>(openUploadOnMount ? 'dataHub' : 'overview');
   const [focus, setFocus] = useState<Partial<DatasetFilter> | null>(null);
   const [preset, setPreset] = useState<PeriodPreset>('last30');
   const [custom, setCustom] = useState<DateRange | null>(null);
@@ -240,6 +239,11 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
   );
 
   const renderView = () => {
+    const affiliateRows = dataset?.tiktokAffiliateOrders;
+    const affiliateView = view === 'overview' ? 'overview' : view === 'productsCombo' ? 'products'
+      : view === 'ads' || view === 'live' || view === 'video' ? 'adsLive' : null;
+    const affiliatePanel = affiliateView && affiliateRows?.length
+      ? <TikTokAffiliatePanel key={view} rows={affiliateRows} lang={lang} view={affiliateView} /> : null;
     if (loading) {
       return (
         <div className="bg-surface border border-line shadow-card rounded-2xl p-10 text-center text-sm text-fg" aria-live="polite">
@@ -249,12 +253,17 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
       );
     }
     if (view === 'dataHub') {
-      return <DataView lang={lang} dataset={dataset} sourceKind={ws.sourceKind} onOutcome={ws.applyImport} onLoadDemo={ws.loadDemo} onClear={ws.clear} persisted={ws.persisted} />;
+      return <DataView lang={lang} dataset={dataset} sourceKind={ws.sourceKind} onOutcome={ws.applyImport} onLoadDemo={ws.loadDemo} onClear={ws.clear} persisted={ws.persisted}
+        onAffiliateComplete={() => setView((current) => current === 'dataHub' ? 'overview' : current)} />;
     }
     if (view === 'settings') {
       return <SettingsView lang={lang} dataset={dataset} settings={ws.costSettings} onChange={ws.updateSettings} workspaceMode="analyst" onChangeMode={onChangeMode} onChangeLanguage={setLanguage} />;
     }
     if (!dataset || !bounds || !resolved || !baseFilter) {
+      if (affiliatePanel) return affiliatePanel;
+      if (view === 'alerts' && dataset?.tiktokAffiliateOrders?.length) {
+        return <AffiliateDolphin rows={dataset.tiktokAffiliateOrders} lang={lang} context={{ vi: 'Toàn bộ dữ liệu TikTok Affiliate đã nhập', en: 'All imported TikTok Affiliate data' }} />;
+      }
       return (
         <div className="rounded-card border border-line bg-surface p-6 text-center sm:p-10">
           <h2 className="text-card-title text-fg">{vi ? 'Chưa có dữ liệu để phân tích' : 'No data to analyze yet'}</h2>
@@ -328,7 +337,8 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
             />
           )}
           <ViewErrorBoundary lang={lang} key={view}>
-            {view === 'overview' && <ExecutiveOverview />}
+            {affiliatePanel && <div className="mb-4">{affiliatePanel}</div>}
+            {view === 'overview' && <ExecutiveOverview light={theme === 'light'} />}
             {view === 'alerts' && <DolphinView key={bounds.end} />}
             {view === 'category' && <CategoryIntelligence />}
             {view === 'productsCombo' && <ProductsCombo />}
@@ -366,10 +376,11 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
       <button
         key={item.key}
         type="button"
-        onClick={() => (item.classic ? onOpenClassic() : goTo(item.key as AnalystView))}
+        onClick={() => goTo(item.key)}
         aria-current={active ? 'page' : undefined}
+        aria-label={label}
         title={collapsed ? label : vi && item.en !== item.vi ? item.en : undefined}
-        className={`flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-sm transition-colors ${
+        className={`workspace-nav-item flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-sm transition-colors ${
           active ? 'bg-primary-soft font-semibold text-primary' : 'font-medium text-fg/80 hover:bg-hover hover:text-fg'
         } ${collapsed ? 'justify-center px-0' : ''}`}
       >
@@ -385,12 +396,12 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
   const current = ALL_ITEMS.find((i) => i.key === view);
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-6" data-analyst-view={view}>
       <aside
         className={`hidden shrink-0 transition-[width] lg:block ${collapsed ? 'w-[72px]' : 'w-[248px]'}`}
         aria-label={vi ? 'Điều hướng Analyst' : 'Analyst navigation'}
       >
-        <nav className="sticky top-20 flex max-h-[calc(100vh-6rem)] flex-col border-r border-line pr-3">
+        <nav className="workspace-nav sticky top-20 flex max-h-[calc(100vh-6rem)] flex-col border-r border-line pr-3">
           <div className="flex-1 space-y-4 overflow-y-auto">
             {GROUPS.map((g) => (
               <div key={g.en}>
@@ -409,7 +420,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
                 type="button"
                 onClick={() => goTo('dataQuality')}
                 title={vi ? 'Mở trang Chất lượng dữ liệu' : 'Open Data Quality'}
-                className={`flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-small text-muted hover:bg-hover hover:text-fg ${collapsed ? 'justify-center px-0' : ''}`}
+                className={`workspace-nav-item flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-small text-muted hover:bg-hover hover:text-fg ${collapsed ? 'justify-center px-0' : ''}`}
               >
                 <Database className="h-4 w-4 shrink-0" aria-hidden />
                 {!collapsed && (
@@ -421,19 +432,10 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
             )}
             <button
               type="button"
-              onClick={onOpenClassic}
-              title={vi ? 'Dashboard cổ điển' : 'Classic dashboard'}
-              className={`flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-small text-muted hover:bg-hover hover:text-fg ${collapsed ? 'justify-center px-0' : ''}`}
-            >
-              <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden />
-              {!collapsed && <span className="truncate">{vi ? 'Dashboard cổ điển' : 'Classic dashboard'}</span>}
-            </button>
-            <button
-              type="button"
               onClick={() => setCollapsed(!collapsed)}
               aria-label={collapsed ? (vi ? 'Mở rộng thanh bên' : 'Expand sidebar') : vi ? 'Thu gọn thanh bên' : 'Collapse sidebar'}
               title={collapsed ? (vi ? 'Mở rộng' : 'Expand') : vi ? 'Thu gọn' : 'Collapse'}
-              className={`flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-small text-muted hover:bg-hover hover:text-fg ${collapsed ? 'justify-center px-0' : ''}`}
+              className={`workspace-nav-item flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-small text-muted hover:bg-hover hover:text-fg ${collapsed ? 'justify-center px-0' : ''}`}
             >
               {collapsed ? <PanelLeftOpen className="h-4 w-4" aria-hidden /> : <PanelLeftClose className="h-4 w-4" aria-hidden />}
               {!collapsed && <span>{vi ? 'Thu gọn' : 'Collapse'}</span>}
@@ -460,7 +462,7 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
         {menuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={vi ? 'Menu phân tích' : 'Analyst menu'}>
             <button type="button" className="absolute inset-0 bg-overlay" aria-label={vi ? 'Đóng menu' : 'Close menu'} onClick={() => setMenuOpen(false)} />
-            <nav className="absolute inset-y-0 left-0 flex w-[min(320px,88vw)] flex-col bg-bg p-4">
+            <nav className="workspace-nav absolute inset-y-0 left-0 flex w-[min(320px,88vw)] flex-col bg-bg p-4">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-card-title text-fg">{vi ? 'Phân tích' : 'Analyst'}</span>
                 <button
@@ -479,17 +481,15 @@ export const AnalystWorkspace: React.FC<Props> = ({ language: lang, setLanguage,
                     <div className="space-y-0.5">{g.items.map(navButton)}</div>
                   </div>
                 ))}
-                <button type="button" onClick={onOpenClassic} className="flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-small text-muted hover:bg-hover hover:text-fg">
-                  <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden />
-                  {vi ? 'Dashboard cổ điển' : 'Classic dashboard'}
-                </button>
               </div>
             </nav>
           </div>
         )}
         {current && (
-          <div className="mb-6">
-            <PageTitle title={vi ? current.vi : current.en} description={vi ? current.descVi : undefined} />
+          <div className="analyst-page-heading mb-6">
+            <PageTitle title={vi ? current.vi : current.en} description={view === 'overview' && theme === 'light'
+              ? vi ? 'Điều gì đã thay đổi? Có cần điều chỉnh vận hành không?' : 'What changed, and does it warrant an operational adjustment?'
+              : vi ? current.descVi : undefined} />
           </div>
         )}
         {renderView()}

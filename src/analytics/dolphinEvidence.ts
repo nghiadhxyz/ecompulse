@@ -23,9 +23,11 @@ import { addDays, enumerateDays, formatRangeVi, type DateRange } from './period'
 import { fmtByUnit, fmtChange, fmtDay, fmtMoneyCompact, fmtMultiple, fmtPp, fmtRate, sessionDateLabel } from './format';
 import type { Bilingual } from './metric';
 import type { Evidence } from './evidence';
+import { askAffiliateDolphin, isAffiliateQuestion } from './tiktokAffiliate';
 
 export type DolphinIntent =
   | 'overview'
+  | 'metric_summary'
   | 'why_change'
   | 'growing_skus'
   | 'best_product'
@@ -34,6 +36,7 @@ export type DolphinIntent =
   | 'cost_increase'
   | 'losing_products'
   | 'ads'
+  | 'affiliate'
   | 'unknown';
 
 export interface DolphinAnswer {
@@ -58,41 +61,50 @@ function norm(q: string): string {
   return q
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/đ/g, 'd');
+    .replace(/\p{M}/gu, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
-const has = (q: string, ...words: string[]) => words.some((w) => q.includes(w));
+const has = (q: string, ...phrases: string[]) => phrases.some((phrase) => ` ${q} `.includes(` ${phrase} `));
+
+const METRIC_PHRASES = [
+  ['cancelRate', ['huy', 'cancel', 'cancellation']],
+  ['refundRate', ['hoan tra', 'tra hoan', 'hoan hang', 'hoan tien', 'tra hang', 'refund', 'refunds']],
+  ['margin', ['margin', 'bien loi', 'bien ln', 'ty suat loi nhuan']],
+  ['profit', ['loi nhuan', 'profit', 'lai rong', 'tien lai', 'loi duoc', 'lai duoc']],
+  ['aov', ['aov', 'gia tri don', 'gia tri trung binh moi don', 'gia tri don trung binh']],
+  ['cvr', ['cvr', 'chuyen doi', 'conversion']],
+  ['orders', ['so don', 'don hang', 'orders', 'bao nhieu don', 'may don']],
+  ['gmv', ['gmv', 'doanh thu', 'doanh so', 'revenue', 'ban duoc bao nhieu tien']],
+] as const satisfies readonly (readonly [RootCauseMetric, readonly string[]])[];
 
 export function detectIntent(question: string): { intent: DolphinIntent; metric?: RootCauseMetric; campaignHint?: string } {
   const q = norm(question);
-  const metric: RootCauseMetric | undefined = has(q, 'huy', 'cancel')
-    ? 'cancelRate'
-    : has(q, 'hoan', 'tra hang', 'refund')
-      ? 'refundRate'
-      : has(q, 'margin', 'bien loi')
-        ? 'margin'
-        : has(q, 'loi nhuan', 'profit', ' lai', 'lai ')
-          ? 'profit'
-          : has(q, 'aov', 'gia tri don', 'gio hang')
-            ? 'aov'
-            : has(q, 'cvr', 'chuyen doi', 'conversion')
-              ? 'cvr'
-              : has(q, 'so don', 'don hang', 'orders')
-                ? 'orders'
-                : has(q, 'gmv', 'doanh thu', 'doanh so', 'revenue')
-                  ? 'gmv'
-                  : undefined;
-  const campaign = /(\d{1,2})[.\/](\d{1,2})/.exec(q);
-  if (has(q, 'live') && has(q, 'chuyen doi', 'conversion', 'cvr', 'thap', 'kem')) return { intent: 'live_conversion' };
-  if (campaign && has(q, 'huy', 'cancel')) return { intent: 'campaign_cancel', campaignHint: `${Number(campaign[1])}.${Number(campaign[2])}` };
-  if (has(q, 'chi phi') && has(q, 'tang', 'nhieu', 'manh')) return { intent: 'cost_increase' };
-  if (has(q, 'tai sao', 'vi sao', 'nguyen nhan', 'tai vi', 'why')) return { intent: 'why_change', metric: metric ?? 'gmv' };
-  if (has(q, 'tot nhat', 'best', 'chu luc')) return { intent: 'best_product' };
-  if (has(q, 'lo ', ' lo', 'dang lo', 'thua lo', 'losing')) return { intent: 'losing_products' };
-  if ((has(q, 'sku', 'san pham') && has(q, 'tang', 'growth', 'tang truong')) || has(q, 'co hoi')) return { intent: 'growing_skus' };
-  if (has(q, 'quang cao', 'ads', 'roas')) return { intent: 'ads' };
-  if (has(q, 'the nao', 'ra sao', 'tong quan', 'tinh hinh', 'sao roi', 'on khong', 'thang nay', 'tuan nay', 'hom qua')) return { intent: 'overview' };
+  const metric = METRIC_PHRASES.find(([, phrases]) => has(q, ...phrases))?.[0];
+  const campaign = /\b(\d{1,2})\s*[./]\s*(\d{1,2})\b/.exec(question);
+  const product = has(q, 'sku', 'san pham', 'mat hang', 'mon nao', 'ma hang', 'sp', 'products', 'product');
+  const change = has(q, 'tang', 'giam', 'bien dong', 'thay doi', 'tut', 'sut', 'di xuong', 'drop', 'increase', 'decrease');
+  const why = has(q, 'tai sao', 'vi sao', 'nguyen nhan', 'tai vi', 'do dau', 'ly do', 'why') ||
+    (change && has(q, 'sao', 'giai thich'));
+  if (has(q, 'live', 'livestream', 'live stream', 'phat truc tiep') &&
+      has(q, 'chuyen doi', 'conversion', 'cvr', 'thap', 'kem', 'it don', 'khong ra don', 'e don')) return { intent: 'live_conversion' };
+  if (campaign && metric === 'cancelRate') return { intent: 'campaign_cancel', campaignHint: `${Number(campaign[1])}.${Number(campaign[2])}` };
+  if (has(q, 'chi phi', 'phi san', 'tien von', 'gia von', 'cost', 'costs') &&
+      has(q, 'tang', 'nhieu', 'manh', 'doi len', 'cao hon', 'increase', 'rose')) return { intent: 'cost_increase' };
+  if (has(q, 'quang cao', 'ads', 'roas', 'chay qc', 'quang cao tra phi')) return { intent: 'ads' };
+  if (product && has(q, 'lo', 'thua lo', 'am von', 'am loi nhuan', 'khong co lai', 'losing')) return { intent: 'losing_products' };
+  if (has(q, 'tot nhat', 'best', 'chu luc', 'ban chay', 'ban nhieu nhat', 'best seller') ||
+      (product && has(q, 'cao nhat', 'loi nhat', 'lai nhat', 'top'))) return { intent: 'best_product' };
+  if ((product && has(q, 'tang', 'growth', 'tang truong', 'len manh', 'ban tot hon')) ||
+      has(q, 'co hoi')) return { intent: 'growing_skus' };
+  if (metric && why) return { intent: 'why_change', metric };
+  if (metric && (change || has(q, 'bao nhieu', 'may don', 'la bao nhieu', 'duoc may', 'how much', 'how many') ||
+      q.split(' ').length <= 3)) return { intent: 'metric_summary', metric };
+  if (has(q, 'tong quan', 'tinh hinh', 'ket qua kinh doanh', 'bao cao kinh doanh', 'overview') ||
+      ((metric || has(q, 'shop', 'cua hang', 'kinh doanh', 'ban hang')) &&
+      has(q, 'the nao', 'ra sao', 'sao roi', 'on khong', 'thang nay', 'tuan nay', 'hom qua', 'ky nay'))) return { intent: 'overview' };
   return { intent: 'unknown' };
 }
 
@@ -140,6 +152,18 @@ function findCampaign(dataset: CanonicalDataset, hint: string): CalendarEntry | 
 }
 
 export function askDolphin(dataset: CanonicalDataset, question: string, ctx: DolphinContext): DolphinAnswer {
+  if (dataset.tiktokAffiliateOrders?.length) {
+    const affiliateOnly = dataset.orders.length === 0 && dataset.dailyMetrics.length === 0;
+    const affiliate = askAffiliateDolphin(dataset.tiktokAffiliateOrders, question, {
+      vi: 'TikTok Affiliate · toàn bộ dữ liệu đã nhập. Dùng bộ lọc trong báo cáo Affiliate để chọn kỳ',
+      en: 'TikTok Affiliate · all imported data. Use the Affiliate report filters to select a period',
+    }, affiliateOnly);
+    if (affiliate) return answer('affiliate', question, affiliate);
+    if (isAffiliateQuestion(question)) return noData('affiliate', question, {
+      vi: 'Câu hỏi này chưa đối chiếu được từ báo cáo Affiliate. Bạn có thể hỏi về GMV, hoa hồng, sản phẩm, hoàn tiền hoặc trạng thái quyết toán.',
+      en: 'The Affiliate report cannot answer this question. Try asking about GMV, commission, products, refunds or settlement status.',
+    });
+  }
   const { intent, metric, campaignHint } = detectIntent(question);
   const filter: DatasetFilter = { range: ctx.range, platforms: ctx.platforms };
   const period = `${formatRangeVi(ctx.range)} so với ${formatRangeVi(ctx.previousRange)}`;
@@ -157,6 +181,45 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
   }
 
   switch (intent) {
+    case 'metric_summary': {
+      const key = metric ?? 'gmv';
+      const spec = ROOT_CAUSE_METRICS[key];
+      const comparison = compareRanges(dataset, filter, ctx.previousRange);
+      const result = comparison.current.metrics[key];
+      const change = comparison.metrics[key];
+      if (change.current === null) return noData(intent, question, result.notes?.[0] ?? {
+        vi: 'Kỳ đang chọn chưa có đủ dữ liệu cho chỉ số này.',
+        en: 'The selected period lacks data for this metric.',
+      });
+      const label = result.label ?? spec.label;
+      const formatted = (lang: 'vi' | 'en') => fmtByUnit(change.current, spec.unit, lang);
+      const delta = (lang: 'vi' | 'en') => spec.unit === 'ratio'
+        ? fmtPp(change.percentagePointDelta ?? null, lang)
+        : fmtChange(change.percentageDelta, lang);
+      return answer(intent, question, {
+        insight: {
+          vi: `${label.vi} kỳ ${formatRangeVi(ctx.range)}: ${formatted('vi')}.`,
+          en: `${label.en} for ${formatRangeVi(ctx.range)}: ${formatted('en')}.`,
+        },
+        evidence: [{
+          label, unit: spec.unit, current: change.current,
+          currentLabel: { vi: 'Kỳ này', en: 'Current' }, baseline: change.previous,
+          baselineLabel: { vi: 'Kỳ so sánh', en: 'Comparison' },
+          filter: { ...baseEv, cancelledOnly: key === 'cancelRate' || undefined },
+        }],
+        interpretation: change.previous === null ? {
+          vi: 'Chưa có số liệu kỳ so sánh cho chỉ số này.',
+          en: 'No comparison value is available for this metric.',
+        } : {
+          vi: `Kỳ so sánh ${formatRangeVi(ctx.previousRange)}: ${fmtByUnit(change.previous, spec.unit)}. Thay đổi: ${delta('vi')}.`,
+          en: `Comparison period ${formatRangeVi(ctx.previousRange)}: ${fmtByUnit(change.previous, spec.unit, 'en')}. Change: ${delta('en')}.`,
+        },
+        nextChecks: [{
+          vi: `Hỏi “Vì sao ${spec.label.vi.toLowerCase()} thay đổi?” để xem các phần đóng góp.`,
+          en: `Ask “Why did ${spec.label.en.toLowerCase()} change?” to see the breakdown.`,
+        }],
+      });
+    }
     case 'overview': {
       const cmp = compareRanges(dataset, filter, ctx.previousRange);
       const m = cmp.metrics;
@@ -430,7 +493,7 @@ export function askDolphin(dataset: CanonicalDataset, question: string, ctx: Dol
       return answer('unknown', question, {
         insight: { vi: 'Dolphin chưa hiểu câu hỏi này.', en: 'Dolphin did not understand this question.' },
         evidence: [],
-        interpretation: { vi: 'Dolphin chỉ trả lời từ số liệu đã tính trong EcomPulse (không đoán). Hãy thử một câu hỏi gợi ý bên dưới.', en: 'Dolphin answers only from computed numbers. Try a suggested question.' },
+        interpretation: { vi: 'Hãy nêu rõ chỉ số hoặc chủ đề cần xem, ví dụ “Số đơn bao nhiêu?”, “Doanh thu tụt do đâu?” hoặc “Mặt hàng nào đang lỗ?”.', en: 'Name the metric or topic you want to investigate, such as “How many orders?” or “Why did revenue drop?”.' },
         nextChecks: [],
       });
   }

@@ -163,7 +163,7 @@ export const AdsIntelligenceView: React.FC = () => {
                 <XAxis dataKey="label" tick={axisProps.tick} tickLine={false} minTickGap={16} axisLine={{ stroke: CHART.grid }} />
                 <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} tick={axisProps.tick} width={64} tickLine={false} axisLine={false} />
                 <Tooltip {...tooltipProps} cursor={{ fill: 'var(--hover)' }} formatter={(v: number) => [fmtMoney(v, lang), vi ? 'Chi phí' : 'Spend']} />
-                <Bar isAnimationActive={false} dataKey="spend" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <Bar isAnimationActive={false} dataKey="spend" fill={CHART.bar} radius={[4, 4, 0, 0]} maxBarSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>

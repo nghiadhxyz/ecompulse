@@ -1,15 +1,20 @@
 import type { SheetReadInfo } from '../../../analytics/importers/shopeeSalesAnalysis';
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { UploadCloud, FileSpreadsheet, X, Loader2, ShieldCheck, Trash2, PlayCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { formatRangeVi, PLATFORM_LABELS, REPORT_KIND_LABELS, type CanonicalDataset, type Lang } from '../../../analytics';
 import { DataQualityPanel } from '../../data/DataQualityPanel';
 import { startImport, type ImportHandle, type ImportOutcome } from '../importClient';
 import { GhostButton, NotEnoughData, PrimaryButton, Section } from '../ui';
+import { TikTokAffiliatePanel } from '../../workspace/TikTokAffiliatePanel';
+import { AFFILIATE_HEADERS, type AffiliateColumnMapping } from '../../../analytics/importers/tiktokAffiliate';
 
 export interface ImportLogEntry {
   fileName: string;
   outcome: ImportOutcome | { type: 'cancelled' } | { type: 'legacy_summary'; ok: boolean; message?: string; sheets?: SheetReadInfo[]; period?: { start: string; end: string } | null };
 }
+
+type AffiliateMappingPreview = Extract<ImportOutcome, { type: 'tiktok_affiliate_mapping' }>;
+type AffiliateDecision = AffiliateColumnMapping | null;
 
 interface DataViewProps {
   lang: Lang;
@@ -20,6 +25,10 @@ interface DataViewProps {
   onLoadDemo: () => void;
   onClear: () => void;
   persisted: boolean;
+  initialFiles?: File[] | null;
+  onInitialFilesStarted?: () => void;
+  onImportComplete?: () => void;
+  onAffiliateComplete?: () => void;
 }
 
 const STAGE: Record<string, { vi: string; en: string }> = {
@@ -28,7 +37,7 @@ const STAGE: Record<string, { vi: string; en: string }> = {
   mapping: { vi: 'Đang chuẩn hóa đơn hàng', en: 'Mapping orders' },
 };
 
-export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, onOutcome, onLoadDemo, onClear, persisted }) => {
+export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, onOutcome, onLoadDemo, onClear, persisted, initialFiles, onInitialFilesStarted, onImportComplete, onAffiliateComplete }) => {
   const vi = lang === 'vi';
   const inputRef = useRef<HTMLInputElement>(null);
   const [queue, setQueue] = useState<{ name: string; stage: string; fraction: number } | null>(null);
@@ -36,25 +45,104 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
   const [dragging, setDragging] = useState(false);
   const handleRef = useRef<ImportHandle | null>(null);
   const cancelledRef = useRef(false);
+  const startedInitialFiles = useRef<File[] | null>(null);
+  const decisionRef = useRef<((decision: AffiliateDecision) => void) | null>(null);
+  const mountedRef = useRef(true);
+  const [affiliatePreview, setAffiliatePreview] = useState<AffiliateMappingPreview | null>(null);
 
-  const runFiles = async (files: FileList | File[]) => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (handleRef.current) {
+        cancelledRef.current = true;
+        handleRef.current.cancel();
+      }
+      if (decisionRef.current) {
+        cancelledRef.current = true;
+        decisionRef.current(null);
+        decisionRef.current = null;
+      }
+    };
+  }, []);
+
+  const finishAffiliateMapping = (decision: AffiliateDecision) => {
+    decisionRef.current?.(decision);
+    decisionRef.current = null;
+    setAffiliatePreview(null);
+  };
+
+  const runFiles = useCallback(async (files: FileList | File[], onComplete?: () => void) => {
+    if (handleRef.current || !files.length) return;
     cancelledRef.current = false;
+    let allSucceeded = true;
+    let hasAffiliate = false;
+    let affiliateNeedsReview = false;
     for (const file of Array.from(files)) {
       if (cancelledRef.current) break;
       setQueue({ name: file.name, stage: 'reading', fraction: 0 });
-      const handle = startImport(file, (stage, fraction) => setQueue({ name: file.name, stage, fraction }));
-      handleRef.current = handle;
-      const outcome = await handle.result;
-      const applied = outcome.type === 'cancelled' || outcome.type === 'error' ? outcome : await onOutcome(file, outcome);
+      let applied: ImportLogEntry['outcome'];
+      try {
+        const read = (mapping?: AffiliateColumnMapping) => {
+          const handle = startImport(file, (stage, fraction) => setQueue({ name: file.name, stage, fraction }), mapping);
+          handleRef.current = handle;
+          return handle.result;
+        };
+        const reviewMapping = (preview: AffiliateMappingPreview) => {
+          if (!mountedRef.current || cancelledRef.current) return Promise.resolve(null);
+          return new Promise<AffiliateDecision>((resolve) => {
+            decisionRef.current = resolve;
+            setAffiliatePreview(preview);
+          });
+        };
+        let outcome = await read();
+        if (outcome.type === 'tiktok_affiliate_mapping') {
+          hasAffiliate = true;
+          const mapping = await reviewMapping(outcome);
+          outcome = mapping ? await read(mapping) : { type: 'cancelled' };
+        }
+        if (!mountedRef.current || cancelledRef.current) {
+          applied = { type: 'cancelled' };
+        } else if (outcome.type === 'tiktok_affiliate_orders') {
+          hasAffiliate = true;
+          applied = await onOutcome(file, outcome);
+          if (applied.type === 'tiktok_affiliate_orders') {
+            affiliateNeedsReview ||= Boolean(applied.result.invalid || applied.result.invalidValues || applied.result.conflicts || applied.mergeConflicts);
+          }
+        } else {
+          applied = outcome.type === 'cancelled' || outcome.type === 'error' ? outcome : await onOutcome(file, outcome);
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        applied = { type: 'error', message: { vi: `Lỗi nhập file: ${detail}`, en: `Import failed: ${detail}` } };
+      }
+      if (applied.type === 'cancelled' || applied.type === 'error' || (applied.type === 'legacy_summary' && !applied.ok)) allSucceeded = false;
       setLog((l) => [{ fileName: file.name, outcome: applied }, ...l]);
     }
     handleRef.current = null;
     setQueue(null);
-  };
+    if (allSucceeded && !affiliateNeedsReview && !cancelledRef.current && mountedRef.current) {
+      if (hasAffiliate) onAffiliateComplete?.();
+      else onComplete?.();
+    }
+  }, [onOutcome, onAffiliateComplete]);
+
+  useEffect(() => {
+    if (!initialFiles?.length || startedInitialFiles.current === initialFiles) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active || startedInitialFiles.current === initialFiles) return;
+      startedInitialFiles.current = initialFiles;
+      onInitialFilesStarted?.();
+      void runFiles(initialFiles, onImportComplete);
+    });
+    return () => { active = false; };
+  }, [initialFiles, onInitialFilesStarted, onImportComplete, runFiles]);
 
   const cancel = () => {
     cancelledRef.current = true;
     handleRef.current?.cancel();
+    finishAffiliateMapping(null);
   };
 
   return (
@@ -76,7 +164,9 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
           }}
           className={`rounded-card border-2 border-dashed p-8 text-center transition-colors ${dragging ? 'border-primary bg-primary-soft' : 'border-line bg-surface-2'}`}
         >
-          {queue ? (
+          {affiliatePreview ? (
+            <AffiliateMappingForm preview={affiliatePreview} lang={lang} onDecision={finishAffiliateMapping} />
+          ) : queue ? (
             <div className="mx-auto max-w-md" aria-live="polite">
               <div className="flex items-center justify-center gap-2 text-sm text-fg">
                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
@@ -95,8 +185,8 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
               <p className="mt-2 text-sm font-semibold text-fg">{vi ? 'Kéo thả file vào đây hoặc chọn file' : 'Drop files here or choose files'}</p>
               <p className="mx-auto mt-1 max-w-lg text-small text-muted">
                 {vi
-                  ? 'File .xlsx hoặc .csv của Shopee, TikTok Shop, Lazada: file xuất đơn hàng, báo cáo quảng cáo, báo cáo từ khóa quảng cáo, livestream, hiệu quả sản phẩm (traffic), affiliate/video, Phân tích bán hàng Shopee, danh mục sản phẩm (SKU, ngành hàng, nhóm hàng, giá vốn). Có thể chọn nhiều file cùng lúc.'
-                  : 'Supported (Shopee, TikTok Shop, Lazada, .xlsx/.csv): orders, ads, ad keywords, live, product traffic, affiliate/video, Shopee sales analysis, product catalog (SKU + category / niche / COGS). Multiple files allowed.'}
+                  ? 'File .xlsx hoặc .csv của Shopee, TikTok Shop, Lazada: file xuất đơn hàng, báo cáo quảng cáo, từ khóa, livestream, hiệu quả sản phẩm, affiliate/video, TikTok Affiliate, Phân tích bán hàng Shopee và danh mục sản phẩm. Có thể chọn nhiều file cùng lúc.'
+                  : 'Supported (Shopee, TikTok Shop, Lazada, .xlsx/.csv): orders, ads, ad keywords, live, product traffic, affiliate/video, TikTok Affiliate, Shopee sales analysis and product catalog. Multiple files allowed.'}
               </p>
               <PrimaryButton className="mt-4" onClick={() => inputRef.current?.click()}>
                 <FileSpreadsheet className="h-4 w-4" aria-hidden /> {vi ? 'Chọn file' : 'Choose files'}
@@ -124,6 +214,8 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
           </ul>
         )}
       </Section>
+
+      {!!dataset?.tiktokAffiliateOrders?.length && <TikTokAffiliatePanel rows={dataset.tiktokAffiliateOrders} lang={lang} />}
 
       <Section
         title={vi ? 'Dữ liệu đang dùng' : 'Current data'}
@@ -177,6 +269,35 @@ export const DataView: React.FC<DataViewProps> = ({ lang, dataset, sourceKind, o
     </div>
   );
 };
+
+function AffiliateMappingForm({ preview, lang, onDecision }: {
+  preview: AffiliateMappingPreview; lang: Lang; onDecision: (decision: AffiliateDecision) => void;
+}) {
+  const vi = lang === 'vi';
+  const [mapping, setMapping] = useState<AffiliateColumnMapping>({});
+  return (
+    <div className="mx-auto max-w-lg space-y-3 text-left text-sm text-fg">
+      <p className="font-semibold">{vi ? 'Xác nhận cột TikTok Affiliate' : 'Verify the TikTok Affiliate columns'}</p>
+      <p className="text-muted">{vi ? 'Tiêu đề cột thiếu hoặc trùng. Chọn đúng cột trong file để tiếp tục kiểm tra.' : 'Some headers are missing or repeated. Select the corresponding columns to validate the file.'}</p>
+      {preview.fields.map((field) => (
+        <label key={field} className="flex flex-col gap-1">
+          {AFFILIATE_HEADERS[field]}
+          <select className="min-h-10 rounded-control border border-line bg-surface px-2" value={mapping[field] ?? ''}
+            onChange={(e) => setMapping((current) => ({ ...current, [field]: e.target.value === '' ? undefined : Number(e.target.value) }))}>
+            <option value="">{vi ? 'Chọn cột' : 'Choose column'}</option>
+            {preview.headers.map((header, index) => header.trim() && !preview.used.includes(index) && (
+              <option key={index} value={index} disabled={mapping[field] !== index && Object.values(mapping).includes(index)}>{index + 1}. {header}</option>
+            ))}
+          </select>
+        </label>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        <PrimaryButton disabled={preview.fields.some((field) => mapping[field] === undefined)} onClick={() => onDecision(mapping)}>{vi ? 'Kiểm tra ánh xạ' : 'Validate mapping'}</PrimaryButton>
+        <GhostButton onClick={() => onDecision(null)}>{vi ? 'Bỏ qua file' : 'Skip file'}</GhostButton>
+      </div>
+    </div>
+  );
+}
 
 const SHEET_KIND_LABELS: Record<SheetReadInfo['kind'], { vi: string; en: string }> = {
   daily_shop: { vi: 'số liệu shop theo ngày', en: 'daily shop totals' },
@@ -249,7 +370,22 @@ const ImportResultCard: React.FC<{ entry: ImportLogEntry; lang: Lang }> = ({ ent
       </li>
     );
   }
-  if (o.type === 'shopee_summary') return null;
+  if (o.type === 'shopee_summary' || o.type === 'tiktok_affiliate_mapping') return null;
+  if (o.type === 'tiktok_affiliate_orders') {
+    const conflicts = o.result.conflicts + (o.mergeConflicts ?? 0);
+    return (
+      <li className="rounded-control border border-line px-3 py-2.5 text-sm text-muted">
+        <b className="font-semibold text-fg">{entry.fileName}</b> · TikTok Affiliate
+        <a className="ml-2 font-semibold text-primary hover:underline" href="#tiktok-affiliate-report">{vi ? 'Xem báo cáo' : 'View report'}</a>
+        {(o.result.invalid > 0 || o.result.invalidValues > 0) && (
+          <p className="text-warn">{vi
+            ? `${o.result.invalid} dòng bị bỏ qua, ${o.result.invalidValues} ô không hợp lệ được giữ trống.`
+            : `${o.result.invalid} skipped rows and ${o.result.invalidValues} invalid cells left blank.`}</p>
+        )}
+        {conflicts > 0 && <p className="text-warn">{vi ? `${conflicts} khóa đơn/SKU xung đột. Dòng đã có được giữ để tránh ghi đè nhầm.` : `${conflicts} conflicting order/SKU keys. Existing rows were kept.`}</p>}
+      </li>
+    );
+  }
   if (o.type === 'report') {
     const r = o.result;
     const ok = r.stats.imported > 0;

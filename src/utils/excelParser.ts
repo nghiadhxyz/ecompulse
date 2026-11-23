@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { detectTikTokAffiliate } from '../analytics/importers/tiktokAffiliate';
 import {
   OrderItem,
   ParsedStoreData,
@@ -650,6 +651,17 @@ export async function parseShopeeExcelFile(file: File): Promise<ParsedStoreData>
   const sheetNames = workbook.SheetNames;
   if (!sheetNames || sheetNames.length === 0) {
     throw new Error('File Excel rỗng hoặc không có sheet hợp lệ.');
+  }
+
+  const headerSamples = sheetNames.flatMap((name) => {
+    const sheet = workbook.Sheets[name];
+    if (!sheet['!ref']) return [];
+    const range = XLSX.utils.decode_range(sheet['!ref']);
+    range.e.r = Math.min(range.e.r, range.s.r + 19);
+    return [{ name, rows: XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, range, defval: '' }) }];
+  });
+  if (detectTikTokAffiliate(headerSamples)) {
+    throw new Error('Đây là báo cáo TikTok Affiliate. Vào Dữ liệu trong Seller hoặc Analyst để nhập và xem hoa hồng.');
   }
 
   // Check if this is a Standardized Universal Workbook (7 Sheets: sales_daily, traffic_source... or legacy 4 Sheets)

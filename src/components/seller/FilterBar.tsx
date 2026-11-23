@@ -39,7 +39,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ lang, preset, onPreset, cu
   const [open, setOpen] = useState(false);
   const presetLabel = PRESETS.find((p) => p.key === preset);
   return (
-    <div className="sticky top-16 z-20 rounded-card border border-line bg-surface px-3 py-2">
+    <div className="workspace-filter sticky top-16 z-20 rounded-card border border-line bg-surface px-3 py-2">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-11 w-full items-center gap-2 text-left text-sm lg:hidden">
         <CalendarDays className="h-4 w-4 shrink-0 text-muted" aria-hidden />
         <span className="min-w-0 flex-1 truncate">

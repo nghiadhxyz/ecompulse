@@ -248,18 +248,20 @@ const MissingLine: React.FC<{ items: KpiItem[]; lang: Lang }> = ({ items, lang }
  * a large narrow figure, the change. `accentFirst` paints the first figure in the accent —
  * the one highlight of the page.
  */
-export const FigureStrip: React.FC<{ items: KpiItem[]; lang: Lang; compareLabel?: string; accentFirst?: boolean }> = ({ items, lang, compareLabel, accentFirst }) => {
-  const shown = items.filter((i) => i.metric.value !== null);
+export const FigureStrip: React.FC<{ items: KpiItem[]; lang: Lang; compareLabel?: string; accentFirst?: boolean; showMissing?: boolean }> = ({ items, lang, compareLabel, accentFirst, showMissing }) => {
+  const shown = showMissing ? items : items.filter((i) => i.metric.value !== null);
   return (
     <div className="space-y-2">
-      <dl className="grid grid-cols-2 gap-y-6 border-y border-line py-5 lg:grid-cols-4">
+      <dl className="workspace-figures grid grid-cols-2 gap-y-6 border-y border-line py-5 lg:grid-cols-4">
         {shown.map((i, n) => (
           <div key={i.key} className={`min-w-0 border-line ${n % 2 === 1 ? 'border-l pl-4' : 'pr-4'} lg:border-l lg:px-6 lg:first:border-l-0 lg:first:pl-0`}>
             <dt>
               <MetricLabel item={i} lang={lang} />
             </dt>
             <dd className={`mt-1 text-kpi lg:text-figure ${accentFirst && n === 0 ? 'text-accent' : 'text-fg'}`}>{fmtByUnit(i.metric.value, i.metric.unit, lang, true)}</dd>
-            {i.cmp && (
+            {i.metric.value === null ? (
+              <dd className="mt-2 text-small text-muted">{i.metric.notes?.[0]?.[lang] ?? (lang === 'vi' ? 'Chưa đủ dữ liệu' : 'Not enough data')}</dd>
+            ) : i.cmp && (
               <dd className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 <DeltaBadge cmp={i.cmp} lang={lang} goodWhenUp={i.goodWhenUp} />
                 {compareLabel && i.cmp.direction !== 'unknown' && <span className="text-small text-muted">{compareLabel}</span>}
@@ -269,7 +271,7 @@ export const FigureStrip: React.FC<{ items: KpiItem[]; lang: Lang; compareLabel?
           </div>
         ))}
       </dl>
-      <MissingLine items={items} lang={lang} />
+      <MissingLine items={showMissing ? items.filter((i) => i.missingAction) : items} lang={lang} />
     </div>
   );
 };
@@ -308,7 +310,7 @@ export const MetricLedger: React.FC<{ items: KpiItem[]; lang: Lang; title?: stri
   return (
     <div className="space-y-2">
       {title && <h2 className="text-card-title text-fg">{title}</h2>}
-      <dl className="grid grid-cols-1 gap-x-10 md:grid-cols-2">
+      <dl className="workspace-ledger grid grid-cols-1 gap-x-10 md:grid-cols-2">
         {shown.map((i) => (
           <div key={i.key} className="flex min-h-12 items-center justify-between gap-3 border-b border-line py-2">
             <dt className="min-w-0">

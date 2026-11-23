@@ -90,7 +90,7 @@ export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ dataset, lan
               const Icon = style.icon;
               return (
                 <li key={c.key} className="rounded-control border border-line px-3 py-2.5">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm font-medium text-fg">{t(c.label)}</span>
                     <Badge tone={style.tone} icon={<Icon className="h-3 w-3" aria-hidden />}>
                       {vi ? style.vi : style.en}

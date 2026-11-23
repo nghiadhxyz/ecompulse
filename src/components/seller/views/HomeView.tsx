@@ -25,6 +25,8 @@ import { ChartTotalNote } from '../../workspace/MismatchBox';
 import { SubsidyPanel } from '../../workspace/SummaryInsightPanels';
 import { AlertStack, FigureStrip, MetricLedger, type KpiItem } from '../../ui/data';
 import { CHART, axisProps, gridProps, tooltipProps } from '../../../theme/chart';
+import { PageTitle } from '../../ui/primitives';
+import '../../../styles/executive-overview-light.css';
 
 
 function sumMetrics(a: MetricResult, b: MetricResult): MetricResult {
@@ -57,10 +59,11 @@ export const HomeView: React.FC = () => {
   const primary: KpiItem[] = [
     { key: 'gmv', label: vi ? 'Doanh thu' : 'Revenue', metric: k.gmv, cmp: c.gmv },
     { key: 'netRevenue', label: vi ? 'Doanh thu thực nhận' : 'Net revenue', metric: k.netRevenue, cmp: c.netRevenue, definition: vi ? 'Doanh thu − doanh số hủy − tiền hoàn cho khách' : 'Revenue − cancelled sales − refunds' },
-    { key: 'profit', label: vi ? 'Lợi nhuận ước tính' : 'Est. profit', metric: k.profit, cmp: c.profit, missingAction: { label: vi ? 'Nhập giá vốn' : 'Enter COGS', onClick: () => goTo('settings') } },
     { key: 'orders', label: vi ? 'Đơn hàng' : 'Orders', metric: k.orders, cmp: c.orders },
+    { key: 'roas', label: 'ROAS', metric: k.roas, cmp: c.roas, definition: vi ? 'Doanh thu quy đổi từ quảng cáo ÷ chi phí quảng cáo' : 'Ad-attributed revenue ÷ ad spend' },
   ];
   const secondary: KpiItem[] = [
+    { key: 'profit', label: vi ? 'Lợi nhuận ước tính' : 'Est. profit', metric: k.profit, cmp: c.profit, missingAction: { label: vi ? 'Nhập giá vốn' : 'Enter COGS', onClick: () => goTo('settings') } },
     { key: 'margin', label: vi ? 'Biên lợi nhuận' : 'Margin', metric: k.margin, cmp: c.margin },
     { key: 'units', label: vi ? 'Sản phẩm bán ra' : 'Units sold', metric: k.units, cmp: c.units },
     { key: 'aov', label: vi ? 'Giá trị trung bình mỗi đơn' : 'AOV', metric: k.aov, cmp: c.aov },
@@ -83,7 +86,10 @@ export const HomeView: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="seller-overview space-y-8">
+      <div className="seller-overview-heading hidden">
+        <PageTitle title={vi ? 'Tổng quan' : 'Overview'} description={formatRangeVi(range)} />
+      </div>
       <AlertStack
         lang={lang}
         items={
@@ -101,13 +107,13 @@ export const HomeView: React.FC = () => {
       />
       <BriefLead dataset={dataset} asOf={asOf} platforms={platforms} lang={lang} onOpen={() => goTo('dolphin')} />
 
-      <section aria-label={vi ? 'Chỉ số chính của kỳ' : 'Headline figures'} className="space-y-6">
-        <FigureStrip items={primary} lang={lang} compareLabel={compareLabel} accentFirst />
+      <section aria-label={vi ? 'Chỉ số chính của kỳ' : 'Headline figures'} className="overview-metrics space-y-6">
+        <FigureStrip items={primary} lang={lang} compareLabel={compareLabel} accentFirst showMissing />
         <MetricLedger items={secondary} lang={lang} title={vi ? 'Chỉ số khác' : 'Other metrics'} />
       </section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-        <div className="xl:col-span-3">
+      <div className="overview-charts grid grid-cols-1 xl:grid-cols-5 gap-4">
+        <div className="overview-revenue xl:col-span-3">
           <Section title={vi ? 'Doanh thu theo ngày' : 'Daily revenue'} subtitle={formatRangeVi(range)}>
             {series.length <= 1 ? (
               <p className="text-sm text-muted">{vi ? 'Chọn khoảng từ 2 ngày trở lên để xem xu hướng.' : 'Pick 2+ days to see a trend.'}</p>
@@ -124,7 +130,7 @@ export const HomeView: React.FC = () => {
                       cursor={{ fill: 'var(--hover)' }}
                       formatter={(v: number) => [fmtMoney(v, lang), vi ? 'Doanh thu' : 'Revenue']}
                     />
-                    <Bar isAnimationActive={false} dataKey="gmv" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    <Bar isAnimationActive={false} dataKey="gmv" fill={CHART.bar} radius={[4, 4, 0, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -132,7 +138,7 @@ export const HomeView: React.FC = () => {
             <ChartTotalNote chartTotal={series.reduce((s, p) => s + (p.gmv ?? 0), 0)} kpi={k.gmv.value} lang={lang} tolerance={moneyTolerance(k.gmv.value ?? 0)} />
           </Section>
         </div>
-        <div className="xl:col-span-2">
+        <div className="overview-alerts xl:col-span-2">
           <Section
             title={vi ? 'Cảnh báo' : 'Alerts'}
             subtitle={vi ? `Tính đến ngày ${fmtDay(alertDay)}` : `As of ${fmtDay(alertDay)}`}
@@ -149,7 +155,7 @@ export const HomeView: React.FC = () => {
             ) : (
               <ul className="space-y-2.5">
                 {topAlerts.map((a) => (
-                  <li key={a.id} className="rounded-control border border-line p-3">
+                  <li key={a.id} data-severity={a.severity} className="rounded-control border border-line p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="text-sm font-semibold leading-snug text-fg">{tr(lang, a.title)}</div>
                       <SeverityBadge severity={a.severity} lang={lang} />

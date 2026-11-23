@@ -118,6 +118,8 @@
 
   /* Multi-series palette: Xanh 500k first; blue third so it never sits next to the teal */
   --chart-1: #0b6a85;
+  --chart-bar: #38bdf8;
+  --chart-bar-secondary: #0369a1;
   --chart-2: #ea580c;
   --chart-3: #2563eb;
   --chart-4: #7c3aed;
@@ -136,37 +138,43 @@
   --overlay: rgba(23, 34, 30, 0.45);
 }
 
-/* ---------- DARK workspace theme (option) ---------- */
+/* Dark workspace palette. The light workspace and legacy pages use their own tokens. */
 .ep-app[data-theme='dark'] {
-  --bg: #0e1513;
-  --surface: #151e1b;
-  --surface-2: #1a2522;
-  --border: #26332f;
-  --text: #e6ece9; /* 14.2:1 */
-  --text-muted: #9daba5; /* 7.1:1 */
+  --bg: #080d1f;
+  --navigation: #0c132b;
+  --surface: #111a33;
+  --surface-2: #141e38;
+  --hover: #172241;
+  --border: #273451;
+  --text: #f8fafc;
+  --text-muted: #a7b4cc;
+  --text-tertiary: #8796b3;
 
-  --primary: #5bb8d1; /* 7.5:1 */
-  --primary-soft: #12313a;
-  --primary-contrast: #0e1513;
-  --accent: #e58bbe;
+  --primary: #13bff2;
+  --primary-soft: #14334b;
+  --primary-contrast: #080d1f;
+  --accent: #a78bfa;
 
-  --up: #5bd48a;
-  --up-soft: #12291b;
-  --down: #fb923c;
-  --down-soft: #2e1a0c;
-  --note-soft: #1c2724;
+  --up: #34d399;
+  --up-soft: #102c2a;
+  --down: #f87171;
+  --down-soft: #322032;
+  --mismatch: var(--down);
+  --mismatch-soft: var(--down-soft);
+  --note: var(--text-muted);
+  --note-soft: var(--surface-2);
+  --warn: #fbbf24;
+  --warn-soft: #2c281f;
+  --info: #7dd3fc;
+  --info-soft: #11283d;
 
-  --chart-1: #5bb8d1;
-  --chart-3: #60a5fa;
-  --chart-6: #e58bbe;
-  --chart-grid: #1f2a27;
-  --chart-axis: #9daba5;
-  --chart-sale-band: #18221f;
-  --chart-tooltip-bg: #151e1b;
-
-  --card-shadow: none;
-  --hover: #1c2724;
-  --overlay: rgba(0, 0, 0, 0.6);
+  --chart-1: var(--primary);
+  --chart-grid: var(--border);
+  --chart-axis: var(--text-muted);
+  --chart-anomaly: var(--warn);
+  --chart-sale-band: var(--surface-2);
+  --chart-tooltip-bg: var(--navigation);
+  --overlay: rgb(3 7 19 / 76%);
 }
 
 /* ---------- Type, spacing, radii (shared by both workspace themes) ---------- */
@@ -303,4 +311,296 @@
 }
 .ep-app[data-theme='dark'] {
   color-scheme: dark;
+}
+
+/* Workspace dark mode */
+.ep-app[data-theme='dark'] {
+  --font-text: 'Inter', system-ui, sans-serif;
+  --font-figure: var(--font-text);
+  --figure-stretch: normal;
+
+  .text-page {
+    font-size: clamp(1.5rem, 2vw, 1.75rem);
+    line-height: 1.25;
+  }
+
+  .text-lead,
+  .text-body {
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .workspace-header,
+  .workspace-nav {
+    background: var(--navigation);
+  }
+
+  .seller-nav button {
+    color: var(--text-muted);
+  }
+
+  .workspace-nav button[aria-current='page'] {
+    background: var(--primary-soft);
+    color: var(--primary);
+    box-shadow: inset 0 -2px var(--primary);
+  }
+
+  .seller-nav button:not([aria-current]):hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  /* Collapsed Analyst navigation uses icons as the control labels. */
+  .seller-nav button > svg,
+  .workspace-nav-item:has(.truncate) > svg,
+  .workspace-header :is(#nav-track-marketplace, #nav-track-internal-finance) > svg,
+  .workspace-filter .lucide-calendar-days,
+  .seller-overview .lucide-wallet,
+  .lucide-lightbulb[aria-hidden='true'],
+  .lucide-upload-cloud,
+  .lucide-circle-play,
+  .lucide-sparkles,
+  .workspace-badge > svg[aria-hidden='true'],
+  .workspace-empty-icon,
+  .overview-alerts :is(.lucide-arrow-right, .lucide-chevron-right),
+  .dolphin-decoration {
+    display: none;
+  }
+
+  .workspace-filter [aria-pressed='true'] {
+    background: var(--primary);
+    color: var(--primary-contrast);
+  }
+
+  .workspace-brief {
+    max-width: none;
+    padding: clamp(1rem, 2vw, 1.5rem);
+    border: 1px solid var(--border);
+    border-inline-start: 2px solid var(--primary);
+    border-radius: var(--radius-panel);
+    background: var(--surface);
+  }
+
+  .workspace-brief h2 {
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .workspace-brief .text-lead {
+    max-width: 90ch;
+    margin-top: 0.5rem;
+  }
+
+  .seller-overview,
+  .overview-metrics {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .seller-overview > *,
+  .overview-metrics > * {
+    min-width: 0;
+    margin-block: 0;
+  }
+
+  .overview-metrics .workspace-figures {
+    gap: var(--space-4);
+    border: 0;
+    padding: 0;
+  }
+
+  .overview-metrics .workspace-figures > div {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(0.75rem, 2vw, 1.5rem);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    background: var(--surface);
+  }
+
+  .overview-metrics .workspace-figures dt span {
+    white-space: normal;
+  }
+
+  .overview-metrics .workspace-figures .text-kpi {
+    color: var(--text);
+    font-size: clamp(1.75rem, 2.6vw, 2.25rem);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .overview-metrics .workspace-figures > div > dd:nth-child(3) {
+    margin-top: auto;
+    padding-top: var(--space-2);
+  }
+
+  .overview-metrics .workspace-ledger {
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    background: var(--surface);
+  }
+
+  .overview-metrics .workspace-ledger > div {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-content: start;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .overview-metrics .workspace-ledger dt {
+    flex-basis: 100%;
+  }
+
+  .overview-metrics .workspace-ledger dd {
+    flex-wrap: wrap;
+    flex-shrink: 1;
+  }
+
+  .seller-product-highlights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+    gap: var(--space-3);
+    border: 0;
+  }
+
+  .seller-product-highlights > li {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    background: var(--surface-2);
+  }
+
+  .seller-product-highlights button {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-2);
+    border-radius: var(--radius-panel);
+    text-align: center;
+  }
+
+  .seller-product-highlights button:disabled {
+    background: transparent;
+  }
+
+  .seller-product-highlights .lucide-trophy {
+    display: none;
+  }
+
+  .product-highlight-name {
+    order: 1;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .product-highlight-value {
+    color: var(--primary);
+    font-family: var(--font-text);
+    font-size: clamp(1.375rem, 2.3vw, 1.875rem);
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .seller-order-status button {
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .seller-order-status .text-kpi {
+    font-size: clamp(1.375rem, 2.4vw, 1.875rem);
+    line-height: 1.25;
+  }
+
+  .seller-order-status [data-status='completed'] button {
+    background: var(--up-soft);
+  }
+
+  .seller-order-status [data-status='completed'] button:hover {
+    background: var(--hover);
+  }
+
+  .seller-order-status [data-status='completed'] .text-kpi,
+  .seller-order-rates > :last-child b {
+    color: var(--up);
+  }
+
+  .seller-order-exits .text-kpi,
+  .seller-order-rates > :not(:last-child) b {
+    color: var(--down);
+  }
+
+  .seller-order-rates {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .overview-charts > div {
+    min-width: 0;
+  }
+
+  .overview-charts > div > section {
+    height: 100%;
+  }
+
+  .overview-alerts li[data-severity] {
+    --alert-border: var(--text-tertiary);
+    border-inline-start: 2px solid var(--alert-border);
+  }
+
+  .overview-alerts li[data-severity='critical'] {
+    --alert-border: var(--down);
+  }
+
+  .overview-alerts li[data-severity='opportunity'] {
+    --alert-border: var(--up);
+  }
+
+  .overview-alerts li[data-severity='warning'] {
+    --alert-border: var(--warn);
+  }
+
+  .overview-alerts li[data-severity] > div:first-child {
+    flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 64rem) {
+  .ep-app[data-theme='dark'] .overview-metrics .workspace-ledger {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .ep-app[data-theme='dark'] .overview-metrics .workspace-ledger > div {
+    border-bottom: 0;
+  }
+
+  .ep-app[data-theme='dark'] .overview-metrics .workspace-ledger > div + div {
+    border-inline-start: 1px solid var(--border);
+  }
+
+  .ep-app[data-theme='dark'] .overview-charts {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .ep-app[data-theme='dark'] .overview-revenue {
+    grid-column: span 8;
+  }
+
+  .ep-app[data-theme='dark'] .overview-alerts {
+    grid-column: span 4;
+  }
+}
+
+@media (max-width: 24rem) {
+  .ep-app[data-theme='dark'] .overview-metrics .workspace-figures {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

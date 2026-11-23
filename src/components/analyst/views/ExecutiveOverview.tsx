@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import React, { useId, useMemo } from 'react';
+import { Area, CartesianGrid, ComposedChart, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   breakdown,
   compareRanges,
@@ -19,6 +19,7 @@ import { axisProps, CHART, gridProps, legendProps, tooltipProps, xAxisProps } fr
 import { SourceDriversPanel, SubsidyPanel } from '../../workspace/SummaryInsightPanels';
 import { ChartTotalNote } from '../../workspace/MismatchBox';
 import { BreakdownTable, ChangeCell } from '../ui';
+import '../../../styles/executive-overview-light.css';
 
 /** The four headline figures; the rest go to the ledger below them. */
 const PRIMARY: KpiKey[] = ['gmv', 'netRevenue', 'profit', 'orders'];
@@ -38,9 +39,11 @@ const KPIS: { key: KpiKey; vi: string; en: string; goodWhenUp?: boolean; defVi?:
   { key: 'buyers', vi: 'Người mua', en: 'Buyers', defVi: 'Số người mua khác nhau, gồm cả người có đơn hủy.' },
 ];
 
-export const ExecutiveOverview: React.FC = () => {
+export const ExecutiveOverview: React.FC<{ light: boolean }> = ({ light }) => {
   const { lang, dataset, asOf, platforms, baseFilter, range, previousRange, goTo } = useWorkspace();
   const vi = lang === 'vi';
+  const areaId = useId();
+  const TrendChart = light ? ComposedChart : LineChart;
   const cmp = useMemo(() => compareRanges(dataset, baseFilter, previousRange), [dataset, baseFilter, previousRange]);
   const cur = useMemo(() => dailySeries(dataset, baseFilter), [dataset, baseFilter]);
   const prev = useMemo(() => dailySeries(dataset, { ...baseFilter, range: previousRange }), [dataset, baseFilter, previousRange]);
@@ -78,7 +81,7 @@ export const ExecutiveOverview: React.FC = () => {
   const secondary = kpiItems.filter((k) => !PRIMARY.includes(k.key as KpiKey));
 
   return (
-    <div className="space-y-8">
+    <div className="executive-overview space-y-8">
       <AlertStack items={alerts} lang={lang} label={(n) => (vi ? `${n} lưu ý về kỳ so sánh` : `${n} notes on the comparison`)} />
 
       <BriefLead dataset={dataset} asOf={asOf} platforms={platforms} lang={lang} onOpen={() => goTo('alerts')} />
@@ -100,14 +103,21 @@ export const ExecutiveOverview: React.FC = () => {
             <ChartTotalNote chartTotal={cur.reduce((s, p) => s + (p.gmv ?? 0), 0)} kpi={cmp.current.metrics.gmv.value} lang={lang} tolerance={moneyTolerance(cmp.current.metrics.gmv.value ?? 0)} />
           )}
           {chart.length > 1 && (
-            <div className="mt-4 h-64" role="img" aria-label={vi ? 'GMV theo ngày: kỳ này và kỳ so sánh' : 'Daily GMV: current vs comparison'}>
+            <div className="overview-trend mt-4 h-64" role="img" aria-label={vi ? 'GMV theo ngày: kỳ này và kỳ so sánh' : 'Daily GMV: current vs comparison'}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <TrendChart data={chart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  {light && <defs>
+                    <linearGradient id={areaId} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={CHART.primary} stopOpacity="var(--overview-area-opacity, 0)" />
+                      <stop offset="100%" stopColor={CHART.primary} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>}
                   <CartesianGrid {...gridProps} />
                   <XAxis dataKey="label" {...xAxisProps} />
                   <YAxis tickFormatter={(v: number) => fmtMoneyCompact(v, lang)} {...axisProps} width={64} />
                   <Tooltip {...tooltipProps} formatter={(v: number, name: string) => [fmtMoney(v, lang), name]} />
                   <Legend {...legendProps} />
+                  {light && <Area isAnimationActive={false} type="monotone" dataKey="current" fill={`url(#${areaId})`} stroke="none" tooltipType="none" legendType="none" activeDot={false} connectNulls />}
                   <Line isAnimationActive={false} type="monotone" dataKey="current" name={vi ? `Kỳ này (${formatRangeVi(range)})` : `Current (${formatRangeVi(range)})`} stroke={CHART.primary} strokeWidth={2} dot={false} connectNulls />
                   <Line
                     isAnimationActive={false}
@@ -121,20 +131,20 @@ export const ExecutiveOverview: React.FC = () => {
                     dot={false}
                     connectNulls
                   />
-                </LineChart>
+                </TrendChart>
               </ResponsiveContainer>
             </div>
           )}
         </SectionCard>
 
-        <SectionCard span={12} title={vi ? 'Thay đổi nằm ở sàn nào?' : 'Where — by platform'} description={vi ? 'Đóng góp Δ = phần của thay đổi GMV toàn shop do sàn đó tạo ra' : 'Contribution = share of the total GMV change'}>
+        <SectionCard className="overview-breakdown" span={12} title={vi ? 'Thay đổi nằm ở sàn nào?' : 'Where — by platform'} description={vi ? 'Đóng góp Δ = phần của thay đổi GMV toàn shop do sàn đó tạo ra' : 'Contribution = share of the total GMV change'}>
           {byPlatform.unavailable ? (
             <NotEnoughData lang={lang} reason={tr(lang, byPlatform.unavailable)} />
           ) : (
             <BreakdownTable rows={byPlatform.rows} lang={lang} firstHeader={vi ? 'Sàn' : 'Platform'} columns={['gmv', 'gmvChange', 'contribution', 'profit', 'margin', 'cancel']} />
           )}
         </SectionCard>
-        <SectionCard span={12} title={vi ? 'Ngành hàng nào đóng góp?' : 'What contributed — by category'} description={vi ? 'Bấm một ngành để xem nhóm hàng và SKU bên trong' : 'Click to drill into niche → SKU'}>
+        <SectionCard className="overview-breakdown" span={12} title={vi ? 'Ngành hàng nào đóng góp?' : 'What contributed — by category'} description={vi ? 'Bấm một ngành để xem nhóm hàng và SKU bên trong' : 'Click to drill into niche → SKU'}>
           {byCategory.unavailable ? (
             <NotEnoughData lang={lang} reason={tr(lang, byCategory.unavailable)} />
           ) : (
@@ -150,6 +160,7 @@ export const ExecutiveOverview: React.FC = () => {
 
         {negatives.length > 0 && (
           <SectionCard
+            className="overview-investigation"
             span={12}
             title={vi ? 'Nên xem kỹ chỗ nào?' : 'What to investigate'}
             notes={[vi ? 'Đây là phân rã đóng góp, không phải nguyên nhân. Đi sâu theo ngành/SKU để tìm yếu tố đi cùng.' : 'This is a contribution breakdown, not a cause.']}
@@ -168,10 +179,10 @@ export const ExecutiveOverview: React.FC = () => {
             </ul>
           </SectionCard>
         )}
-        <div className="col-span-12">
-          <SourceDriversPanel before={previousRange} after={range} title={vi ? 'Doanh số thay đổi do kênh hoặc nguồn nào?' : 'Which channel / source moved sales (vs comparison period)'} />
+        <div className="overview-breakdown overview-source col-span-12">
+          <SourceDriversPanel before={previousRange} after={range} title={vi ? 'Doanh số thay đổi do kênh hoặc nguồn nào?' : 'Which channel / source moved sales (vs comparison period)'} showEmpty={light} />
         </div>
-        <div className="col-span-12">
+        <div className="overview-subsidy col-span-12">
           <SubsidyPanel />
         </div>
       </CardGrid>

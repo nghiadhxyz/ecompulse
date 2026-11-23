@@ -73,7 +73,7 @@ export const ProductsView: React.FC = () => {
   return (
     <div className="space-y-4">
       <Section title={vi ? '“Sản phẩm tốt nhất” theo từng tiêu chí' : '“Best product” by criterion'} subtitle={vi ? 'Mỗi tiêu chí có thể là một sản phẩm khác nhau' : 'Each criterion may be a different product'}>
-        <ul className="divide-y divide-line border-y border-line">
+        <ul className="seller-product-highlights divide-y divide-line border-y border-line">
           {leaderItems.map((l) => (
             <li key={l.label}>
               <button
@@ -86,8 +86,8 @@ export const ProductsView: React.FC = () => {
                 <span className="col-start-1 row-start-1 flex items-center gap-1.5 text-small text-muted">
                   <Trophy className="h-3.5 w-3.5 shrink-0" aria-hidden /> {l.label}
                 </span>
-                <span className="col-span-2 row-start-2 truncate text-sm font-medium text-fg sm:col-span-1 sm:col-start-2 sm:row-start-1">{l.row ? l.row.name : vi ? 'Không đủ dữ liệu' : 'Not enough data'}</span>
-                <span className="col-start-2 row-start-1 text-right font-figure text-lg font-semibold tabular text-fg font-stretch-85% sm:col-start-3">{l.row ? l.value : ''}</span>
+                <span className="product-highlight-name col-span-2 row-start-2 truncate text-sm font-medium text-fg sm:col-span-1 sm:col-start-2 sm:row-start-1">{l.row ? l.row.name : vi ? 'Không đủ dữ liệu' : 'Not enough data'}</span>
+                <span className="product-highlight-value col-start-2 row-start-1 text-right font-figure text-lg font-semibold tabular text-fg font-stretch-85% sm:col-start-3">{l.row ? l.value : ''}</span>
               </button>
             </li>
           ))}

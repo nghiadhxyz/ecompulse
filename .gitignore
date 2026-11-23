@@ -10,6 +10,10 @@ coverage/
 
 # Real sample exports (may contain customer data) — never commit
 samples/
+affiliate_orders_*.xlsx
+*.xlsx
+!Báo cáo mẫu.xlsx
+
 
 # Redesign screenshots (before/after) stay local — only the README is committed
 docs/redesign/*
